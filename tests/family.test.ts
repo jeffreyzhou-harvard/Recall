@@ -5,6 +5,7 @@ import { buildFixtureRig, runJudgedPath } from "@/fixtures/harness";
 import { buildTopicRecord, type OutcomeRow } from "@/lib/family/record";
 import { FamilyView } from "@/lib/family/projection";
 import type { GraphData } from "@/lib/graph/types";
+import { SetupStore, dashboardAccess } from "@/lib/tools/policy";
 import { ACCOUNTS_DIFFER, CAPTURE_AND_CONFIRM, HER_LINE, OPENING, SAID, policyWith, run } from "./helpers";
 
 const REDIRECT = "Susan's talked about this before. Want to give her a call?";
@@ -103,7 +104,7 @@ describe("the whitelist projection (tools 14-17)", () => {
   it("never includes text from a contribution she did not say yes to sharing", async () => {
     const kept = await run([...OPENING, ["her", "Cape May...?"], ["recall", SAID.rung2], ["her", "I'm not sure."], ["recall", SAID.rung3], ["her", "Maya, my daughter!"], ["recall", SAID.elaborate], ...CAPTURE_AND_CONFIRM("Yes.", "No.")]);
     expect((await kept.graph.nodesOfType("Contribution"))[0]!.props).toMatchObject({ literal_transcript: HER_LINE, shared: false });
-    expect(await new FamilyView(kept.graph, "person:susan").sharedLines("2000-01-01T00:00:00.000Z", "person:maya")).toEqual([]);
+    expect(await new FamilyView(kept.graph, "person:susan").sharedLines("person:maya")).toEqual([]);
     expect(JSON.stringify(await kept.service.weeklyNote("person:maya"))).not.toContain("every summer");
   });
 });
@@ -218,6 +219,17 @@ describe("Tell Recall about a memory", () => {
     rig.setup.revokeContributor("person:priya", rig.clock.iso());
     expect(await rig.service.tellRecallAMemory(tell("And a bicycle.", "person:priya"))).toEqual({ status: "refused", reason: "contributor_not_approved" });
     expect(await rig.service.tellRecallAMemory(tell("Hello.", "person:stranger"))).toEqual({ status: "refused", reason: "contributor_not_approved" });
+  });
+
+  it("revoking a contributor who also has the family view ends both, and keeps the revoked grant on the record", async () => {
+    const granted = { member_id: "person:priya", detail_level: "weekly_note" as const, granted_at: "2026-10-12T15:00:00.000Z", revoked_at: null };
+    const rig = await buildFixtureRig({ policy: policyWith((p) => (p.approved_people.push("person:priya"), p.dashboard.grants.push(granted))) });
+    expect(dashboardAccess(rig.setup.current(), "person:priya")).toBe("weekly_note");
+    rig.setup.revokeContributor("person:priya", rig.clock.iso());
+    expect(dashboardAccess(rig.setup.current(), "person:priya")).toBeNull();
+    expect(rig.setup.current().dashboard.grants.find((g) => g.member_id === "person:priya")).toEqual({ ...granted, revoked_at: rig.clock.iso() });
+    // A LIVE grant for someone who is not approved is still refused.
+    expect(() => new SetupStore(policyWith((p) => p.dashboard.grants.push({ ...granted, member_id: "person:stranger" })))).toThrow(/approved people only/);
   });
 });
 

@@ -34,6 +34,7 @@ export const send_safety_alert: ToolImpl<"send_safety_alert"> = async (input, ct
 
   const sent: Array<{ alert_id: string; caregiver_id: string; channel: string; script_id: string }> = [];
   const skipped: Array<{ caregiver_id: string; reason: "not_a_designated_caregiver" | "already_alerted_this_call" }> = [];
+  let failure: unknown = null;
   for (const caregiverId of [...new Set(input.caregiver_ids)]) {
     // Designated caregivers only. Nobody else can be alerted, whoever asks.
     const designated = policy.safety.designated_caregivers.find((c) => c.person_id === caregiverId);
@@ -55,10 +56,21 @@ export const send_safety_alert: ToolImpl<"send_safety_alert"> = async (input, ct
       // Fixed text: her name, the category's fixed label, and the time. Nothing she said.
       text: fill(ctx.safetyPhrases.alert, { time: readableTime(at), name, category: entry.label }),
     };
-    await ctx.alerts.send(alert);
+    try {
+      await ctx.alerts.send(alert);
+    } catch (e) {
+      // One caregiver's channel failing must not cost the others their alert, and must not use up this one's:
+      // the claim is given back, so a second try can still reach them.
+      ctx.gate.releaseAlert(input.category, caregiverId);
+      failure ??= e;
+      continue;
+    }
     sent.push({ alert_id: alert.alert_id, caregiver_id: caregiverId, channel: alert.channel, script_id: alert.script_id });
   }
-  if (sent.length === 0) return { sent, skipped, safety_event_id: null };
+  if (sent.length === 0) {
+    if (failure !== null) throw failure;
+    return { sent, skipped, safety_event_id: null };
+  }
 
   // The record: category, time, and who was told (rule 8).
   const logId = `artifact:safety-log:${ctx.session.session_id}`;
@@ -84,5 +96,7 @@ export const send_safety_alert: ToolImpl<"send_safety_alert"> = async (input, ct
   const eventId = `safety-event:${ctx.session.session_id}:${input.category}`;
   await ctx.graph.putNode({ id: eventId, type: "SafetyEvent", label: "Safety handoff", props: { category: input.category, at, recipients: sent.map((s) => s.caregiver_id) }, prov });
   ctx.session.safety_alert_sent = true;
+  // Someone was told, and that is on record. If another caregiver's channel failed, say so: a second try skips whoever was reached.
+  if (failure !== null) throw failure;
   return { sent, skipped, safety_event_id: eventId };
 };

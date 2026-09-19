@@ -11,7 +11,7 @@
 import { cueHints, preferCues } from "@/lib/graph/retrieval-layer";
 import type { GraphEdge, GraphNode } from "@/lib/graph/types";
 import { tokens, turnText } from "@/lib/providers/transcription";
-import { allScriptLines, containsPhrase, fill, firstPhraseIn, slotsOf, ScriptError, type ScriptLine } from "@/lib/script/call-script";
+import { allScriptLines, containsPhrase, fill, firstPhraseIn, slotsOf, stopPhraseIn, ScriptError, type ScriptLine } from "@/lib/script/call-script";
 import { endsInOpenQuestion, lintConduct, lintLines } from "@/lib/script/lint";
 import { FAMILY_SOURCED_MAX_RUNG, type Rung } from "@/lib/state/machine";
 import type { ToolOutput } from "../contracts";
@@ -28,6 +28,9 @@ function spokenNames(node: GraphNode): string[] {
   if (node.type === "Event") return [node.label];
   return [];
 }
+
+/** "I do not remember", "I cannot recall", "I couldn't say", "no clue": the uncontracted and the unlisted ways of saying she is not sure. */
+const SAYS_SHE_CANNOT = /\b(do not|don't|dont|cannot|can not|can't|cant|could not|couldn't|couldnt)(?: (?:really|quite|even|seem to))? (?:remember|recall|know|say)\b|\bno (?:idea|clue)\b/;
 
 // --- tool 5 --------------------------------------------------------------------------------------------------
 
@@ -46,8 +49,10 @@ export const assess_conversation_state: ToolImpl<"assess_conversation_state"> = 
     return result;
   };
 
-  // What she was answering: the recognition rung offers two choices; every other prompt here is open.
-  const format = ctx.session.spoken.at(-1)?.rung === 4 ? ("forced_choice" as const) : ("open" as const);
+  // What she was answering: the recognition rung offers two choices; every other prompt here is open. The identity
+  // line answers a question of HERS and asks nothing, so the question on the table is whatever came before it.
+  const onTheTable = ctx.session.spoken.filter((s) => s.script_id !== ctx.script.lines.identity.id).at(-1);
+  const format = onTheTable?.rung === 4 ? ("forced_choice" as const) : ("open" as const);
 
   // Silence is an endpointed window with no speech of hers: no turn at all, or a final turn with no words.
   const turn = turns.at(-1);
@@ -80,25 +85,29 @@ export const assess_conversation_state: ToolImpl<"assess_conversation_state"> = 
     if (names.some((n) => n !== "" && containsPhrase(transcript, n) && !containsPhrase(recallSaid, n))) matched.push(v.id);
   }
 
-  const conduct = firstPhraseIn(transcript, ctx.script.stop_phrases) ? ("stop_request" as const) : firstPhraseIn(transcript, ctx.script.identity_phrases) ? ("identity_question" as const) : null;
+  const conduct = stopPhraseIn(transcript, ctx.script.stop_phrases) ? ("stop_request" as const) : firstPhraseIn(transcript, ctx.script.identity_phrases) ? ("identity_question" as const) : null;
   const done = (state: Assessment["state"], rule: string): Assessment =>
     record({ turn_id: turn.turn_id, state, silent: false, evidence: { transcript, span: { start_ms: turn.start_ms, end_ms: turn.end_ms }, matched_rule: rule, matched_ids: matched.sort(), conduct_signal: conduct, response_format: format, response_latency_ms: latency } });
 
   if (conduct) return done("no_answer", `conduct:${conduct}`);
-  if (firstPhraseIn(transcript, ctx.script.unsure_phrases)) return done("no_answer", "said_unsure");
+  // Saying she does not remember is never a detail of hers, however many words it takes ("I do not remember", "I have no clue, dear").
+  if (firstPhraseIn(transcript, ctx.script.unsure_phrases) || SAYS_SHE_CANNOT.test(said.join(" "))) return done("no_answer", "said_unsure");
 
   // After a recognition rung both options are words Recall just said, so the reply is read against what was offered.
-  const offered = ctx.session.spoken.at(-1)?.rung === 4 ? ctx.session.last_recognition : null;
+  const offered = onTheTable?.rung === 4 ? ctx.session.last_recognition : null;
   if (offered) {
     const saidAs = async (edgeId: string): Promise<string> => ((await ctx.graph.getEdge(edgeId))?.props.said_as as string | null) ?? "";
     const [one, other] = [await saidAs(offered.correct_edge_id), await saidAs(offered.other_edge_id)];
     const named = (w: string): boolean => w !== "" && containsPhrase(transcript, w);
-    if (named(one) && !named(other)) return done("recalled", "named_one_of_the_two_offered");
+    // "Not my daughter" names the word and means the opposite. Not graded, and not counted as reaching it either.
+    const denied = (w: string): boolean => new RegExp(`\\b(not|never|don't|dont|didn't|didnt|isn't|isnt|wasn't|wasnt)\\b(?: [\\p{L}']+){0,2} ${w.toLowerCase()}\\b`, "u").test(said.join(" "));
+    if (named(one) && !named(other) && !denied(one)) return done("recalled", "named_one_of_the_two_offered");
     return done("no_answer", "did_not_name_one_of_the_two_offered");
   }
 
   if (said.length > 0 && novel.length === 0) return done("no_answer", "echo_of_recall_words");
-  const asksForRepair = (transcript.includes("?") || /\b(pardon|sorry)\b/.test(said.join(" "))) && /\b(what|pardon|sorry|again|repeat|say that)\b/.test(said.join(" "));
+  // A request to say it again is short, or is a question. "Sorry, we went every summer with Maya and the kids" is neither: it is her memory.
+  const asksForRepair = (transcript.includes("?") || (said.length <= 5 && /\b(pardon|sorry)\b/.test(said.join(" ")))) && /\b(what|pardon|sorry|again|repeat|say that)\b/.test(said.join(" "));
   if (asksForRepair) return done("asked_repeat", "repair_request");
   if (said.length >= 4 && novel.length >= 2) return done("new_detail_offered", "substantive_reply");
   if (matched.length > 0) return done("recalled", "named_something_recall_had_not_said");
@@ -152,7 +161,10 @@ async function gather(ctx: ToolContext, topicId: string, verifiedIds: readonly s
   }
   for (const id of verifiedIds) {
     const edge = await ctx.graph.getEdge(id);
-    if (edge?.type === "RELATED_TO" && edge.from === personId && typeof edge.props.said_as === "string" && edge.props.said_as !== "") material.relations.push({ edge, said_as: edge.props.said_as });
+    // The words offered at the recognition rung are HER words for her people. A family member's word for a tie
+    // ("her friend Maya") is their claim, not her memory (rule 13), and is never one of the two options.
+    const hers = verified.get(id)?.speaker === personId && verified.get(id)?.patient_confirmed === true;
+    if (hers && edge?.type === "RELATED_TO" && edge.from === personId && typeof edge.props.said_as === "string" && edge.props.said_as !== "") material.relations.push({ edge, said_as: edge.props.said_as });
   }
   material.claims.sort((a, b) => (a.claim.id < b.claim.id ? -1 : 1));
   material.photos.sort((a, b) => (a.id < b.id ? -1 : 1));

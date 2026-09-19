@@ -6,7 +6,7 @@
  * setup, and the clock (rule 5).
  */
 import { cueHints } from "@/lib/graph/retrieval-layer";
-import { LIFE_PERIODS, SPEAKABLE_AS_FACT, TOPIC_NODE_TYPES, type GraphNode, type TopicFacet } from "@/lib/graph/types";
+import { LIFE_PERIODS, NOT_ANSWERED, SPEAKABLE_AS_FACT, TOPIC_NODE_TYPES, type GraphNode, type TopicFacet } from "@/lib/graph/types";
 import type { ToolOutput } from "../contracts";
 import type { ToolContext } from "../context";
 import { GateError } from "../gates";
@@ -56,10 +56,15 @@ export const get_next_recall_topic: ToolImpl<"get_next_recall_topic"> = async (i
   const eligible: Array<{ node: GraphNode; facet: TopicFacet; last: string | null; told: number; cue: boolean }> = [];
   if (input.person_id !== policy.person_id) return { topic: null, ranked: [], excluded: [], decided_by: "deterministic_ranking" };
 
+  // When each topic last came up. From the topic outcomes, and from the calls themselves - which nobody can clear,
+  // so clearing the family's record never changes what Recall does next (section 6.3); and which exist for a call
+  // she stopped, so the topic she stopped on is not the first thing she hears tomorrow (rule 12).
   const lastRevisit = new Map<string, string>();
-  for (const o of await ctx.graph.nodesOfType("TopicOutcome")) {
-    if (o.props.timestamp <= input.schedule_context.now && o.props.timestamp > (lastRevisit.get(o.props.topic_id) ?? "")) lastRevisit.set(o.props.topic_id, o.props.timestamp);
-  }
+  const cameUp = (topicId: string, at: string): void => {
+    if (at <= input.schedule_context.now && at > (lastRevisit.get(topicId) ?? "")) lastRevisit.set(topicId, at);
+  };
+  for (const o of await ctx.graph.nodesOfType("TopicOutcome")) cameUp(o.props.topic_id, o.props.timestamp);
+  for (const s of await ctx.graph.nodesOfType("Session")) if (s.props.outcome !== NOT_ANSWERED) cameUp(s.props.topic_id, s.props.started_at);
 
   for (const type of TOPIC_NODE_TYPES) {
     for (const node of await ctx.graph.nodesOfType(type)) {

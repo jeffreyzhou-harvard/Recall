@@ -13,6 +13,15 @@ import { z } from "zod";
 import { SOURCE_CLASSES } from "@/lib/graph/types";
 
 const DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
+/** Pure: asks the runtime whether it knows the zone; reads no clock. */
+const isTimeZone = (zone: string): boolean => {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: zone });
+    return true;
+  } catch {
+    return false;
+  }
+};
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 const iso = z.iso.datetime();
 
@@ -31,10 +40,19 @@ export const policySchema = z
     recall_set_up_by: z.string().min(1),
     /** Approved contributors: the only people who may tell Recall a memory, or be granted the family view. */
     approved_people: z.array(z.string()),
+    /**
+     * People who were approved once and have since been revoked. They can do nothing. The list exists so that a
+     * fact about the past - "Priya introduced Recall to her" - stays true after Priya is revoked, instead of
+     * quietly stopping every call.
+     */
+    formerly_approved: z.array(z.string()).default([]),
     /** Who a stored fact may be used with. For recall calls that is her, and only her. */
     approved_audiences: z.array(z.string()),
-    timezone: z.string().min(1),
-    call_windows: z.array(z.strictObject({ days: z.array(z.enum(DAYS)), start: hhmm, end: hhmm })),
+    // A setup that could never place a call is refused when it is written, not discovered when the calls never come.
+    timezone: z.string().min(1).refine(isTimeZone, { message: "not a timezone this system knows (use an IANA name, like America/New_York)" }),
+    call_windows: z.array(
+      z.strictObject({ days: z.array(z.enum(DAYS)).min(1), start: hhmm, end: hhmm }).refine((w) => w.start < w.end, { message: "a call window ends after it starts, on the same day" }),
+    ),
     call_frequency: z.strictObject({ max_calls_per_week: z.number().int().positive(), min_hours_between_calls: z.number().int().nonnegative() }),
     /** Caregiver pause (rule 12). While true no call is placed, and a call already under way ends at once. */
     calls_paused: z.boolean(),
@@ -85,7 +103,8 @@ export const policySchema = z
   .refine((p) => p.established_by.includes(p.person_id), { message: "the joint setup is hers too: she must be one of the people who established it", path: ["established_by"] })
   .refine((p) => p.approved_people.includes(p.recall_set_up_by), { message: "the person named as having set Recall up must be an approved person", path: ["recall_set_up_by"] })
   .refine((p) => p.safety.designated_caregivers.every((c) => p.approved_people.includes(c.person_id)), { message: "designated caregivers must be approved people", path: ["safety", "designated_caregivers"] })
-  .refine((p) => p.dashboard.grants.every((g) => p.approved_people.includes(g.member_id)), { message: "the family view can be granted to approved people only", path: ["dashboard", "grants"] })
+  // A revoked grant stays on the record after its member stops being approved: it is revoked, never deleted.
+  .refine((p) => p.dashboard.grants.every((g) => g.revoked_at !== null || p.approved_people.includes(g.member_id)), { message: "the family view can be granted to approved people only", path: ["dashboard", "grants"] })
   .refine((p) => p.discovery.photo_access_granted_by.every((g) => g === p.person_id || p.approved_people.includes(g)), {
     message: "photo access can only be granted by her or by an approved person",
     path: ["discovery", "photo_access_granted_by"],
@@ -135,7 +154,7 @@ export function attestationsMissing(policy: AccessPolicy): string[] {
   if (a.saved_contact_name.trim() === "") missing.push("the saved contact has no family-chosen name");
   if (!a.saved_contact_photo) missing.push("the saved contact has no family-chosen photo");
   if (!a.recall_introduced_to_her || a.introduced_by === null) missing.push("no family member has introduced Recall to her");
-  else if (!policy.approved_people.includes(a.introduced_by)) missing.push("Recall was introduced by someone who is not an approved person");
+  else if (!policy.approved_people.includes(a.introduced_by) && !policy.formerly_approved.includes(a.introduced_by)) missing.push("Recall was introduced by someone who is not an approved person");
   return missing;
 }
 
@@ -195,6 +214,11 @@ export class SetupStore {
     return structuredClone(this.policy);
   }
 
+  /** Take the latest agreed version from wherever the setup is kept (the onboarding database). Validated like any other change. */
+  replace(raw: unknown): void {
+    this.policy = policySchema.parse(raw);
+  }
+
   private change(next: AccessPolicy): void {
     this.policy = policySchema.parse(next);
   }
@@ -216,6 +240,9 @@ export class SetupStore {
     this.change({
       ...p,
       approved_people: p.approved_people.filter((id) => id !== personId),
+      formerly_approved: p.approved_people.includes(personId) ? [...new Set([...p.formerly_approved, personId])] : p.formerly_approved,
+      // Everything they held goes with them, or the setup would no longer be one the schema accepts and nothing would be revoked at all.
+      discovery: { ...p.discovery, photo_access_granted_by: p.discovery.photo_access_granted_by.filter((id) => id !== personId) },
       dashboard: { ...p.dashboard, grants: p.dashboard.grants.map((g) => (g.member_id === personId && g.revoked_at === null ? { ...g, revoked_at: atIso } : g)) },
     });
   }

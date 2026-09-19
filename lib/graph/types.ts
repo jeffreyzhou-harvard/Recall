@@ -280,6 +280,11 @@ export type EpisodicClaimNode = NodeBase<"EpisodicClaim", { text: string; topic?
 export type PreferenceExpertiseNode = NodeBase<"PreferenceExpertise", { text: string }>;
 export type EventNode = NodeBase<"Event", { wikidata_id: string | null; date: string | null; topic?: TopicFacet }>;
 export type AccessPolicyNode = NodeBase<"AccessPolicy", { policy_ref: string }>;
+/**
+ * A Session's `outcome` for a call she did not pick up. It is recorded, because the agreed time between calls counts
+ * from when her phone last rang - and it says nothing about the topic, which she never heard named.
+ */
+export const NOT_ANSWERED = "not_answered";
 export type SessionNode = NodeBase<"Session", { topic_id: string; started_at: string; ended_at: string | null; outcome: string }>;
 export type ContributionNode = NodeBase<
   "Contribution",
@@ -289,7 +294,13 @@ export type RetrievalRecordNode = NodeBase<"RetrievalRecord", { topic_id: string
 export type FamilyQueryEventNode = NodeBase<"FamilyQueryEvent", { category: string; at: string }>;
 export type WeeklyNoteNode = NodeBase<
   "WeeklyNote",
-  { member_id: string; posted_at: string; lines: Array<{ script_id: string; text: string }>; shared_contribution_id: string | null }
+  {
+    member_id: string;
+    posted_at: string;
+    /** The note exactly as it was posted, so that opening the dashboard again within the week shows it again. */
+    lines: Array<{ script_id: string; text: string; kind?: string; attribution?: { speaker_name: string; share_confirmed_at: string; content_hash: string } | null }>;
+    shared_contribution_id: string | null;
+  }
 >;
 export type ShareConfirmationNode = NodeBase<"ShareConfirmation", { decision: "yes" | "no" | "unclear" | "timeout"; contribution_hash: string; recorded_at: string }>;
 export type TopicOutcomeNode = NodeBase<

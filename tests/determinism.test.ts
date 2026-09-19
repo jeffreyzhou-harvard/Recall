@@ -82,11 +82,11 @@ describe("static determinism guard", () => {
 
   // Live-only code: the one place each external system is touched. Everything else under /lib is
   // judged-path safe, and must not reach these even indirectly.
-  const LIVE_ONLY = [join("lib", "graph", "ladybug-store.ts"), join("lib", "providers", "muse") + "/", join("lib", "providers", "deepgram.ts")];
+  const LIVE_ONLY = [join("lib", "graph", "ladybug-store.ts"), join("lib", "onboarding", "sqlite-store.ts"), join("lib", "providers", "muse") + "/", join("lib", "providers", "deepgram.ts")];
   const isLiveOnly = (rel: string): boolean => LIVE_ONLY.some((p) => rel === p || rel.startsWith(p));
   const NETWORK = /\bfetch\s*\(|new WebSocket\s*\(|new XMLHttpRequest\s*\(|new EventSource\s*\(/;
   // The service composes both loops, so it names the discovery and call modules by type; it opens no connection itself.
-  const LIVE_IMPORT = /@ladybugdb\/core|ladybug-store|providers\/muse|providers\/deepgram|@\/server\//;
+  const LIVE_IMPORT = /@ladybugdb\/core|ladybug-store|node:sqlite|sqlite-store|providers\/muse|providers\/deepgram|@\/server\//;
 
   it("only two named files under /lib touch the network: Deepgram and Muse Spark - and neither can reach family", () => {
     const callers = filesUnder(join(ROOT, "lib"))

@@ -85,7 +85,7 @@ export class RecallService {
       thresholds: deps.thresholds,
     };
     // A runtime with a family context and no call context: a family flow cannot run a call tool even by mistake.
-    this.familyRuntime = new ToolRuntime({ clock: deps.clock, family }, TOOL_IMPLS);
+    this.familyRuntime = new ToolRuntime({ clock: deps.clock, family }, TOOL_IMPLS, { max_log: 500 });
   }
 
   // --- the recall call -----------------------------------------------------------------------------------------
@@ -124,8 +124,16 @@ export class RecallService {
 
   // --- the family side: read when an approved member opens it, never pushed ----------------------------------------
 
+  /**
+   * One family request at a time. Each one reads the graph and then writes to it - the next note's id, the access
+   * log - so two dashboards opened at the same moment would mint the same id, and one of them would fail. A
+   * request that fails does not hold up the next.
+   */
+  private familyQueue: Promise<unknown> = Promise.resolve();
   private family<T extends FamilyTool>(tool: T, input: ToolInput<T>): Promise<ToolOutput<T>> {
-    return this.familyRuntime.call(tool, input);
+    const next = this.familyQueue.then(() => this.familyRuntime.call(tool, input));
+    this.familyQueue = next.catch(() => undefined);
+    return next;
   }
 
   /** "Tell Recall about a memory you share with Susan." One-way: it returns a thank-you or a hint, never anything from the graph. */
@@ -190,6 +198,8 @@ export class RecallService {
   async answerQuestion(question: Question, answer: Answer): Promise<ApplyResult> {
     const { graph } = this.deps;
     const policy = this.deps.setup.current();
+    // Off means off: with discovery not turned on in the joint setup no answer is read - not even handed to a model - and nothing is kept.
+    if (!policy.discovery.enabled) throw new Error("discovery is not turned on in the joint setup");
     const speaker = { id: answer.by, is_participant: answer.by === policy.person_id };
     const proposals = await this.answerInterpreter.interpret(question, answer, speaker, policy.person_id);
     return applyAnswer(question, answer, proposals, { graph, policy });

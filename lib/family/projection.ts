@@ -15,12 +15,14 @@
  * note, an access event, an export event, a family contribution. None of them
  * returns graph content.
  */
-import { patientConfirmed, RECALL_AGENT_ID, type GraphEdge, type GraphNode, type Provenance, type SourceClass } from "@/lib/graph/types";
+import { patientConfirmed, RECALL_AGENT_ID, type GraphEdge, type GraphNode, type Provenance, type SourceClass, type WeeklyNoteNode } from "@/lib/graph/types";
 import { edgeId } from "@/lib/graph/seed";
 import type { GraphStore } from "@/lib/graph/store";
 import type { OutcomeRow } from "./record";
 
 const LOG_ARTIFACT_ID = "artifact:family-side-log";
+
+export type WeeklyNoteLine = WeeklyNoteNode["props"]["lines"][number];
 
 export interface SharedLine {
   /** Opaque handle, used only to mark the line as posted. Never shown. */
@@ -104,14 +106,14 @@ export class FamilyView {
    * Lines she chose to share. The walk starts at her recorded YES to the share question and follows it back
    * to the contribution, so a line with no share-confirmation is not filtered out - it is never reached.
    */
-  async sharedLines(sinceIso: string, memberId: string): Promise<SharedLine[]> {
+  async sharedLines(memberId: string): Promise<SharedLine[]> {
     const alreadyPosted = new Set<string>();
     for (const note of await this.graph.nodesOfType("WeeklyNote")) {
       if (note.props.member_id === memberId && note.props.shared_contribution_id) alreadyPosted.add(note.props.shared_contribution_id);
     }
     const out: SharedLine[] = [];
     for (const share of await this.graph.nodesOfType("ShareConfirmation")) {
-      if (share.props.decision !== "yes" || share.props.recorded_at < sinceIso) continue;
+      if (share.props.decision !== "yes") continue;
       for (const edge of await this.graph.edgesOf(share.id)) {
         if (edge.type !== "SHARE_CONFIRMED_BY" || edge.to !== share.id || alreadyPosted.has(edge.from)) continue;
         const contribution = await this.graph.getNode(edge.from);
@@ -119,7 +121,10 @@ export class FamilyView {
         out.push({ ref: contribution.id, text: contribution.props.literal_transcript, speaker_name: await this.displayName(contribution.prov.author), share_confirmed_at: share.props.recorded_at, content_hash: contribution.props.content_hash });
       }
     }
-    return out.sort((a, b) => (a.share_confirmed_at > b.share_confirmed_at ? -1 : a.share_confirmed_at < b.share_confirmed_at ? 1 : a.ref < b.ref ? -1 : 1));
+    // Oldest first, and no cut-off by date: a note carries one line, so with a date window a second line shared in
+    // the same week - or one shared the day after a note went up - would never be shown to anyone. She said yes to
+    // sharing it; "not yet posted to this member" is the only thing that decides whether it is still waiting.
+    return out.sort((a, b) => (a.share_confirmed_at < b.share_confirmed_at ? -1 : a.share_confirmed_at > b.share_confirmed_at ? 1 : a.ref < b.ref ? -1 : 1));
   }
 
   /** Event topics nobody has given a date for. Names only. */
@@ -210,7 +215,13 @@ export class FamilyView {
     await this.put({ id: await this.nextId("ExportEvent", "export"), type: "ExportEvent", label: "Record exported", props: { requester_id: requesterId, at } }, at);
   }
 
-  async postNote(memberId: string, postedAt: string, lines: Array<{ script_id: string; text: string }>, sharedRef: string | null): Promise<void> {
+  /** The member's note from inside the cap, exactly as posted: fixed lines, and at most one line she chose to share. Null if there is none. */
+  async currentNoteFor(memberId: string, sinceIso: string): Promise<{ posted_at: string; lines: WeeklyNoteLine[] } | null> {
+    const note = (await this.graph.nodesOfType("WeeklyNote")).filter((n) => n.props.member_id === memberId && n.props.posted_at > sinceIso).sort((a, b) => (a.props.posted_at < b.props.posted_at ? 1 : -1))[0];
+    return note ? { posted_at: note.props.posted_at, lines: structuredClone(note.props.lines) } : null;
+  }
+
+  async postNote(memberId: string, postedAt: string, lines: WeeklyNoteLine[], sharedRef: string | null): Promise<void> {
     const id = await this.nextId("WeeklyNote", "weekly-note");
     await this.put({ id, type: "WeeklyNote", label: "Weekly Note", props: { member_id: memberId, posted_at: postedAt, lines, shared_contribution_id: sharedRef } }, postedAt);
     if (sharedRef) {
