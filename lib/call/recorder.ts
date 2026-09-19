@@ -133,10 +133,13 @@ export class ParticipantRecorder {
     try {
       if (!approved || approved.length === 0) return null;
       const full = encodeWavPcm16(this.chunks, CAPTURE_SAMPLE_RATE);
-      const wav = cutWav(full, approved);
-      const source_sha256 = await sha256Bytes(full);
-      full.fill(0);
-      return wav ? { wav, source_sha256, kept: [...approved] } : null;
+      try {
+        const wav = cutWav(full, approved);
+        const source_sha256 = await sha256Bytes(full);
+        return wav ? { wav, source_sha256, kept: [...approved] } : null;
+      } finally {
+        full.fill(0);
+      }
     } finally {
       for (const chunk of this.chunks) chunk.fill(0);
       this.chunks = [];
