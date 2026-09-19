@@ -280,6 +280,7 @@ export const select_scaffold: ToolImpl<"select_scaffold"> = async (input, ctx) =
       const pick = await ctx.scaffoldAdvisor({
         rung: chosen.rung,
         what_she_said: ctx.session.assessments.at(-1)?.evidence.transcript ?? "",
+        topic_category: topic.category,
         eligible: level.map((p) => ({ scaffold_id: p.scaffold.id, cue_id: p.cue!.cue_id, citations: p.citations, what_it_does: p.cue!.kind === "photo" ? "mentions a photograph a family member shared" : "names someone she has said was part of it" })),
       });
       const offered = level.find((p) => p.cue!.cue_id === pick.cue_id);

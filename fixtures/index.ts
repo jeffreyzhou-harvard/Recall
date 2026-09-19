@@ -2,7 +2,7 @@
  * The judged path's data, statically imported: no filesystem and no fetch, so
  * it bundles into the page and runs with the network off.
  *
- * That is all that lives here - seven data files:
+ * That is all that lives here - the judged data files, plus the live-model persona:
  *
  *   graph/family.json          what Susan and her family have told Relay, with who said it and when,
  *                              and Relay's record of earlier calls
@@ -12,6 +12,9 @@
  *   record-thresholds.json     every number the per-topic record uses
  *   safety-phrases.json        the fixed safety list and the fixed alert text
  *   transcripts/call-golden    the literal, time-aligned transcript of the prerecorded call
+ *   question-bank.json         few-shot invitations for the live model only; never spoken on the judged path
+ *   call-persona.md            the live model's voice and hard rules
+ *   reminiscence-techniques.md the facilitator techniques behind the bank
  *
  * Failure-branch data (a revoked topic, conflicting accounts, an unclear yes...) exists only to exercise
  * the gates and lives with the tests, not here.
@@ -23,8 +26,10 @@ import type { AssetManifest } from "@/lib/provenance/assets";
 import type { CallTranscript } from "@/lib/providers/transcription";
 import { safetyPhrasesSchema, type SafetyPhrases } from "@/lib/safety/phrases";
 import { callScriptSchema, type CallScript } from "@/lib/script/call-script";
+import { questionBankSchema, type QuestionBank } from "@/lib/script/question-bank";
 import type { ToolName } from "@/lib/tools";
 import callScript from "./call-script.json";
+import questionBank from "./question-bank.json";
 import familyCopy from "./family-copy.json";
 import family from "./graph/family.json";
 import susanSetup from "./policy/susan-setup.json";
@@ -39,6 +44,7 @@ export const POLICY: unknown = susanSetup;
 export const GOLDEN_TRANSCRIPT = callGolden as CallTranscript;
 // Parsed once, here: a fixture that does not match its schema fails the moment anything imports it.
 export const CALL_SCRIPT: CallScript = callScriptSchema.parse(callScript);
+export const QUESTION_BANK: QuestionBank = questionBankSchema.parse(questionBank);
 export const FAMILY_COPY: FamilyCopy = familyCopySchema.parse(familyCopy);
 export const RECORD_THRESHOLDS: RecordThresholds = recordThresholdsSchema.parse(recordThresholds);
 export const SAFETY_PHRASES: SafetyPhrases = safetyPhrasesSchema.parse(safetyPhrases);

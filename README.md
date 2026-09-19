@@ -17,7 +17,7 @@ If Maya wants to know what Susan remembers about her wedding, Relay does not ans
 
 Relay is not a digital replica, a "chat with her" interface, or a bot that relays decisions. It never impersonates her, never fabricates a first-person memory she didn't provide, and never becomes the thing family members talk to instead of her.
 
-`AGENTS.md` is the complete brief, including the non-negotiables. `SPECS.md` is the locked design doc. When they disagree, `AGENTS.md` wins. HackMIT 2026, Healthcare track.
+`AGENTS.md` is the complete brief, including the non-negotiables. `SPECS.md` is the locked design doc. When they disagree, `AGENTS.md` wins. The live call model's voice is `fixtures/call-persona.md` plus `fixtures/question-bank.json`. HackMIT 2026, Healthcare track.
 
 ## Run it
 

@@ -18,7 +18,7 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { CALL_SCRIPT, FAMILY_COPY, FAMILY_SEED, GOLDEN_TRANSCRIPT, JUDGED_TIMING, MANIFEST, POLICY, RECORD_THRESHOLDS, SAFETY_PHRASES } from "@/fixtures";
+import { CALL_SCRIPT, FAMILY_COPY, FAMILY_SEED, GOLDEN_TRANSCRIPT, JUDGED_TIMING, MANIFEST, POLICY, QUESTION_BANK, RECORD_THRESHOLDS, SAFETY_PHRASES } from "@/fixtures";
 import { FixtureClock } from "@/lib/clock";
 import { MemoryGraphStore } from "@/lib/graph/memory-store";
 import { buildGraph } from "@/lib/graph/seed";
@@ -108,7 +108,7 @@ export async function createLiveRelay(config: LiveConfig): Promise<LiveRelay> {
     runtime: { fixtureLatency: { clock, ms, default_ms } },
     // Muse Spark, when a key is present: which cue to offer (never whether to climb), and reading facts out of an
     // answer. Both only propose; the guards in lib/ decide. Without a key the deterministic choices run instead.
-    ...(spark ? { answerInterpreter: new MuseAnswerInterpreter(spark, graph), scaffoldAdvisor: loudly(museScaffoldAdvisor(spark)) } : {}),
+    ...(spark ? { answerInterpreter: new MuseAnswerInterpreter(spark, graph), scaffoldAdvisor: loudly(museScaffoldAdvisor(spark, QUESTION_BANK)) } : {}),
   });
 
   // One call at a time: sessions share a graph and a clock.

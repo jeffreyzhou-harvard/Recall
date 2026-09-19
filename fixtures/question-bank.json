@@ -1,0 +1,245 @@
+{
+  "version": 1,
+  "description": "Few-shot invitations and follow-ups for the live model (fixtures/reminiscence-techniques.md §3). Never spoken on the judged path. AGENTS.md wins: invitations only, no identification tests, no feeling-naming.",
+  "core_few_shot_ids": [
+    "QB-CHILDHOOD-HOUSE",
+    "QB-SCHOOL-OPEN",
+    "QB-WORK-FIRST-JOB",
+    "QB-COURTSHIP-MET",
+    "QB-WEDDING-DAY",
+    "QB-PARENTING-LITTLE",
+    "QB-PLACE-OPEN",
+    "QB-HOMETOWN-TOWN",
+    "QB-HOLIDAY-TRIP",
+    "QB-FOOD-MEAL",
+    "QB-MUSIC-LISTEN",
+    "QB-PERSON-OPEN"
+  ],
+  "entries": [
+    {
+      "id": "QB-CHILDHOOD-HOUSE",
+      "bank_category": "childhood",
+      "script_categories": ["hometown"],
+      "kind": "opener",
+      "text": "I'd love to hear about the house you grew up in. What comes to mind?",
+      "adaptation": "A",
+      "source": "Haight LREF childhood stage; Dementia UK early life"
+    },
+    {
+      "id": "QB-CHILDHOOD-FAMILY",
+      "bank_category": "childhood",
+      "script_categories": ["hometown"],
+      "kind": "opener",
+      "text": "Tell me about your family when you were little.",
+      "adaptation": "A",
+      "source": "Age NI Family & Relationships domain"
+    },
+    {
+      "id": "QB-CHILDHOOD-LIVING",
+      "bank_category": "childhood",
+      "script_categories": ["hometown"],
+      "kind": "followup",
+      "text": "What was it like living there?",
+      "adaptation": "A",
+      "source": "Age NI; used only after she has shared something"
+    },
+    {
+      "id": "QB-SCHOOL-OPEN",
+      "bank_category": "school",
+      "script_categories": ["hometown"],
+      "kind": "opener",
+      "text": "Tell me what you remember about your school.",
+      "adaptation": "R",
+      "source": "Age NI manual open-question example"
+    },
+    {
+      "id": "QB-SCHOOL-DAYS",
+      "bank_category": "school",
+      "script_categories": ["hometown"],
+      "kind": "opener",
+      "text": "I'd love to hear about your school days.",
+      "adaptation": "A",
+      "source": "Age NI; RYCT/REMCARE schooldays"
+    },
+    {
+      "id": "QB-WORK-FIRST-JOB",
+      "bank_category": "work",
+      "script_categories": ["workplace"],
+      "kind": "opener",
+      "text": "I'd love to hear about your first job.",
+      "adaptation": "A",
+      "source": "Age NI working life; Haight LREF adulthood"
+    },
+    {
+      "id": "QB-WORK-HOW-FOUND",
+      "bank_category": "work",
+      "script_categories": ["workplace"],
+      "kind": "followup",
+      "text": "How did you find the job?",
+      "adaptation": "R",
+      "source": "Age NI verbatim; open follow-up only"
+    },
+    {
+      "id": "QB-WORK-PEOPLE",
+      "bank_category": "work",
+      "script_categories": ["workplace"],
+      "kind": "followup",
+      "text": "Tell me about the people you worked with.",
+      "adaptation": "A",
+      "source": "Age NI; Dementia UK working life"
+    },
+    {
+      "id": "QB-COURTSHIP-MET",
+      "bank_category": "courtship",
+      "script_categories": ["family_event"],
+      "kind": "opener",
+      "text": "I'd love to hear about how you and {name} met.",
+      "adaptation": "A",
+      "source": "Age NI courtship prompts"
+    },
+    {
+      "id": "QB-WEDDING-DAY",
+      "bank_category": "courtship",
+      "script_categories": ["family_event"],
+      "kind": "opener",
+      "text": "Tell me about your wedding day.",
+      "adaptation": "A",
+      "source": "Alzheimer Society BC; Haight adulthood"
+    },
+    {
+      "id": "QB-WEDDING-WORE",
+      "bank_category": "courtship",
+      "script_categories": ["family_event"],
+      "kind": "followup",
+      "text": "What do you remember about what you wore?",
+      "adaptation": "A",
+      "source": "Age NI wedding-outfit prompt; sensory follow-up only"
+    },
+    {
+      "id": "QB-PARENTING-LITTLE",
+      "bank_category": "parenting",
+      "script_categories": ["family_event"],
+      "kind": "opener",
+      "text": "I'd love to hear about when {name} was little.",
+      "adaptation": "A",
+      "source": "PositivePsychology structured-review guide"
+    },
+    {
+      "id": "QB-PARENTING-KIDS",
+      "bank_category": "parenting",
+      "script_categories": ["family_event"],
+      "kind": "opener",
+      "text": "Tell me about a favorite memory with your kids.",
+      "adaptation": "A",
+      "source": "Dementia UK relationship sections"
+    },
+    {
+      "id": "QB-PLACE-OPEN",
+      "bank_category": "places",
+      "script_categories": ["family_summers", "hometown"],
+      "kind": "opener",
+      "text": "I'd love to hear about {place}. What comes to mind?",
+      "adaptation": "A",
+      "source": "Golden-path Cape May opener, generalized"
+    },
+    {
+      "id": "QB-HOMETOWN-TOWN",
+      "bank_category": "places",
+      "script_categories": ["hometown"],
+      "kind": "opener",
+      "text": "Tell me about the town where you grew up.",
+      "adaptation": "A",
+      "source": "This Is Me / Dementia UK places that matter"
+    },
+    {
+      "id": "QB-HOLIDAY-TRIP",
+      "bank_category": "holidays",
+      "script_categories": ["family_summers"],
+      "kind": "opener",
+      "text": "I'd love to hear about a trip you took that you loved.",
+      "adaptation": "A",
+      "source": "Age NI holidays; Age Exchange Dice Game"
+    },
+    {
+      "id": "QB-HOLIDAY-SMELL",
+      "bank_category": "holidays",
+      "script_categories": ["family_summers"],
+      "kind": "followup",
+      "text": "What smells would bring you back there?",
+      "adaptation": "R",
+      "source": "Age NI sensory prompt; deepening follow-up only, never rung 1"
+    },
+    {
+      "id": "QB-FOOD-MEAL",
+      "bank_category": "food",
+      "script_categories": ["family_event"],
+      "kind": "opener",
+      "text": "I'd love to hear about a meal your family used to make together.",
+      "adaptation": "A",
+      "source": "Age Exchange Dice Game Food"
+    },
+    {
+      "id": "QB-FOOD-KITCHEN",
+      "bank_category": "food",
+      "script_categories": ["hometown"],
+      "kind": "opener",
+      "text": "Tell me about your kitchen growing up.",
+      "adaptation": "A",
+      "source": "Age Exchange; Alzheimer Society BC shared experience"
+    },
+    {
+      "id": "QB-MUSIC-LISTEN",
+      "bank_category": "music",
+      "script_categories": ["family_event"],
+      "kind": "opener",
+      "text": "I'd love to hear about the music you used to listen to.",
+      "adaptation": "A",
+      "source": "Dementia UK preferences; Age Exchange Cinema"
+    },
+    {
+      "id": "QB-MUSIC-SHOW",
+      "bank_category": "music",
+      "script_categories": ["family_event"],
+      "kind": "opener",
+      "text": "Tell me about a show or a film you loved.",
+      "adaptation": "A",
+      "source": "Age Exchange Theatres/Concerts"
+    },
+    {
+      "id": "QB-COMMUNITY-NEIGHBORHOOD",
+      "bank_category": "community",
+      "script_categories": ["hometown"],
+      "kind": "opener",
+      "text": "I'd love to hear what your neighborhood was like back then.",
+      "adaptation": "A",
+      "source": "Age NI Historical Context domain"
+    },
+    {
+      "id": "QB-PERSON-OPEN",
+      "bank_category": "person",
+      "script_categories": ["person"],
+      "kind": "opener",
+      "text": "I'd love to hear about {name}.",
+      "adaptation": "A",
+      "source": "AGENTS.md §6.1 person-topic invitation; never Who is"
+    },
+    {
+      "id": "QB-LATER-GOOD-DAY",
+      "bank_category": "later_life",
+      "script_categories": [],
+      "kind": "opener",
+      "text": "Tell me what a good day looks like for you now.",
+      "adaptation": "A",
+      "source": "Dementia UK later life; use sparingly"
+    },
+    {
+      "id": "QB-LATER-MATTERS",
+      "bank_category": "later_life",
+      "script_categories": [],
+      "kind": "opener",
+      "text": "I'd love to hear what matters most to you these days.",
+      "adaptation": "A",
+      "source": "Haight/Maercker closing questions, softened; use sparingly"
+    }
+  ]
+}

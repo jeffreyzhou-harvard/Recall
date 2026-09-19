@@ -91,6 +91,8 @@ export function newSession(sessionId: string): SessionRecord {
 export interface ScaffoldAdvice {
   rung: number;
   what_she_said: string;
+  /** Call-script ladder category, so the live model can pull matching few-shot invitations. */
+  topic_category: string | null;
   /** Each with the verified ids it would cite. The advisor may choose among these and nothing else. */
   eligible: Array<{ scaffold_id: string; cue_id: string; citations: string[]; what_it_does: string }>;
 }

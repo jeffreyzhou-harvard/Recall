@@ -4,6 +4,7 @@
  * WHICH cue to offer. No call transport is tested here; the call feature is being built separately.
  */
 import { describe, expect, it } from "vitest";
+import { QUESTION_BANK } from "@/fixtures";
 import { runFixture } from "@/fixtures/harness";
 import { DeepgramLive, transcribeWav, type HeardTurn, type SocketLike } from "@/lib/providers/deepgram";
 import { museScaffoldAdvisor } from "@/lib/providers/muse/reasoning";
@@ -175,6 +176,6 @@ describe("Muse Spark only proposes", () => {
     expect(await pickVia(async (a) => ({ cue_id: a.eligible[0]!.cue_id, citations: ["claim:taught-at-lincoln"] }))).toMatchObject(personFirst); // cites outside the cue
     expect(await pickVia(async () => Promise.reject(new MuseApiError(500, "down")))).toMatchObject(personFirst);
     const { spark } = sparkReturning({ cue_id: "artifact:photo-cape-may", citations: ["artifact:photo-cape-may"] });
-    expect(await pickVia(museScaffoldAdvisor(spark))).toMatchObject(personFirst);
+    expect(await pickVia(museScaffoldAdvisor(spark, QUESTION_BANK))).toMatchObject(personFirst);
   });
 });

@@ -22,6 +22,8 @@ import type { Question } from "@/lib/discovery/questions";
 import { RELATION_NAMES, type Relation } from "@/lib/graph/relations";
 import type { GraphStore } from "@/lib/graph/store";
 import { SPEAKABLE_AS_FACT } from "@/lib/graph/types";
+import { scaffoldSystemPrompt } from "@/lib/script/persona";
+import type { QuestionBank } from "@/lib/script/question-bank";
 import type { ScaffoldAdvisor } from "@/lib/tools/context";
 import type { MuseSpark } from "./spark";
 
@@ -87,9 +89,10 @@ The kind of support has already been decided; you are only choosing between the 
 export const SCAFFOLD_ADVICE_BUDGET_MS = 6_000;
 
 /** Spark picks among the cues on offer. The caller re-checks the pick and keeps its own choice if it is not one that was offered. */
-export function museScaffoldAdvisor(spark: MuseSpark, budgetMs = SCAFFOLD_ADVICE_BUDGET_MS): ScaffoldAdvisor {
+export function museScaffoldAdvisor(spark: MuseSpark, bank: QuestionBank, budgetMs = SCAFFOLD_ADVICE_BUDGET_MS): ScaffoldAdvisor {
   return async (advice) => {
     const schema = z.strictObject({ cue_id: z.enum(advice.eligible.map((e) => e.cue_id) as [string, ...string[]]), citations: z.array(z.string()) });
-    return spark.structured("select_cue", schema, [{ role: "system", content: SCAFFOLD_RULES }, { role: "user", content: JSON.stringify(advice) }], { reasoning_effort: "minimal", max_completion_tokens: 2000, timeout_ms: budgetMs });
+    const system = scaffoldSystemPrompt(bank, advice.topic_category, SCAFFOLD_RULES);
+    return spark.structured("select_cue", schema, [{ role: "system", content: system }, { role: "user", content: JSON.stringify(advice) }], { reasoning_effort: "minimal", max_completion_tokens: 2000, timeout_ms: budgetMs });
   };
 }

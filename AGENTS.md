@@ -179,6 +179,7 @@ Rules:
 - **What a yes is worth.** Relay logs the kind of prompt beside every reply (`open`, `forced_choice`, `yes_no`), because a yes/no answer is the format most open to a yes that means no. A memory is never stored on a bare yes: she has just heard her own words played back.
 - **Held silence.** The first quiet window on a rung is not a miss. Relay says the backchannel line (`BACKCHANNEL-WAIT`) and waits again. Only the next quiet window on that rung is a `no_answer` that climbs or wraps up. A spoken "I don't know" still climbs at once.
 - **Fixed procedural lines.** Every line that carries no factual claim (greeting, topic-intro template, each ladder-rung template, store-confirmation request, share-confirmation request, thanks, kind close, narrowing line, restate-once fallback, backchannel, family-redirect line, identity line, safety line) lives in `/fixtures/call-script.json` with a stable script ID. Template slots are filled only from graph node values. Every other Relay line must carry citations (rule 6).
+- **Live-model voice.** The judged path never generates a line. The live side-demo model is bound by `/fixtures/call-persona.md` and the few-shot bank in `/fixtures/question-bank.json` (see `lib/script/persona.ts`). It still cannot skip a gate, invent her words, name a mood, or speak a line that is not a reviewed script ID or a cited fact. Facilitator techniques live in `/fixtures/reminiscence-techniques.md`; they are subordinate to this file.
 - **Attribution.** "You told me..." only when the claim's speaker is her. A claim by anyone else is phrased with its author ("Maya mentioned..."). A mismatch fails closed.
 - **Language.** The banned-phrase lint (§12, test 8) covers rule 11 plus diagnostic and emotional-state words. The starter banned list lives in the script fixture and grows, never shrinks.
 - **Closing.** Always kind. A close after no answer never frames the outcome as a failure.
@@ -284,7 +285,9 @@ Keep the graph compact and private. Do not import a large ontology or FHIR. This
                      call-script.json (fixed lines + banned-phrase list),
                      family-copy.json (family-side fixed lines),
                      record-thresholds.json (window sizes, minimums),
-                     safety-phrases.json (safety list, categories, fixed alert lines)
+                     safety-phrases.json (safety list, categories, fixed alert lines),
+                     call-persona.md + question-bank.json (live model only),
+                     reminiscence-techniques.md (facilitator source, not spoken)
 /assets              prerecorded audio/video/images (immutable once cut)
 /scripts             seed, hash, verify, language-lint, and test runners
 ```
@@ -295,7 +298,7 @@ Rules: fixtures are data, not code branches; `/assets` media is never re-encoded
 
 The 90-second judged path runs entirely on prerecorded call branches and deterministic fixture outputs. Telephony, ASR, model latency, and network access must never touch it. Preload every asset. The `/present` route hides controls and auto-advances; arrow keys step manually as a fallback.
 
-A live model + live Deepgram/Muse path may exist as an optional side demo, behind a flag, never in the judged path. The counterfactual (a version without the ladder, where Relay repeats "Who is Maya?" once and she says "I don't know") is prerecorded and clearly labeled as an alternate path, never as a claim about the person.
+A live model + live Deepgram/Muse path may exist as an optional side demo, behind a flag, never in the judged path. When it runs, Muse Spark is given the persona prompt and category-matched few-shot invitations (`lib/script/persona.ts`); it still only proposes among eligible cues, and `render_prompt` still speaks only a reviewed script line or a cited fact. The counterfactual (a version without the ladder, where Relay repeats "Who is Maya?" once and she says "I don't know") is prerecorded and clearly labeled as an alternate path, never as a claim about the person.
 
 ## 10. Visual direction and accessibility
 
@@ -353,7 +356,7 @@ End-card metrics the demo must be able to show: 100% of her attributed words are
 
 - `main` is protected. Feature branches named `<owner>/<area>-<thing>` (e.g. `dev2/tools-gates`).
 - Suggested ownership split so agents and people do not collide: `/components` + visual polish (frontend), `/lib/state` + `/lib/tools` (orchestration), `/lib/graph` + `/lib/provenance` + `/fixtures` (data), `/assets` + script recording (media).
-- Changes to `/lib/state`, the tool JSON schemas, policy fixtures, `call-script.json`, `family-copy.json`, `record-thresholds.json`, or `safety-phrases.json` require a second person's review: they define the safety gates, what Relay may say, and what the family may be shown, including the family-redirect guarantee.
+- Changes to `/lib/state`, the tool JSON schemas, policy fixtures, `call-script.json`, `family-copy.json`, `record-thresholds.json`, `safety-phrases.json`, `call-persona.md`, or `question-bank.json` require a second person's review: they define the safety gates, what Relay may say, and what the family may be shown, including the family-redirect guarantee.
 - `/assets` is append-only after hashing. Replacing a hashed asset requires re-running the provenance verification script.
 - Commit small and often; rebase before opening work that touches the reducer.
 

@@ -1,6 +1,6 @@
 /** AGENTS.md section 12, test 8: language and conduct. The same lint runs here, in `npm run lint:language`, and inside render_prompt. */
 import { describe, expect, it } from "vitest";
-import { CALL_SCRIPT, FAMILY_COPY, SAFETY_PHRASES } from "@/fixtures";
+import { CALL_SCRIPT, FAMILY_COPY, QUESTION_BANK, SAFETY_PHRASES } from "@/fixtures";
 import { runJudgedPath } from "@/fixtures/harness";
 import { allScriptLines, fill, slotsOf } from "@/lib/script/call-script";
 import { endsInOpenQuestion, isInvitation, lintConduct, lintLines, type LintLine } from "@/lib/script/lint";
@@ -97,7 +97,7 @@ describe("conduct", () => {
   });
 
   it("script ids are unique, and every slot is one Relay knows how to fill from the graph or the joint setup", () => {
-    const lines = [...allScriptLines(CALL_SCRIPT), ...Object.values(FAMILY_COPY.lines), SAFETY_PHRASES.alert];
+    const lines = [...allScriptLines(CALL_SCRIPT), ...QUESTION_BANK.entries, ...Object.values(FAMILY_COPY.lines), SAFETY_PHRASES.alert];
     expect(new Set(lines.map((l) => l.id)).size).toBe(lines.length);
     const known = new Set(["name", "set_up_by", "caregiver", "emergency_number", "topic", "cue", "person", "author", "place", "relation", "option_a", "option_b"]);
     for (const l of allScriptLines(CALL_SCRIPT)) for (const slot of slotsOf(l.text)) expect(known.has(slot), `${l.id} {${slot}}`).toBe(true);
