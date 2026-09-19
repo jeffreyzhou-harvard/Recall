@@ -116,8 +116,9 @@ export async function questionFor(gap: Gap, graph: GraphStore, participantId: st
 
 /** The next rung of support, or null when there is no more to offer. Reaching the end is not a failure: Relay moves on. */
 export function nextRung(question: Question, after: RungLevel): Rung | null {
-  const at = question.rungs.findIndex((r) => r.level === after);
-  return question.rungs[at + 1] ?? null;
+  // By level, not by position: a question with no `cue` rung must still move on past it, never back to `open`.
+  const reached = RUNG_LEVELS.indexOf(after);
+  return question.rungs.find((r) => RUNG_LEVELS.indexOf(r.level) > reached) ?? null;
 }
 
 /**

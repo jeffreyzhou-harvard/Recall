@@ -240,6 +240,23 @@ describe("never a test", () => {
     expect(nextRung(q, "tell")).toBeNull(); // the end of the ladder is not a failure; Relay moves on
   });
 
+  it("a ladder missing a rung skips past it, and never circles back to asking her again", async () => {
+    const rig = await rigWithLibrary(discoveryOn({ invite_her_confirmation: true }));
+    const [q1, q2] = await rig.service.nextQuestions(2);
+    await rig.service.answerQuestion(q1!, says(ANIKA, "That's her friend Maya.", "a1")); // a friend is not "someone in your family": no cue rung
+    await rig.service.answerQuestion(q2!, says(ANIKA, "That's her sister Priya.", "a2"));
+    const gap = (await findGaps(rig.graph, { participant_id: MOM, invite_her_confirmation: true })).find((g) => g.kind === "invite_her_word" && g.cluster_id === "cluster:face:f1");
+    const q = await questionFor(gap!, rig.graph, MOM);
+    expect(q.rungs.map((r) => r.level)).toEqual(["open", "recognition", "tell"]);
+    expect(nextRung(q, "open")!.level).toBe("recognition");
+    expect(nextRung(q, "cue")!.level).toBe("recognition");
+    expect(nextRung(q, "recognition")!.level).toBe("tell");
+    for (const only of [q.rungs.slice(0, 1), q.rungs.slice(0, 2)]) {
+      expect(nextRung({ ...q, rungs: only }, "cue")?.level ?? null).toBe(only.length === 2 ? "recognition" : null);
+      expect(nextRung({ ...q, rungs: only }, "recognition")).toBeNull();
+    }
+  });
+
   it("stores nothing about how a question went: no rung, no timing, no attempts - nothing a memory score could be built from", async () => {
     const rig = await rigWithLibrary();
     const [who] = await rig.service.nextQuestions(1);

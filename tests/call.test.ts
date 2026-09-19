@@ -10,6 +10,12 @@ import { ParticipantRecorder } from "@/lib/call/recorder";
 import { HubError, SignalingHub, type HubEvent, type Signal } from "@/lib/call/signaling";
 import { cutWav, encodeWavPcm16, floatToPcm16 } from "@/lib/provenance/wav";
 
+// The real cut, observable: the recorder must wipe the full WAV it handed over, whatever the cut did.
+vi.mock("@/lib/provenance/wav", async (original) => {
+  const wav = await original<typeof import("@/lib/provenance/wav")>();
+  return { ...wav, cutWav: vi.fn(wav.cutWav) };
+});
+
 const OFFER: Signal = { kind: "description", description: { type: "offer", sdp: "v=0" } };
 const CANDIDATE: Signal = { kind: "candidate", candidate: { candidate: "candidate:1 1 udp 1 10.0.0.1 9 typ host", sdpMid: "0", sdpMLineIndex: 0, usernameFragment: null } };
 
@@ -268,6 +274,16 @@ describe("capturing her audio (rule 8)", () => {
     const recorder = filled();
     const chunks = (recorder as unknown as { chunks: Int16Array[] }).chunks;
     expect(await recorder.finish(null)).toBeNull();
+    expect(chunks.every((c) => c.every((s) => s === 0))).toBe(true);
+  });
+
+  it("wipes the full recording even when an approved span lies outside it", async () => {
+    const recorder = filled();
+    const chunks = (recorder as unknown as { chunks: Int16Array[] }).chunks;
+    await expect(recorder.finish([{ start_ms: 2500, end_ms: 4000 }])).rejects.toThrow(/outside the recording/);
+    const full = vi.mocked(cutWav).mock.lastCall![0];
+    expect(full.byteLength).toBe(44 + 3 * SECOND * 2);
+    expect(full.every((b) => b === 0), "the encoded WAV is zeroed on the way out").toBe(true);
     expect(chunks.every((c) => c.every((s) => s === 0))).toBe(true);
   });
 
