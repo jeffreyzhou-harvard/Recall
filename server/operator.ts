@@ -1,14 +1,4 @@
-/**
- * Two keys, because they open different things. LIVE ONLY.
- *
- *   operator   turns the schedule - the one thing that can cause a call to her - and runs onboarding
- *   family     opens the family routes, until there is a sign-in
- *
- * They are separate so that whatever a family member's browser holds can never place a call (rule 5: Recall
- * has no mechanism by which a family member can trigger a same-moment call to her). The operator's key also
- * opens the family routes; the family's key opens nothing else. In production a key is required, and with
- * none configured nobody gets in (fail closed). In development both are open, for local testing.
- */
+/** Operator credentials and member-bound family credentials (AGENTS.md §2 rules 5, 14, 15). */
 import { timingSafeEqual } from "node:crypto";
 
 function holds(request: Request, header: string, secret: string | undefined): boolean {
@@ -16,15 +6,37 @@ function holds(request: Request, header: string, secret: string | undefined): bo
   const [a, b] = [Buffer.from(request.headers.get(header) ?? ""), Buffer.from(secret)];
   return a.length === b.length && timingSafeEqual(a, b);
 }
-const open = (...secrets: Array<string | undefined>): boolean => secrets.every((s) => !s) && process.env.NODE_ENV !== "production";
 
-export function isOperator(request: Request): boolean {
-  const secret = process.env.RECALL_OPERATOR_SECRET;
-  return open(secret) || holds(request, "x-recall-operator", secret);
+/** Invalid or overlapping credentials disable both surfaces, including in development. */
+function credentials(): { operator?: string; members: Record<string, string> } | null {
+  const operator = process.env.RECALL_OPERATOR_SECRET;
+  try {
+    const members: unknown = JSON.parse(process.env.RECALL_FAMILY_CREDENTIALS || "{}");
+    if (!members || typeof members !== "object" || Array.isArray(members)) return null;
+    const entries = Object.entries(members);
+    if (entries.some(([id, secret]) => !id.trim() || typeof secret !== "string" || !secret.trim())) return null;
+    const secrets = entries.map(([, secret]) => secret as string);
+    if (new Set(secrets).size !== secrets.length || (operator && secrets.includes(operator))) return null;
+    // The old shared key has no member identity. Refuse it rather than silently keeping that access path.
+    if (process.env.RECALL_FAMILY_SECRET) return null;
+    return { operator, members: members as Record<string, string> };
+  } catch {
+    return null;
+  }
 }
 
-export function isFamily(request: Request): boolean {
-  const [family, operator] = [process.env.RECALL_FAMILY_SECRET, process.env.RECALL_OPERATOR_SECRET];
-  if (family && operator && family === operator) return holds(request, "x-recall-operator", operator); // one shared key would undo the point of having two
-  return open(family, operator) || holds(request, "x-recall-family", family) || holds(request, "x-recall-operator", operator);
+export function isOperator(request: Request): boolean {
+  const config = credentials();
+  if (!config) return false;
+  const local = !config.operator && Object.keys(config.members).length === 0 && process.env.NODE_ENV !== "production";
+  return local || holds(request, "x-recall-operator", config.operator);
+}
+
+/** A requested member must match the credential owner. Only an explicit operator credential can act for others. */
+export function isFamily(request: Request, memberId?: string): boolean {
+  const config = credentials();
+  if (!config) return false;
+  if (holds(request, "x-recall-operator", config.operator)) return true;
+  return Object.entries(config.members).some(([id, secret]) =>
+    (memberId === undefined || memberId === id) && holds(request, "x-recall-family", secret));
 }
