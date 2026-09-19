@@ -254,12 +254,21 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
       await speak(fixed.share_question!);
       const shareReply = await hear();
       if (!shareReply) break; // a stop here leaves nothing stored: commit comes last (section 5)
-      const share = await runtime.call("confirm_share", { contribution_hash: captured.content_hash, audio_window: shareReply });
+      let share: ToolOutput<"confirm_share">;
+      try {
+        share = await runtime.call("confirm_share", { contribution_hash: captured.content_hash, audio_window: shareReply });
+      } catch (e) {
+        if (!(e instanceof ToolTimeoutError)) throw e;
+        // Her answer to the share question never blocks storing (section 5): the reducer resolves it as "not shared",
+        // and the record of that is taken with no window, so the commit still has the gate's share decision to check.
+        dispatch({ type: "TOOL_TIMEOUT", tool: e.tool });
+        share = await runtime.call("confirm_share", { contribution_hash: captured.content_hash, audio_window: null });
+      }
       if (share.stop_requested) {
         await stop();
         break;
       }
-      dispatch({ type: "SHARE_CONFIRMATION_RECORDED", confirmation_id: share.share_confirmation_id, decision: share.decision, contribution_hash: share.contribution_hash });
+      if (!machine().context.share_resolved) dispatch({ type: "SHARE_CONFIRMATION_RECORDED", confirmation_id: share.share_confirmation_id, decision: share.decision, contribution_hash: share.contribution_hash });
 
       const committed = await runtime.call("confirm_and_store", { step: "commit", contribution_hash: captured.content_hash, policy_token_id: tokenId });
       if (committed.step !== "commit") throw new Error("unreachable");
