@@ -16,6 +16,7 @@ import {
   EDGE_TYPES,
   EPISTEMIC_STATUSES,
   EXTRACTION_METHODS,
+  LIFE_PERIODS,
   NODE_TYPES,
   SOURCE_CLASSES,
   initialStatus,
@@ -45,7 +46,7 @@ const sourceSchema = z.object({
 export type SeedSource = z.infer<typeof sourceSchema>;
 
 /** Per-type `props` shapes. Unknown keys are rejected, so nothing rides along unvalidated. */
-const topicFacet = z.strictObject({ spoken_as: z.string().min(1), category: z.string().min(1) });
+const topicFacet = z.strictObject({ spoken_as: z.string().min(1), category: z.string().min(1), life_period: z.enum(LIFE_PERIODS).optional() });
 const rung = z.number().int().min(1).max(5);
 
 export const propsSchemas: Record<NodeType, z.ZodType> = {

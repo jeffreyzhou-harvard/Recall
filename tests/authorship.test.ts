@@ -31,7 +31,7 @@ describe("authorship invariants", () => {
   });
 
   it("every spoken Relay line maps to a script id, and every fact in it to a verified citation", async () => {
-    const r = await run([...OPENING, ["her", "Cape May...?"], ["relay", SAID.rung2], ["her", "I'm not sure."], ["relay", SAID.rung3], ["her", "Hmm."], ["relay", SAID.rung4], ["her", "My sister."], ["relay", SAID.rung5], ...CAPTURE_AND_CONFIRM()]);
+    const r = await run([...OPENING, ["her", "Cape May...?"], ["relay", SAID.rung2], ["her", "I'm not sure."], ["relay", SAID.rung3], ["her", "Hmm."], ["relay", SAID.rung4], ["her", "My daughter."], ["relay", SAID.elaborate], ...CAPTURE_AND_CONFIRM()]);
     const scriptIds = new Set(allScriptLines(CALL_SCRIPT).map((l) => l.id));
     for (const s of r.recording.spoken) {
       expect(scriptIds.has(s.script_id), s.text).toBe(true);

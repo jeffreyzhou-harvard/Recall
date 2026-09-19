@@ -46,7 +46,7 @@ const NEGATIVE_CONTROLS = overlay(
 );
 
 const graphWithControls = (): GraphData => buildGraph(mergeSeeds(FAMILY_SEED, NEGATIVE_CONTROLS), assets);
-const params: RetrievalParams = { topic_id: TOPIC, policy_id: "policy:susan-setup", audience: "person:susan", allowed_sources: ["prior_claim_with_source", "recall_call", "family_contribution", "joint_setup"], max_hops: 2, now_iso: "2026-11-05T17:30:00.000Z" };
+const params: RetrievalParams = { topic_id: TOPIC, policy_id: "policy:susan-setup", audience: "person:susan", allowed_sources: ["prior_claim_with_source", "recall_call", "family_contribution", "joint_setup"], max_hops: 2, now_iso: "2026-11-05T15:30:00.000Z" };
 
 describe("schema", () => {
   it("has the brief's eighteen node types and its edges, each node in exactly one layer", () => {

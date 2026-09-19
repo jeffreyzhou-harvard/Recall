@@ -2,13 +2,13 @@
  * The family side's routes. LIVE ONLY.
  *
  * There is no sign-in yet, so `member` is whoever the caller says they are. Until there is, these routes
- * are open in development and need the operator secret in production, like the call routes. What a member
+ * are open in development and need the operator secret in production. What a member
  * may see is still decided, every time, by the joint setup (rule 14): an id that is not an approved
  * member with a live grant gets nothing.
  */
-import { mayCreateRoom } from "@/server/call-rooms";
+import { isOperator } from "@/server/operator";
 
-export const guard = (request: Request): Response | null => (mayCreateRoom(request) ? null : Response.json({ error: "not allowed" }, { status: 403 }));
+export const guard = (request: Request): Response | null => (isOperator(request) ? null : Response.json({ error: "not allowed" }, { status: 403 }));
 
 export async function bodyOf(request: Request): Promise<Record<string, unknown> | null> {
   try {

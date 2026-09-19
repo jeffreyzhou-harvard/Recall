@@ -7,9 +7,9 @@ import { InvalidTransitionError, initialState, reduce, reduceStrict, replay, typ
 import { createRelayStore } from "@/lib/state/store";
 
 const H = "a".repeat(64);
-const at = (s: number): { at: string } => ({ at: new Date(Date.parse("2026-11-05T17:30:00.000Z") + s * 1000).toISOString() });
+const at = (s: number): { at: string } => ({ at: new Date(Date.parse("2026-11-05T15:30:00.000Z") + s * 1000).toISOString() });
 const GOLDEN: RelayEvent[] = [
-  { type: "CALL_SCHEDULED", person_id: "person:susan", topic_id: "event:x", topic_label: "X", family_sourced: false },
+  { type: "CALL_SCHEDULED", person_id: "person:susan", topic_id: "event:x", topic_label: "X", family_sourced: false, reorientation_allowed: false },
   { type: "POLICY_GRANTED", policy_token_id: "token:1", max_call_minutes: 12 },
   { type: "CALL_CONNECTED", session_id: "session:1" },
   { type: "GREETING_DELIVERED", prompt_id: "p1", discloses_ai: true },
@@ -101,14 +101,23 @@ describe("the ladder's order, enforced here as well as in select_scaffold", () =
     for (const n of [2, 3, 4, 5] as const) expect(() => reduceStrict(parkedIn("topic_selected"), rung(n), at(9))).toThrow(/never starts above rung 1/);
   });
 
-  it("never jumps to reorientation, never repeats a rung, never goes back down", () => {
-    expect(() => reduceStrict(lost(), rung(5), at(9))).toThrow(/rungs 1-4 have each been tried/);
+  it("an autobiographical memory is never stated outright, whatever has fired", () => {
+    expect(() => reduceStrict(lost(), rung(5), at(9))).toThrow(/never used for an autobiographical or identity memory/);
+    const all = [2, 3, 4].reduce((m, n, i) => reduceStrict(reduceStrict(m, rung(n as 2 | 3 | 4), at(9 + 2 * i)), { type: "TURN_ASSESSED", turn_id: `t${n}`, turn_state: "no_answer", silent: false }, at(10 + 2 * i)), lost());
+    expect(all.context.rungs_fired).toEqual([1, 2, 3, 4]);
+    expect(() => reduceStrict(all, rung(5), at(20))).toThrow(/never used for an autobiographical or identity memory/);
+    expect(reduceStrict(all, { type: "LADDER_EXHAUSTED", reason: "nothing more" }, at(20)).state).toBe("no_answer_today");
+  });
+
+  it("where the last rung is allowed at all, it never jumps the queue; and a rung is never repeated or revisited", () => {
+    const procedural = [{ ...GOLDEN[0]!, reorientation_allowed: true } as RelayEvent, ...GOLDEN.slice(1, 7)].reduce((m, e, i) => reduceStrict(m, e, at(i)), initialState());
+    expect(() => reduceStrict(procedural, rung(5), at(9))).toThrow(/rungs 1-4 have each been tried/);
     expect(() => reduceStrict(lost(), rung(1), at(9))).toThrow(/at most once/);
     const afterThree = reduceStrict(reduceStrict(reduceStrict(lost(), rung(2), at(9)), { type: "TURN_ASSESSED", turn_id: "t", turn_state: "no_answer", silent: false }, at(10)), rung(4), at(11));
     expect(afterThree.context.rungs_fired).toEqual([1, 2, 4]);
     const back = reduceStrict(afterThree, { type: "TURN_ASSESSED", turn_id: "u", turn_state: "no_answer", silent: false }, at(12));
     expect(() => reduceStrict(back, rung(3), at(13))).toThrow(/below rung 4/);
-    expect(() => reduceStrict(back, rung(5), at(13))).toThrow(/rungs 1-4 have each been tried/); // rung 3 never fired
+    expect(() => reduceStrict(back, rung(5), at(13))).toThrow(/never used for an autobiographical/);
   });
 
   it("stops at rung 3 for a family-sourced, unconfirmed topic", () => {

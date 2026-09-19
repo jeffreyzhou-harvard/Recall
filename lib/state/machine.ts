@@ -83,7 +83,7 @@ export type StopHow = "hang_up" | "explicit_stop" | "caregiver_pause";
 export type GateName = "identity" | "policy" | "evidence" | "confirmation" | "authorship";
 
 export type RelayEvent =
-  | { type: "CALL_SCHEDULED"; person_id: string; topic_id: string; topic_label: string; family_sourced: boolean }
+  | { type: "CALL_SCHEDULED"; person_id: string; topic_id: string; topic_label: string; family_sourced: boolean; reorientation_allowed: boolean }
   | { type: "POLICY_GRANTED"; policy_token_id: string; max_call_minutes: number }
   | { type: "POLICY_DENIED"; reason: string }
   | { type: "CALL_NOT_ANSWERED"; detail: string }
@@ -114,6 +114,8 @@ export interface RelayContext {
   topic_id: string | null;
   topic_label: string | null;
   family_sourced: boolean;
+  /** False for an autobiographical or identity memory: Relay never states one outright (EVIDENCE.md, section B). */
+  reorientation_allowed: boolean;
   policy_token_id: string | null;
   max_call_minutes: number | null;
   session_id: string | null;
@@ -149,6 +151,7 @@ export const INITIAL_CONTEXT: RelayContext = {
   topic_id: null,
   topic_label: null,
   family_sourced: false,
+  reorientation_allowed: false,
   policy_token_id: null,
   max_call_minutes: null,
   session_id: null,
@@ -195,6 +198,7 @@ function rungProblem(ctx: RelayContext, rung: Rung): string | null {
   if (ctx.rungs_fired.includes(rung)) return `rung ${rung} has already fired on this topic; each rung fires at most once per call`;
   if (rung <= highest(ctx)) return `rung ${rung} is below rung ${highest(ctx)}, which has already been tried`;
   if (ctx.family_sourced && rung > FAMILY_SOURCED_MAX_RUNG) return `rung ${rung} is disabled for a family-sourced, unconfirmed topic (rule 13)`;
+  if (rung === 5 && !ctx.reorientation_allowed) return "reorientation is never used for an autobiographical or identity memory: stating it outright shades into correction";
   if (rung === 5 && !([1, 2, 3, 4] as Rung[]).every((r) => ctx.rungs_fired.includes(r))) return "reorientation is never reached before rungs 1-4 have each been tried in order";
   return null;
 }
@@ -246,7 +250,7 @@ export const TRANSITIONS: Record<RelayState, StateTable> = {
     CALL_SCHEDULED: (_ctx, e) => ({
       to: "scheduled",
       label: "Call scheduled",
-      patch: { person_id: e.person_id, topic_id: e.topic_id, topic_label: e.topic_label, family_sourced: e.family_sourced },
+      patch: { person_id: e.person_id, topic_id: e.topic_id, topic_label: e.topic_label, family_sourced: e.family_sourced, reorientation_allowed: e.reorientation_allowed },
     }),
   },
   scheduled: {

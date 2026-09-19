@@ -97,7 +97,7 @@ describe("the whitelist projection (tools 14-17)", () => {
     const share = (await r.graph.nodesOfType("ShareConfirmation"))[0]!;
     expect(leaks({ id: share.props.decision, hash: share.props.contribution_hash }, forbidden)).toEqual([]);
     const shareCall = r.recording.tool_log.find((c) => c.tool === "confirm_share")!;
-    expect(Object.keys(shareCall.output as object).sort()).toEqual(["confirmation_hash", "contribution_hash", "decision", "recorded_at", "share_confirmation_id", "stop_requested"]); // her decision; nothing she said
+    expect(Object.keys(shareCall.output as object).sort()).toEqual(["confirmation_hash", "contribution_hash", "decision", "recorded_at", "response_format", "share_confirmation_id", "stop_requested"]); // her decision and the kind of question it answered; nothing she said
   });
 
   it("never includes text from a contribution she did not say yes to sharing", async () => {
@@ -177,7 +177,7 @@ describe("the family view is opt-in, revocable, and for approved members only (r
   it("the setup prompts a periodic re-confirmation", async () => {
     const { reconfirmationDue } = await import("@/lib/tools");
     const rig = await buildFixtureRig();
-    expect(reconfirmationDue(rig.setup.current(), "2026-11-05T17:30:00.000Z")).toBe(false);
+    expect(reconfirmationDue(rig.setup.current(), "2026-11-05T15:30:00.000Z")).toBe(false);
     expect(reconfirmationDue(rig.setup.current(), "2027-01-15T00:00:00.000Z")).toBe(true);
     rig.setup.recordReconfirmation("2027-01-15T00:00:00.000Z");
     expect(reconfirmationDue(rig.setup.current(), "2027-01-16T00:00:00.000Z")).toBe(false);
@@ -185,7 +185,7 @@ describe("the family view is opt-in, revocable, and for approved members only (r
 });
 
 describe("Tell Relay about a memory", () => {
-  const tell = (what: string, by = "person:maya") => ({ contributor_id: by, claim: { who: "Mom and me", what_happened: what, when_where: "Cape May, the eighties", photo_asset_id: null, about_topic_id: "event:cape-may-summers" }, provenance: { medium: "text" as const, received_at: "2026-11-05T17:30:00.000Z" } });
+  const tell = (what: string, by = "person:maya") => ({ contributor_id: by, claim: { who: "Mom and me", what_happened: what, when_where: "Cape May, the eighties", photo_asset_id: null, about_topic_id: "event:cape-may-summers" }, provenance: { medium: "text" as const, received_at: "2026-11-05T15:30:00.000Z" } });
 
   it("stores it exactly as typed, as the contributor's claim, patient_confirmed false - and returns nothing from the graph", async () => {
     const rig = await buildFixtureRig();

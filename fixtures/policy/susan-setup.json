@@ -27,8 +27,8 @@
         "sat",
         "sun"
       ],
-      "start": "10:00",
-      "end": "19:00"
+      "start": "09:00",
+      "end": "12:00"
     }
   ],
   "call_frequency": {
@@ -56,7 +56,7 @@
   "blocked_terms": [],
   "speech": {
     "pace": "slow",
-    "max_call_minutes": 12
+    "max_call_minutes": 8
   },
   "review": {
     "store_confirmation_required": true,

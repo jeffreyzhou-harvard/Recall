@@ -6,7 +6,7 @@
  * setup, and the clock (rule 5).
  */
 import { cueHints } from "@/lib/graph/retrieval-layer";
-import { SPEAKABLE_AS_FACT, TOPIC_NODE_TYPES, type GraphNode, type TopicFacet } from "@/lib/graph/types";
+import { LIFE_PERIODS, SPEAKABLE_AS_FACT, TOPIC_NODE_TYPES, type GraphNode, type TopicFacet } from "@/lib/graph/types";
 import type { ToolOutput } from "../contracts";
 import type { ToolContext } from "../context";
 import { GateError } from "../gates";
@@ -36,10 +36,24 @@ export async function isFamilySourced(ctx: Pick<ToolContext, "graph">, node: Gra
   return true;
 }
 
+/**
+ * How often this memory has been told: the accounts of it, hers and her family's, that a person stands behind.
+ * Retrieval frequency, more than age, is what seems to keep a memory reachable (EVIDENCE.md, section A).
+ */
+async function timesTold(ctx: Pick<ToolContext, "graph">, topicId: string): Promise<number> {
+  let told = 0;
+  for (const edge of await ctx.graph.edgesOf(topicId)) {
+    if (edge.type !== "ABOUT" || edge.to !== topicId) continue;
+    const claim = await ctx.graph.getNode(edge.from);
+    if (claim && SPEAKABLE_AS_FACT.has(claim.prov.status)) told++;
+  }
+  return told;
+}
+
 export const get_next_recall_topic: ToolImpl<"get_next_recall_topic"> = async (input, ctx) => {
   const policy = ctx.setup.current();
   const excluded: Array<{ topic_id: string; reason: string }> = [];
-  const eligible: Array<{ node: GraphNode; facet: TopicFacet; last: string | null; cue: boolean }> = [];
+  const eligible: Array<{ node: GraphNode; facet: TopicFacet; last: string | null; told: number; cue: boolean }> = [];
   if (input.person_id !== policy.person_id) return { topic: null, ranked: [], excluded: [], decided_by: "deterministic_ranking" };
 
   const lastRevisit = new Map<string, string>();
@@ -57,25 +71,41 @@ export const get_next_recall_topic: ToolImpl<"get_next_recall_topic"> = async (i
       else if (!policy.topics.allow.includes(node.id)) out("not on the allow list");
       else if (!SPEAKABLE_AS_FACT.has(node.prov.status)) out(`not confirmed by anyone: ${node.prov.status}`);
       else if (node.prov.expires_at !== null && node.prov.expires_at <= input.schedule_context.now) out("expired");
-      else eligible.push({ node, facet, last: lastRevisit.get(node.id) ?? null, cue: (await cueHints(ctx.graph, node.id)).some((h) => h.effective > 0) });
+      else eligible.push({ node, facet, last: lastRevisit.get(node.id) ?? null, told: await timesTold(ctx, node.id), cue: (await cueHints(ctx.graph, node.id)).some((h) => h.effective > 0) });
     }
   }
 
-  // Freshness first: never revisited, then longest ago. Then a topic Relay already knows a helpful cue for. Then id.
+  // Freshness first - never revisited, then longest ago - so that every memory comes round again, call after call,
+  // rather than being visited once. Among those equally due: the one told most often; then by when in her life it is
+  // from, where someone has said (ages 6-30, then recent, then the years between; unknown last); then a topic Relay
+  // already knows a helpful cue for; then id. Nothing here is a model's judgment.
+  const period = (f: TopicFacet): number => (f.life_period ? LIFE_PERIODS.indexOf(f.life_period) : LIFE_PERIODS.length);
   eligible.sort((a, b) => {
     if (a.last !== b.last) return a.last === null ? -1 : b.last === null ? 1 : a.last < b.last ? -1 : 1;
+    if (a.told !== b.told) return b.told - a.told;
+    if (period(a.facet) !== period(b.facet)) return period(a.facet) - period(b.facet);
     if (a.cue !== b.cue) return a.cue ? -1 : 1;
     return a.node.id < b.node.id ? -1 : 1;
   });
 
   const first = eligible[0];
   const topic: Topic | null = first
-    ? { topic_id: first.node.id, topic_type: first.node.type, label: first.node.label, spoken_as: first.facet.spoken_as, category: first.facet.category, family_sourced: await isFamilySourced(ctx, first.node, policy.person_id), last_revisited_at: first.last }
+    ? {
+        topic_id: first.node.id,
+        topic_type: first.node.type,
+        label: first.node.label,
+        spoken_as: first.facet.spoken_as,
+        category: first.facet.category,
+        family_sourced: await isFamilySourced(ctx, first.node, policy.person_id),
+        // Only a category the reviewed script marks as procedural may ever be stated outright. Nothing else is.
+        reorientation_allowed: ctx.script.ladder.categories[first.facet.category]?.memory_kind === "procedural",
+        last_revisited_at: first.last,
+      }
     : null;
   ctx.session.topic = topic;
   return {
     topic,
-    ranked: eligible.map((e, i) => ({ topic_id: e.node.id, rank: i + 1, last_revisited_at: e.last, has_effective_cue: e.cue })),
+    ranked: eligible.map((e, i) => ({ topic_id: e.node.id, rank: i + 1, last_revisited_at: e.last, times_told: e.told, life_period: e.facet.life_period ?? null, has_effective_cue: e.cue })),
     excluded: excluded.sort((a, b) => (a.topic_id < b.topic_id ? -1 : 1)),
     decided_by: "deterministic_ranking",
   };

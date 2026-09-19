@@ -20,7 +20,6 @@ export const SAID = {
   rung3: fill(FS.association!.person!, { cue: "Maya" }),
   rung3photo: fill(FS.association!.photo!, { author: "Maya" }),
   rung4: fill(FS.recognition!, { place: "Cape May", option_a: "daughter", option_b: "sister" }),
-  rung5: fill(FS.reorientation!, { relation: "daughter", person: "Maya", place: "Cape May" }),
   elaborate: FS.elaborate!.text,
   storeQuestion: L.store_question.text,
   shareQuestion: L.share_question.text,
@@ -32,6 +31,19 @@ export const SAID = {
   safety: fill(L.safety, { caregiver: "Maya", emergency_number: "911" }),
 };
 export const HER_LINE = "We went to Cape May every summer.";
+
+/**
+ * TEST ONLY. Relay's real script has no reorientation line, because every topic it has is autobiographical and
+ * such a memory is never stated outright (EVIDENCE.md, section B). The last rung's machinery still has to be
+ * right for the day a procedural topic exists - so this script pretends the golden category is one.
+ */
+export const REORIENTATION_TEXT = "You and your {relation} {person} spent summers together at {place}. You told me about them. What do you remember about those?";
+export const SCRIPT_WITH_REORIENTATION = ((): typeof CALL_SCRIPT => {
+  const script = structuredClone(CALL_SCRIPT);
+  Object.assign(script.ladder.categories.family_summers!, { memory_kind: "procedural", reorientation: { id: "LADDER-5-TEST-ONLY", text: REORIENTATION_TEXT } });
+  return script;
+})();
+export const SAID_RUNG5 = fill({ id: "LADDER-5-TEST-ONLY", text: REORIENTATION_TEXT }, { relation: "daughter", person: "Maya", place: "Cape May" });
 
 export type Step = ["relay", string] | ["her", string] | ["silence"] | ["playback"];
 

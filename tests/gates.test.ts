@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { runJudgedPath } from "@/fixtures/harness";
 import { GateError, GateKeeper } from "@/lib/tools";
-import { bench, overlay, policyWith, HER_LINE } from "./helpers";
+import { bench, overlay, policyWith, HER_LINE, SCRIPT_WITH_REORIENTATION } from "./helpers";
 
 const H = "a".repeat(64);
 const gateOf = async (p: Promise<unknown>): Promise<string> => p.then(() => "no gate fired", (e) => (e instanceof GateError ? e.gate : `threw ${String(e)}`));
@@ -78,8 +78,9 @@ describe("evidence-bounded speech (rule 6)", () => {
     const mayas = "claim:maya-remembers-cape-may";
     // Maya's account said as a plain fact ("You and Maya..."): refused.
     expect(await gateOf(b.runtime.call("render_prompt", { topic_id: b.topicId, scaffold_id: "LADDER-3-PERSON-FAMILY-SUMMERS", slot_ids: { cue: "person:maya" }, citations: [b.topicId, mayas, "person:maya"] }))).toBe("evidence");
-    // Maya's account under "You told me": refused.
-    expect(await gateOf(b.runtime.call("render_prompt", { topic_id: b.topicId, scaffold_id: "LADDER-5-FAMILY-SUMMERS", slot_ids: { relation: "RELATED_TO:person:susan->person:maya", person: "person:maya", place: "place:cape-may" }, citations: [b.topicId, mayas, "person:maya", "place:cape-may", "RELATED_TO:person:susan->person:maya"] }))).toBe("evidence");
+    // Maya's account under "You told me": refused. (Relay's own script has no such line; this is the test-only one.)
+    const withLastRung = await bench({ script: SCRIPT_WITH_REORIENTATION });
+    expect(await gateOf(withLastRung.runtime.call("render_prompt", { topic_id: b.topicId, scaffold_id: "LADDER-5-TEST-ONLY", slot_ids: { relation: "RELATED_TO:person:susan->person:maya", person: "person:maya", place: "place:cape-may" }, citations: [b.topicId, mayas, "person:maya", "place:cape-may", "RELATED_TO:person:susan->person:maya"] }))).toBe("evidence");
     // Her own account attributed to Maya: refused.
     expect(await gateOf(b.runtime.call("render_prompt", { topic_id: b.topicId, scaffold_id: "LADDER-3-FAMILY-SOURCED", slot_ids: { author: "person:maya", topic: b.topicId }, citations: [b.topicId, hers, "person:maya"] }))).toBe("evidence");
     // The matching attribution is said.

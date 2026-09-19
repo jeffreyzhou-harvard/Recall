@@ -40,6 +40,23 @@ export function lintLines(lines: readonly LintLine[], banned: readonly BannedEnt
   return findings;
 }
 
+/**
+ * How Relay talks (EVIDENCE.md, section C). One question per turn; and sentences kept short, because it is
+ * syntactic complexity - not speed - that costs comprehension. Checked over every line spoken to her.
+ */
+export function lintConduct(lines: readonly LintLine[], conduct: { max_questions_per_line: number; max_words_per_sentence: number }): LintFinding[] {
+  const findings: LintFinding[] = [];
+  for (const line of lines.filter((l) => l.surface === "call")) {
+    const questions = (line.text.match(/\?/g) ?? []).length;
+    if (questions > conduct.max_questions_per_line) findings.push({ id: line.id, phrase: `${questions} questions in one turn`, rule: 6, text: line.text });
+    for (const sentence of line.text.split(/(?<=[.?!])\s+/)) {
+      const words = sentence.trim().split(/\s+/).filter(Boolean).length;
+      if (words > conduct.max_words_per_sentence) findings.push({ id: line.id, phrase: `a sentence of ${words} words`, rule: 6, text: sentence });
+    }
+  }
+  return findings;
+}
+
 /** Section 12, test 8: a rung-1 prompt is an invitation. It never opens by testing her. */
 export const isInvitation = (text: string): boolean => {
   const t = normalize(text).trimStart();

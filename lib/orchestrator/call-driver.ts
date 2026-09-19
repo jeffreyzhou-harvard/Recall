@@ -3,13 +3,30 @@
  * played back, and Relay listens for her next final turn.
  *
  * The judged path uses FixtureCallDriver over a prerecorded call. Telephony,
- * ASR, and model latency never touch it (AGENTS.md section 9). A live driver
- * for the optional side demo would implement the same interface.
+ * ASR, and model latency never touch it (AGENTS.md section 9).
+ *
+ * A live call is one more implementation of `CallDriver`, paired with a
+ * `TranscriptionProvider` that returns her turns for the windows `listen()`
+ * hands back. What a live driver owes the engine:
+ *   - `listen()` resolves on her next FINAL turn, or on silence. A window with no speech of hers is how
+ *     silence is reported; the reducer decides what two of them mean.
+ *   - `connect()` and `listen()` throw `CallUnavailableError` when nobody answers or the line drops. Any
+ *     other error is a bug, and surfaces as one.
+ *   - `hangUp()` ends the call AND wipes whatever audio the driver was holding (rule 8). The orchestrator
+ *     calls it exactly once, on every way out, including an error nobody planned for.
  */
 import type { FixtureClock } from "@/lib/clock";
 import type { MediaSpan } from "@/lib/graph/types";
 import type { AudioWindow, CallTranscript, Turn } from "@/lib/providers/transcription";
 import { turnText } from "@/lib/providers/transcription";
+
+/** Nobody answered, or the line dropped. Not a failure of the engine: the run ends `no_answer_today` or `stopped`. */
+export class CallUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CallUnavailableError";
+  }
+}
 
 export interface SpokenPrompt {
   prompt_id: string;

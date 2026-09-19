@@ -242,7 +242,16 @@ export interface TopicFacet {
   spoken_as: string;
   /** Key into the call script's ladder lines: "family_summers", "workplace"... */
   category: string;
+  /**
+   * When in her life it is from, if a person has said. Used only to break ties when choosing a topic:
+   * memories from roughly ages 6-30 are the most retrievable, then very recent ones, then the years
+   * between (EVIDENCE.md, section A). Never guessed from a date.
+   */
+  life_period?: LifePeriod;
 }
+
+export const LIFE_PERIODS = ["ages_6_to_30", "recent", "after_30"] as const;
+export type LifePeriod = (typeof LIFE_PERIODS)[number];
 
 interface NodeBase<T extends NodeType, P> {
   id: string;

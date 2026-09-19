@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { CALL_SCRIPT, FAMILY_COPY, SAFETY_PHRASES } from "@/fixtures";
 import { runJudgedPath } from "@/fixtures/harness";
 import { allScriptLines, fill, slotsOf } from "@/lib/script/call-script";
-import { endsInOpenQuestion, isInvitation, lintLines, type LintLine } from "@/lib/script/lint";
+import { endsInOpenQuestion, isInvitation, lintConduct, lintLines, type LintLine } from "@/lib/script/lint";
 import { collectFixedLines } from "@/scripts/lib/language-lines";
 import { CAPTURE_AND_CONFIRM, OPENING, SAID, run } from "./helpers";
 
@@ -19,7 +19,7 @@ describe("the banned-phrase lint", () => {
 
   it("passes over every line Relay actually rendered and every family surface it produced, across the branches", async () => {
     const golden = await runJudgedPath();
-    const climbed = await run([...OPENING, ["her", "Cape May...?"], ["relay", SAID.rung2], ["her", "I'm not sure."], ["relay", SAID.rung3], ["her", "Hmm."], ["relay", SAID.rung4], ["her", "My sister."], ["relay", SAID.rung5], ...CAPTURE_AND_CONFIRM()]);
+    const climbed = await run([...OPENING, ["her", "Cape May...?"], ["relay", SAID.rung2], ["her", "I'm not sure."], ["relay", SAID.rung3], ["her", "Hmm."], ["relay", SAID.rung4], ["her", "My daughter."], ["relay", SAID.elaborate], ...CAPTURE_AND_CONFIRM()]);
     const lines: LintLine[] = [];
     for (const r of [golden, climbed]) {
       for (const p of r.recording.prompts) lines.push({ id: p.script_id, text: p.text, surface: "call" });
@@ -75,8 +75,25 @@ describe("conduct", () => {
     expect(endsInOpenQuestion("Maya mentioned a trip to Cape May.")).toBe(false);
   });
 
-  it("rungs 1-4 never state the answer; only rung 5 says 'You told me', and only of her own words", () => {
-    for (const l of allScriptLines(CALL_SCRIPT)) expect(/you told me/i.test(l.text), l.id).toBe(/^LADDER-5-/.test(l.id));
+  it("no line in Relay's script states a memory outright: every topic is autobiographical, so there is no reorientation line at all", () => {
+    for (const l of allScriptLines(CALL_SCRIPT)) expect(/you told me/i.test(l.text) || /^LADDER-5/.test(l.id), l.id).toBe(false);
+    for (const [name, c] of Object.entries(CALL_SCRIPT.ladder.categories)) expect([name, c.memory_kind, c.reorientation]).toEqual([name, "autobiographical", undefined]);
+  });
+
+  it("the script schema refuses a reorientation line on an autobiographical category", async () => {
+    const { callScriptSchema } = await import("@/lib/script/call-script");
+    const bad = structuredClone(CALL_SCRIPT) as unknown as { ladder: { categories: Record<string, Record<string, unknown>> } };
+    bad.ladder.categories.family_summers!.reorientation = { id: "LADDER-5-X", text: "You and Maya spent summers at Cape May." };
+    expect(() => callScriptSchema.parse(bad)).toThrow(/never states such a memory outright/);
+  });
+
+  it("one question per turn, and short sentences rather than slow ones", () => {
+    expect(CALL_SCRIPT.conduct).toEqual({ max_questions_per_line: 1, max_words_per_sentence: 16 });
+    expect(lintConduct(collectFixedLines(), CALL_SCRIPT.conduct)).toEqual([]);
+    const say = (text: string): LintLine[] => [{ id: "x", text, surface: "call" }];
+    expect(lintConduct(say("Where did you go? And who went with you?"), CALL_SCRIPT.conduct).map((f) => f.phrase)).toEqual(["2 questions in one turn"]);
+    expect(lintConduct(say("It was the place that your family, who had been going there since before Maya was born, used to visit every single summer."), CALL_SCRIPT.conduct)[0]!.phrase).toMatch(/a sentence of \d+ words/);
+    expect(lintConduct([{ id: "x", text: "Where did you go? And who went with you?", surface: "family" }], CALL_SCRIPT.conduct)).toEqual([]); // the rule is about how Relay talks to HER
   });
 
   it("script ids are unique, and every slot is one Relay knows how to fill from the graph or the joint setup", () => {

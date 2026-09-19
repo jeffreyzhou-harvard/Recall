@@ -151,7 +151,7 @@ export const confirm_and_store: ToolImpl<"confirm_and_store"> = async (input, ct
     const decision: StoreDecision = turn ? (stopRequested ? "no" : classifyYes(turnText(turn))) : "unclear";
     const recordedAt = ctx.clock.iso();
     const body = { decision, contribution_hash: input.contribution_hash, audio: { asset_id: asset.id, span: turn ? { start_ms: turn.start_ms, end_ms: turn.end_ms } : null, media_hash: asset.sha256 }, recorded_at: recordedAt };
-    const confirmation = { step: "confirm" as const, confirmation_id: `store-confirmation:${ctx.session.session_id}`, ...body, stop_requested: stopRequested, confirmation_hash: await contentHash(body) };
+    const confirmation = { step: "confirm" as const, confirmation_id: `store-confirmation:${ctx.session.session_id}`, ...body, stop_requested: stopRequested, response_format: "yes_no" as const, confirmation_hash: await contentHash(body) };
     ctx.gate.recordStoreConfirmation(input.contribution_hash, decision);
     ctx.session.store_confirmation = confirmation;
     return confirmation;
@@ -227,7 +227,7 @@ export const confirm_share: ToolImpl<"confirm_share"> = async (input, ctx) => {
   const decision = !input.audio_window ? ("timeout" as const) : turn ? (stopRequested ? ("no" as const) : classifyYes(turnText(turn))) : ("unclear" as const);
   const recordedAt = ctx.clock.iso();
   const body = { decision, contribution_hash: input.contribution_hash, recorded_at: recordedAt };
-  const confirmation: ToolOutput<"confirm_share"> = { share_confirmation_id: `share-confirmation:${ctx.session.session_id}`, ...body, stop_requested: stopRequested, confirmation_hash: await contentHash(body) };
+  const confirmation: ToolOutput<"confirm_share"> = { share_confirmation_id: `share-confirmation:${ctx.session.session_id}`, ...body, stop_requested: stopRequested, response_format: "yes_no", confirmation_hash: await contentHash(body) };
   ctx.gate.recordShareConfirmation(input.contribution_hash, decision);
   ctx.session.share_confirmation = confirmation;
   return confirmation;
