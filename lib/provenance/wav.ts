@@ -88,3 +88,42 @@ export function cutWav(source: Uint8Array, kept: readonly MediaSpan[]): Uint8Arr
   }
   return out;
 }
+
+/** 16-bit mono PCM samples as a WAV file. What a live call is captured into, so `cutWav` can apply the EDL to it. */
+export function encodeWavPcm16(chunks: readonly Int16Array[], sampleRate: number): Uint8Array {
+  const samples = chunks.reduce((n, c) => n + c.length, 0);
+  const out = new Uint8Array(44 + samples * 2);
+  const view = new DataView(out.buffer);
+  const put = (at: number, text: string): void => void [...text].forEach((c, i) => (out[at + i] = c.charCodeAt(0)));
+  put(0, "RIFF");
+  view.setUint32(4, 36 + samples * 2, true);
+  put(8, "WAVE");
+  put(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); // PCM
+  view.setUint16(22, 1, true); // mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  put(36, "data");
+  view.setUint32(40, samples * 2, true);
+  let at = 44;
+  for (const chunk of chunks) {
+    for (const sample of chunk) {
+      view.setInt16(at, sample, true);
+      at += 2;
+    }
+  }
+  return out;
+}
+
+/** Float samples in [-1, 1], as the Web Audio API delivers them, to 16-bit PCM. Clamped, never scaled or "improved". */
+export function floatToPcm16(input: Float32Array): Int16Array {
+  const out = new Int16Array(input.length);
+  for (let i = 0; i < input.length; i++) {
+    const s = Math.max(-1, Math.min(1, input[i]!));
+    out[i] = Math.round(s < 0 ? s * 0x8000 : s * 0x7fff);
+  }
+  return out;
+}

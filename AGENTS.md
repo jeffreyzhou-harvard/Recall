@@ -141,6 +141,8 @@ Keep the graph compact and private. Do not import a large ontology or FHIR. This
                      photo, nothing else), lexical interpretation, graph writes
 /lib/bridge          the neutral seam to the family's existing thread; refuses any
                      message that is not a reply to a forward it received
+/lib/call            LIVE ONLY. WebRTC video call: signaling hub, peer session (perfect
+                     negotiation), ICE config, and the rule-8 audio recorder
 /lib/bridge/telegram LIVE ONLY. Bot API client, update -> forwarded ask, bindings,
                      and the Telegram transport behind the shared guard
 /server              LIVE ONLY. Composition of the live process (webhook + polling)
@@ -298,3 +300,19 @@ await relay.answerQuestion(question, answer);         // only what was literally
 - **Answers** (`answers.ts`): `applyAnswer` is the single door. Grounded (names and her words must appear literally), closed vocabulary, stated-versus-inferred, sourced, all-or-nothing. A face someone already mentioned by name joins that person rather than creating a second one.
 - **What it gives the participation loop:** intake matches confirmed People/Places/Activities/Preferences by name (`mention_ids`), and a tie she stated can satisfy the identity gate. Being known grants nothing: whether someone may ask is still only the access policy's decision.
 - **The demo cast in this section's source pitch differs from the fixed golden path.** The pitch used Susan / Maya (daughter) / Anika (granddaughter) and "gulab jamun or rasmalai"; section 4 is still Mom / Anika and "kheer or halwa", and the fixtures follow section 4. Decide one cast and re-lock section 4 before recording anything.
+
+## 19. Video call over WebRTC (live only)
+
+A live call between Relay and her device, in the browser, over WebRTC (https://webrtc.org). It exists because there is no telephony: this is the live call path. It is never on the judged path, which plays a prerecorded call; tests enforce that nothing judged-path safe imports `lib/call`.
+
+**This changes a claim the rest of this file makes.** Sections 1, 4, and 10 say Relay calls her on "an ordinary phone" and that "she never operates this UI". A video call means she is on a browser device. Until the team decides which story the demo tells, keep both true where it matters: her page (`/call/[room]`) is one task with one large control, someone may open the link for her, and after that there is exactly one thing to tap. It already keeps section 10's hard rules (24px+ text, 44px+ control, plain words, no technical state, no countdowns, no red errors) and must keep them when it is designed properly.
+
+- **Signaling** (`lib/call/signaling.ts`) is ours, because WebRTC leaves it to the application: Server-Sent Events down, POST up, on Next route handlers, no WebSocket server and no dependency. It carries negotiation only - audio and video flow peer to peer and never touch the server - and stores nothing. The message schema is strict, so the channel cannot be used to send anything else.
+- **A room is one call between exactly two peers**, `relay` and `participant`, each with its own token. A call link works once: hanging up closes the room for both, and it expires on its own. Her token rides in the URL fragment, which browsers never send to a server.
+- **Only Relay starts a call.** The orchestrator builds its call driver only after the access policy grants an ask. `POST /api/call/rooms` needs `RELAY_OPERATOR_SECRET` in production, and with none set nobody can start one.
+- **Rule 8 is the recorder's shape** (`lib/call/recorder.ts`): there is no method that returns the whole recording. `finish(approvedSpans)` returns only those spans and zeroes the rest; with nothing approved it returns nothing. Audio is held in memory for the length of the call, never written to disk, never given to a `MediaRecorder`. It reads the audio track only: **video is never recorded, by anyone.** Capture is 16-bit PCM so the edit-decision list is applied by copying her samples byte for byte.
+- **Relay has a voice and no face.** Its side adds an audio transceiver (its own labeled voice goes out by replacing that sender's track) and receives video only.
+- **A double tap must never start a second call.** It would take the seat from the first and strand both. Her page takes the first tap and ignores the rest; `npm run e2e:call` re-clicks on purpose to keep it that way.
+- **Not built yet:** a live `CallDriver`. WebRTC is the transport and the capture; turning her audio into turns (Deepgram / Muse Voice Transcribe) and Relay's prompts into its labeled voice is what connects it to the orchestrator.
+- **To run it for real:** her device needs HTTPS (browsers only allow camera and microphone on a secure origin; `localhost` is the one exception). Venue, campus, and hotel wifi usually block direct routes, so set a TURN server in `RELAY_ICE_SERVERS` or the call will sit on "Connecting...". Rooms live in memory, so this needs a long-running Node server, not serverless hosting.
+- `npm run build && npm run e2e:call` makes one real call between two headless Chromes with a synthetic camera and microphone. It is the only check that proves the live path connects; it is not part of `npm run check` because it needs Chrome.

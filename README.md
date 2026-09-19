@@ -73,12 +73,25 @@ To ask: post your question (with a photo if you like), then reply to it with `/a
 
 `RELAY_CALL=none` (default) is intake only: the ask is validated and recorded, and no call is placed, because there is no telephony yet. `RELAY_CALL=prerecorded` runs the session against the prerecorded golden call and posts her voice card back under the question - real Telegram on both ends of a recorded call. It only completes for the Diwali ask that call was recorded for, and only inside the policy's call window (10:00-19:00 New York); outside it the family correctly gets "Not this time."
 
+## Video call (WebRTC)
+
+A live call between Relay and her device, in the browser. It exists because there is no telephony. Live only.
+
+```bash
+npm run dev                          # then open http://localhost:3000/call/host and press "Start a call"
+npm run build && npm run e2e:call    # one real call between two headless Chromes (needs Chrome)
+```
+
+`/call/host` is Relay's side (an operator scaffold); it prints her one-time link, `/call/<room>#<token>`. Signaling is a small SSE + POST channel on Next route handlers - no WebSocket server, no dependency - and carries negotiation only: audio and video go peer to peer. Her audio is captured in memory under rule 8: only spans she approved are ever returned, the rest is zeroed, and video is never recorded.
+
+Three things will bite outside `localhost`: her device needs **HTTPS** for camera and microphone; venue wifi usually needs a **TURN** server (`RELAY_ICE_SERVERS`) or the call sits on "Connecting..."; and rooms live in memory, so it needs a **long-running Node server**, not serverless hosting.
+
 ## What is not built yet
 
 - **The interface.** `/` and `/present` are plain scaffolds. Design goes through the Impeccable skill: run `/impeccable init` first (see `AGENTS.md` section 16).
 - **Real media.** Everything in `/assets` is a generated stand-in (a tick once a second; an SVG that says "Placeholder"). Word timings in the transcripts are placeholders too. See below.
 - **Photo analysis.** The discovery loop is built from the analyzer's output onward. The analyzer itself (face grouping, EXIF, scene themes) is an interface, `PhotoAnalyzer`, with no implementation: it is a model concern with its own consent questions. A model that reads richer facts out of an answer plugs in as an `AnswerInterpreter`; today a small lexical one handles "my daughter Maya" and place names.
-- **Live parts.** `ThreadBridge` now has a real Telegram transport. Three seams still have only their deterministic implementation: `CallDriver` (telephony - the big one), `TranscriptionProvider` (Deepgram / Muse Voice Transcribe), and `AskInterpreter` plus the `select_scaffold` decision (Muse Spark). The judged path must never depend on the live ones.
+- **Live parts.** `ThreadBridge` has a real Telegram transport, and a live WebRTC call connects and captures her audio. Three seams still have only their deterministic implementation: `CallDriver` (the big one: nothing yet turns her live audio into turns, or Relay's prompts into its voice, so the WebRTC call is not wired to the orchestrator), `TranscriptionProvider` (Deepgram / Muse Voice Transcribe), and `AskInterpreter` plus the `select_scaffold` decision (Muse Spark). The judged path must never depend on the live ones.
 - **The counterfactual replay.** Nothing exists for it yet, by design: the no-tools bot's lines are not written in `AGENTS.md` and should be locked by the team, not invented by an agent. It is a labeled, prerecorded clip, so it needs a recording and a transcript but no engine work.
 
 ## Replacing the placeholder media
