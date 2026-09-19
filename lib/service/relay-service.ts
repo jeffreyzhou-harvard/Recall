@@ -27,7 +27,7 @@ import { ProvLog } from "@/lib/provenance/prov-log";
 import type { TranscriptionProvider } from "@/lib/providers/transcription";
 import { buildRecording, type SessionRecording } from "@/lib/session/recording";
 import { createRelayStore } from "@/lib/state/store";
-import { GateKeeper, TOOL_IMPLS, ToolRuntime, newSession, type AccessPolicy, type Fault, type ToolContext, type ToolName } from "@/lib/tools";
+import { GateKeeper, TOOL_IMPLS, ToolRuntime, newSession, type AccessPolicy, type Fault, type ScaffoldAdvisor, type ToolContext, type ToolName } from "@/lib/tools";
 
 export interface RelayDeps {
   graph: GraphStore;
@@ -41,6 +41,8 @@ export interface RelayDeps {
   interpreter?: AskInterpreter;
   /** Reads facts out of an answer. It only proposes: applyAnswer decides what is grounded enough to keep. */
   answerInterpreter?: AnswerInterpreter;
+  /** Live only (Muse Spark). May pick among the scaffold rungs the ladder found eligible; see select_scaffold. */
+  scaffoldAdvisor?: ScaffoldAdvisor;
   runtime?: {
     faults?: Fault[];
     fixtureLatency?: { clock: FixtureClock; ms: Partial<Record<ToolName, number>>; default_ms: number };
@@ -143,6 +145,7 @@ export class RelayService {
       prov: new ProvLog(),
       bridge: deps.bridge,
       machine: () => store.getState().machine,
+      scaffoldAdvisor: deps.scaffoldAdvisor,
     };
     const runtime = new ToolRuntime(ctx, TOOL_IMPLS, deps.runtime ?? {});
     const already = deps.bridge.posted().length;

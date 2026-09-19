@@ -150,6 +150,12 @@ function rungCitations(rung: ScaffoldId, f: VerifiedFacts): string[] | null {
 }
 
 const TARGET_RUNG: Record<RepairTarget, number> = { whole: 0, asker: 1, referent: 2 };
+const RUNG_DOES: Record<ScaffoldId, string> = {
+  repeat: "says the ask again, as it was first put",
+  name_asker: "says who is asking",
+  restate_options: "names the choices on offer, and the photo that came with them",
+  source_backed_cue: "plays back something she herself said before, from the original recording",
+};
 
 /**
  * The deterministic ladder. Least support first: a rung is chosen only when
@@ -191,12 +197,38 @@ export const select_scaffold: ToolImpl<"select_scaffold"> = async (input, ctx) =
     else chosen = { scaffold_id: rung, citations };
   }
 
+  // Live only: Muse Spark may choose among the rungs that are ELIGIBLE - never outside them. Its pick is
+  // re-checked here, and anything not on offer, or any failure at all, falls back to the ladder's own choice.
+  let decidedBy: "deterministic_ladder" | "muse_spark" = "deterministic_ladder";
+  const eligible = SCAFFOLD_IDS.map((rung, index) => ({ rung, index, citations: rungCitations(rung, facts) })).filter(
+    (r): r is { rung: ScaffoldId; index: number; citations: string[] } => r.index >= floor && !input.scaffolds_used.includes(r.rung) && r.citations !== null,
+  );
+  if (chosen && ctx.scaffoldAdvisor && eligible.length > 1) {
+    try {
+      const pick = await ctx.scaffoldAdvisor({
+        observed: { state: input.state, repair_target: input.repair_target, what_she_said: ctx.session.assessments.at(-1)?.evidence.transcript ?? "" },
+        eligible: eligible.map((r) => ({ scaffold_id: r.rung, citations: r.citations, what_it_does: RUNG_DOES[r.rung] })),
+      });
+      const offered = eligible.find((r) => r.rung === pick.scaffold_id);
+      if (offered && pick.citations.length > 0 && pick.citations.every((c) => offered.citations.includes(c))) {
+        decidedBy = "muse_spark";
+        if (offered.rung !== chosen.scaffold_id) {
+          for (const r of rejected) if (r.scaffold_id === offered.rung) r.reason = "(chosen)";
+          rejected.push({ scaffold_id: chosen.scaffold_id, reason: "Muse Spark judged it would not supply what she asked for" });
+          chosen = { scaffold_id: offered.rung, citations: offered.citations };
+        }
+      }
+    } catch {
+      // The ladder's choice stands.
+    }
+  }
+
   if (chosen) ctx.session.telemetry.scaffolds_fired.push(chosen.scaffold_id);
   return {
     scaffold_id: chosen?.scaffold_id ?? null,
     citations: chosen?.citations ?? [],
-    rejected,
-    decided_by: "deterministic_ladder" as const,
+    rejected: rejected.filter((r) => r.reason !== "(chosen)"),
+    decided_by: decidedBy,
   };
 };
 

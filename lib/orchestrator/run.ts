@@ -169,7 +169,7 @@ export async function runAsk(env: RunEnv): Promise<RunResult> {
 
       const confirm = await runtime.call("render_prompt", { ask_id: ask.ask_id, scaffold_id: "confirm_send", citations: only([ask.asker_id]) });
       await speak(confirm);
-      await driver.playback();
+      await driver.playback({ asset_id: window.asset_id, spans: captured.kept });
       dispatch({ type: "PLAYBACK_STARTED", contribution_hash: captured.content_hash }, false);
 
       const reply = await driver.listen();
@@ -215,6 +215,10 @@ export async function runAsk(env: RunEnv): Promise<RunResult> {
         await speak(fixed.close_kindly);
         dispatch({ type: "CALL_CLOSED" }, false);
       }
+    } else if (e instanceof Error && e.name === "CallUnavailableError") {
+      // Nobody joined, or the call dropped. The run ends safely wherever it was, records only what actually
+      // happened, and the family gets the neutral notice.
+      dispatch({ type: "CALL_DROPPED", detail: e.message }, false);
     } else if (e instanceof BridgeError) {
       // The thread could not be reached, so her contribution was not delivered. Handled exactly like a
       // tool that did not respond: after capture that means nothing sends, and the run ends safely.

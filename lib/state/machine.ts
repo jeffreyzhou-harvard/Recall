@@ -87,7 +87,9 @@ export type RelayEvent =
   | { type: "GATE_MISSING"; gate: GateName; detail: string }
   | { type: "TOOL_TIMEOUT"; tool: string }
   | { type: "FIXED_RESTATEMENT_DELIVERED"; prompt_id: string }
-  | { type: "CALL_CLOSED" };
+  | { type: "CALL_CLOSED" }
+  /** A live call could not be placed, or ended before Relay finished. Nothing is said to have happened that did not. */
+  | { type: "CALL_DROPPED"; detail: string };
 
 export type RelayEventType = RelayEvent["type"];
 type EventOf<T extends RelayEventType> = Extract<RelayEvent, { type: T }>;
@@ -302,6 +304,12 @@ export function crossCutting(state: RelayState, ctx: RelayContext, event: RelayE
       if (AFTER_CAPTURE.includes(state)) return { to: "not_sent", label: "Not sent", patch };
       if (state === "fallback") return null;
       return { to: "blocked", label: "Not placed", patch, note: "the call is never placed" };
+    }
+    case "CALL_DROPPED": {
+      const patch = { ending_reason: event.detail, family_notice: "not_this_time" as const };
+      if (AFTER_CAPTURE.includes(state)) return { to: "not_sent", label: "Not sent", patch, note: "the call ended before she could approve it" };
+      if (IN_CALL.includes(state) || state === "fallback") return { to: "wrapped_up", label: "Call ended early", patch };
+      return { to: "blocked", label: "Not placed", patch, note: "the call could not be placed" };
     }
     case "CONTENT_OR_AUDIENCE_CHANGED":
       // Rule 3: any change to the artifact or its audience invalidates approval,

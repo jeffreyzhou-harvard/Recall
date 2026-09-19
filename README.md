@@ -67,20 +67,23 @@ The family's thread is a Telegram group. Live only: the judged `/present` path n
 1. Create a bot with [@BotFather](https://t.me/BotFather). **Leave group privacy mode on** - Telegram then sends Relay only `/ask` commands and the one message they reply to, never the rest of the chat.
 2. Put the token in `.env.local` as `TELEGRAM_BOT_TOKEN`, then `npm run telegram -- whoami` and `npm run telegram -- setup`.
 3. Add the bot to the family group. Run `npm run telegram -- discover`, send `/help` in the group, and copy the chat and user ids it prints into `RELAY_TELEGRAM_BINDINGS` (format in `.env.example`).
-4. `npm run telegram -- poll`. No public URL needed. (For a deployed app use `npm run telegram -- webhook https://your-host` with `TELEGRAM_WEBHOOK_SECRET` set.)
+4. `npm run telegram -- poll`. No public URL needed. (For a deployed app use `npm run telegram -- webhook https://your-host` with `TELEGRAM_WEBHOOK_SECRET` set.) With `RELAY_CALL=video`, run the web app and use `npm run telegram -- poll --forward http://localhost:3000` instead: the call has to be placed by the process that serves the call pages.
 
 To ask: post your question (with a photo if you like), then reply to it with `/ask kheer and halwa` - the words after `/ask` say what the photo shows.
 
-`RELAY_CALL=none` (default) is intake only: the ask is validated and recorded, and no call is placed, because there is no telephony yet. `RELAY_CALL=prerecorded` runs the session against the prerecorded golden call and posts her voice card back under the question - real Telegram on both ends of a recorded call. It only completes for the Diwali ask that call was recorded for, and only inside the policy's call window (10:00-19:00 New York); outside it the family correctly gets "Not this time."
+`RELAY_CALL=none` (default) is intake only: the ask is validated and recorded, and no call is placed. `RELAY_CALL=video` places a live video call and runs a real session over it (next section). `RELAY_CALL=prerecorded` runs the session against the prerecorded golden call and posts her voice card back under the question - real Telegram on both ends of a recorded call. It only completes for the Diwali ask that call was recorded for, and only inside the policy's call window (10:00-19:00 New York); outside it the family correctly gets "Not this time."
 
 ## Video call (WebRTC)
 
-A live call between Relay and her device, in the browser. It exists because there is no telephony. Live only.
+A live call between Relay and her device, in the browser, that drives a real Relay session. Live only.
 
 ```bash
-npm run dev                          # then open http://localhost:3000/call/host and press "Start a call"
+RELAY_CALL=video npm run dev         # open http://localhost:3000/call/host and leave it open: it is Relay's end of every call
 npm run build && npm run e2e:call    # one real call between two headless Chromes (needs Chrome)
+npm run build && npm run e2e:live    # a whole session for real: Deepgram + Muse Spark, a few cents a run (macOS + Chrome)
 ```
+
+With `DEEPGRAM_API_KEY` (and optionally `MUSE_API_KEY`) in `.env.local`, a granted ask - from Telegram, or `POST /api/live/asks` from the web app - places a call. `/call/host` joins it as Relay and shows her one-time link. When she taps Join, Relay speaks each line on her device in the device's own synthetic voice, labeled "Relay"; **Deepgram** turns her speech into words with timings; **Muse Spark** chooses among the scaffolds Relay's ladder found eligible (and falls back to the ladder if it is slow, wrong, or down); her own recording is played back to her; and only her spoken yes delivers it. Her audio is wiped from the server when the call ends. `AGENTS.md` section 20 has the design.
 
 `/call/host` is Relay's side (an operator scaffold); it prints her one-time link, `/call/<room>#<token>`. Signaling is a small SSE + POST channel on Next route handlers - no WebSocket server, no dependency - and carries negotiation only: audio and video go peer to peer. Her audio is captured in memory under rule 8: only spans she approved are ever returned, the rest is zeroed, and video is never recorded.
 
@@ -91,7 +94,7 @@ Three things will bite outside `localhost`: her device needs **HTTPS** for camer
 - **The interface.** `/` and `/present` are plain scaffolds. Design goes through the Impeccable skill: run `/impeccable init` first (see `AGENTS.md` section 16).
 - **Real media.** Everything in `/assets` is a generated stand-in (a tick once a second; an SVG that says "Placeholder"). Word timings in the transcripts are placeholders too. See below.
 - **Photo analysis.** The discovery loop is built from the analyzer's output onward. The analyzer itself (face grouping, EXIF, scene themes) is an interface, `PhotoAnalyzer`, with no implementation: it is a model concern with its own consent questions. A model that reads richer facts out of an answer plugs in as an `AnswerInterpreter`; today a small lexical one handles "my daughter Maya" and place names.
-- **Live parts.** `ThreadBridge` has a real Telegram transport, and a live WebRTC call connects and captures her audio. Three seams still have only their deterministic implementation: `CallDriver` (the big one: nothing yet turns her live audio into turns, or Relay's prompts into its voice, so the WebRTC call is not wired to the orchestrator), `TranscriptionProvider` (Deepgram / Muse Voice Transcribe), and `AskInterpreter` plus the `select_scaffold` decision (Muse Spark). The judged path must never depend on the live ones.
+- **Live parts.** Telegram, the video call, Deepgram, and Muse Spark (scaffold choice and graph ingestion) are all real. One seam still has only its deterministic implementation: `AskInterpreter` (reading the forwarded ask). The judged path must never depend on the live parts.
 - **The counterfactual replay.** Nothing exists for it yet, by design: the no-tools bot's lines are not written in `AGENTS.md` and should be locked by the team, not invented by an agent. It is a labeled, prerecorded clip, so it needs a recording and a transcript but no engine work.
 
 ## Replacing the placeholder media

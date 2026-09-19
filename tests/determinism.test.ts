@@ -75,17 +75,18 @@ describe("static determinism guard", () => {
 
   // Live-only code: the one place each external system is touched. Everything else under /lib is
   // judged-path safe, and must not reach these even indirectly.
-  const LIVE_ONLY = [join("lib", "graph", "ladybug-store.ts"), join("lib", "bridge", "telegram") + "/", join("lib", "call") + "/"];
+  const LIVE_ONLY = [join("lib", "graph", "ladybug-store.ts"), join("lib", "bridge", "telegram") + "/", join("lib", "call") + "/", join("lib", "providers", "muse") + "/", join("lib", "providers", "deepgram.ts")];
   const isLiveOnly = (rel: string): boolean => LIVE_ONLY.some((p) => rel === p || rel.startsWith(p));
   const NETWORK = /\bfetch\s*\(|new WebSocket\s*\(|new XMLHttpRequest\s*\(|new EventSource\s*\(/;
-  const LIVE_IMPORT = /@ladybugdb\/core|ladybug-store|bridge\/telegram|@\/lib\/call\/|@\/server\//;
+  // The service composes both loops, so it names the discovery and call modules by type; it opens no connection itself.
+  const LIVE_IMPORT = /@ladybugdb\/core|ladybug-store|bridge\/telegram|@\/lib\/call\/|providers\/muse|providers\/deepgram|@\/server\//;
 
-  it("only two named files under /lib touch the network: the Telegram client and the call's signaling client", () => {
+  it("only four named files under /lib touch the network: Telegram, the call's signaling client, Deepgram, and Muse Spark", () => {
     const callers = filesUnder(join(ROOT, "lib"))
       .filter((f) => NETWORK.test(readFileSync(f, "utf8")))
       .map((f) => f.slice(ROOT.length + 1))
       .sort();
-    expect(callers).toEqual([join("lib", "bridge", "telegram", "api.ts"), join("lib", "call", "signaling-client.ts")]);
+    expect(callers).toEqual([join("lib", "bridge", "telegram", "api.ts"), join("lib", "call", "signaling-client.ts"), join("lib", "providers", "deepgram.ts"), join("lib", "providers", "muse", "spark.ts")]);
   });
 
   it("nothing judged-path safe imports live-only code: not the rest of /lib, not the harness, not /present", () => {

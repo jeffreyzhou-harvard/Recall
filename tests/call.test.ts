@@ -247,8 +247,18 @@ describe("capturing her audio (rule 8)", () => {
     return recorder;
   };
 
-  it("has no way to get the whole recording out: only `finish`, which takes the approved spans", () => {
-    expect(Object.getOwnPropertyNames(ParticipantRecorder.prototype).sort()).toEqual(["constructor", "elapsedMs", "finish", "start"]);
+  it("lets her samples leave in exactly three bounded ways, and returns them to a caller in only one", () => {
+    // start(onChunk)  streams each chunk on to Relay's own server for transcription, where the same rule is enforced
+    //                 (LiveCall.hangUp wipes it). It is a stream in flight, not a way to keep anything.
+    // play(spans)     sends her own audio to her own ears, into the call. It resolves to nothing.
+    // finish(spans)   the ONLY method that hands samples back - and only the spans she approved.
+    expect(Object.getOwnPropertyNames(ParticipantRecorder.prototype).sort()).toEqual(["constructor", "elapsedMs", "finish", "outgoingTrack", "play", "start"]);
+  });
+
+  it("playing her audio back hands nothing to the caller, and does nothing once the recording is finished", async () => {
+    const recorder = filled();
+    await recorder.finish(null);
+    expect(await recorder.play([{ start_ms: 0, end_ms: 1000 }])).toBeUndefined();
   });
 
   it("returns only what she approved, and wipes the rest", async () => {

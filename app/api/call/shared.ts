@@ -11,3 +11,36 @@ export function refusal(e: unknown): Response {
 
 export const tokenOf = (request: Request): string | null => new URL(request.url).searchParams.get("token");
 export type RoomParams = { params: Promise<{ room: string }> };
+
+/** Server-Sent Events: push `T`s down one long response until the client goes away. Shared by every live stream. */
+export function eventStream<T>(request: Request, subscribe: (push: (event: T) => void, close: () => void) => () => void): Response {
+  const encoder = new TextEncoder();
+  let cleanup = (): void => {};
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      let open = true;
+      const write = (chunk: string): void => {
+        if (open) controller.enqueue(encoder.encode(chunk));
+      };
+      const heartbeat = setInterval(() => write(": keep-alive\n\n"), 15_000);
+      const unsubscribe = subscribe(
+        (event) => write(`data: ${JSON.stringify(event)}\n\n`),
+        () => cleanup(),
+      );
+      cleanup = () => {
+        if (!open) return;
+        open = false;
+        clearInterval(heartbeat);
+        unsubscribe();
+        try {
+          controller.close();
+        } catch {
+          // already closed by the client
+        }
+      };
+      request.signal.addEventListener("abort", cleanup);
+    },
+    cancel: () => cleanup(),
+  });
+  return new Response(stream, { headers: { "content-type": "text/event-stream", "cache-control": "no-cache, no-transform", connection: "keep-alive" } });
+}

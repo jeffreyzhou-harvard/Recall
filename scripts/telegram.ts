@@ -6,6 +6,10 @@
  *   npm run telegram -- discover            print chat and user ids of incoming commands, replying to nobody
  *                                           (use this to fill in RELAY_TELEGRAM_BINDINGS)
  *   npm run telegram -- poll                run the bot by long polling: no public URL needed
+ *   npm run telegram -- poll --forward <base-url>
+ *                                           poll, but hand each update to the web app at <base-url> (your
+ *                                           `next dev`/`next start`). REQUIRED for RELAY_CALL=video: the call
+ *                                           has to be placed by the process that serves the call pages.
  *   npm run telegram -- webhook <base-url>  point Telegram at <base-url>/api/telegram/webhook
  *   npm run telegram -- webhook:off         remove the webhook (required before `poll`)
  *
@@ -15,7 +19,7 @@
  */
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { TelegramClient } from "@/lib/bridge/telegram/api";
+import { TelegramClient, WEBHOOK_SECRET_HEADER, type TgUpdate } from "@/lib/bridge/telegram/api";
 import { ASK_COMMAND } from "@/lib/bridge/telegram/updates";
 import { configFromEnv, createLiveRelay } from "@/server/relay-live";
 import { ROOT } from "./lib/asset-tools";
@@ -24,7 +28,7 @@ for (const file of [".env.local", ".env"]) {
   if (existsSync(join(ROOT, file))) process.loadEnvFile(join(ROOT, file));
 }
 
-const [command = "help", arg] = process.argv.slice(2);
+const [command = "help", arg, arg2] = process.argv.slice(2);
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
@@ -36,11 +40,20 @@ function client(): TelegramClient {
   return new TelegramClient(token);
 }
 
-async function poll(discoverOnly: boolean): Promise<void> {
+/** Hand an update to the web app exactly as Telegram would: same route, same secret. The web app does the rest, and logs it. */
+async function forward(base: string, update: TgUpdate): Promise<void> {
+  const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  if (!secret) throw new Error("set TELEGRAM_WEBHOOK_SECRET: the web app refuses updates without it");
+  const res = await fetch(`${base.replace(/\/$/, "")}/api/telegram/webhook`, { method: "POST", headers: { "content-type": "application/json", [WEBHOOK_SECRET_HEADER]: secret }, body: JSON.stringify(update) });
+  console.log(`update ${update.update_id}: handed to the web app (${res.status})`);
+}
+
+async function poll(discoverOnly: boolean, forwardTo: string | null = null): Promise<void> {
   const tg = client();
-  const relay = discoverOnly ? null : await createLiveRelay(configFromEnv(process.env, ROOT));
+  const relay = discoverOnly || forwardTo ? null : await createLiveRelay(configFromEnv(process.env, ROOT));
+  if (relay?.callMode === "video") throw new Error("RELAY_CALL=video needs the web app to place the call. Start it, then:  npm run telegram -- poll --forward http://localhost:3000");
   const me = await tg.getMe();
-  console.log(discoverOnly ? `discovering ids for @${me.username} - send /${ASK_COMMAND} or /help in the chat you want to bind; nothing will be replied to` : `@${me.username} is polling (RELAY_CALL=${relay!.callMode}). Ctrl-C to stop.`);
+  console.log(discoverOnly ? `discovering ids for @${me.username} - send /${ASK_COMMAND} or /help in the chat you want to bind; nothing will be replied to` : forwardTo ? `@${me.username} is polling and handing updates to ${forwardTo}. Ctrl-C to stop.` : `@${me.username} is polling (RELAY_CALL=${relay!.callMode}). Ctrl-C to stop.`);
 
   let offset: number | undefined;
   for (;;) {
@@ -50,6 +63,10 @@ async function poll(discoverOnly: boolean): Promise<void> {
         const m = update.message;
         if (discoverOnly) {
           if (m) console.log(`chat ${m.chat.id} (${m.chat.type}${m.chat.title ? `, "${m.chat.title}"` : ""})  user ${m.from?.id} (${m.from?.first_name ?? "?"})`);
+          continue;
+        }
+        if (forwardTo) {
+          await forward(forwardTo, update);
           continue;
         }
         const handled = await relay!.handle(update);
@@ -81,7 +98,8 @@ switch (command) {
     await poll(true);
     break;
   case "poll":
-    await poll(false);
+    if (arg !== undefined && (arg !== "--forward" || !arg2 || !/^https?:\/\//.test(arg2))) throw new Error("usage: npm run telegram -- poll [--forward http://localhost:3000]");
+    await poll(false, arg === "--forward" ? arg2! : null);
     break;
   case "webhook": {
     const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
@@ -97,5 +115,5 @@ switch (command) {
     console.log("webhook removed");
     break;
   default:
-    console.log("commands: whoami | setup | discover | poll | webhook <https-base-url> | webhook:off");
+    console.log("commands: whoami | setup | discover | poll [--forward <base-url>] | webhook <https-base-url> | webhook:off");
 }

@@ -6,13 +6,12 @@
  * time. Anything without it is refused before the body is read.
  */
 import { timingSafeEqual } from "node:crypto";
+import { after } from "next/server";
 import { WEBHOOK_SECRET_HEADER, type TgUpdate } from "@/lib/bridge/telegram/api";
-import { configFromEnv, createLiveRelay, type LiveRelay } from "@/server/relay-live";
+import { getLiveRelay } from "@/server/relay-live";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-let relay: Promise<LiveRelay> | null = null;
 
 function authentic(presented: string | null, expected: string): boolean {
   if (!presented) return false;
@@ -32,18 +31,17 @@ export async function POST(request: Request): Promise<Response> {
     return new Response("bad request", { status: 400 });
   }
 
-  try {
-    // Built once and kept: it holds the graph. Only a failed start-up is retried on the next request.
-    relay ??= createLiveRelay(configFromEnv(process.env, process.cwd())).catch((e: unknown) => {
-      relay = null;
-      throw e;
-    });
-    const handled = await (await relay).handle(update);
-    console.log(`[telegram] update ${update.update_id}: ${handled.update.kind}${handled.recording ? ` -> ${handled.recording.final_state}` : ""}`);
-  } catch (e) {
-    // Answer 200 regardless: a non-200 makes Telegram redeliver, and an update that fails once will
-    // fail every time. Redelivery of a good update is already harmless (forward ids are idempotent).
-    console.error(`[telegram] update ${update.update_id} failed:`, e);
-  }
+  // Answer first, work afterwards. A granted ask places a call that lasts minutes; Telegram gives a webhook
+  // about a minute before it calls the delivery failed and sends the update again. And answer 200 regardless:
+  // an update that fails once will fail every time. Redelivery of a good update is already harmless
+  // (forward ids are idempotent).
+  after(async () => {
+    try {
+      const handled = await (await getLiveRelay()).handle(update);
+      console.log(`[telegram] update ${update.update_id}: ${handled.update.kind}${handled.recording ? ` -> ${handled.recording.final_state}` : ""}`);
+    } catch (e) {
+      console.error(`[telegram] update ${update.update_id} failed:`, e);
+    }
+  });
   return new Response("ok");
 }

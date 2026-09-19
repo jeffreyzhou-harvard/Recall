@@ -67,6 +67,19 @@ export function newSession(sessionId: string): SessionRecord {
   };
 }
 
+/** What `select_scaffold` shows an advisor: what was observed, and the only rungs on offer. */
+export interface ScaffoldAdvice {
+  observed: { state: string; repair_target: string | null; what_she_said: string };
+  /** Least support first, each with the verified ids it would cite. The advisor may choose among these and nothing else. */
+  eligible: Array<{ scaffold_id: string; citations: string[]; what_it_does: string }>;
+}
+export interface ScaffoldChoice {
+  scaffold_id: string;
+  citations: string[];
+}
+/** Optional, live only (Muse Spark). Its pick is re-checked; anything not on offer falls back to the deterministic ladder. */
+export type ScaffoldAdvisor = (advice: ScaffoldAdvice) => Promise<ScaffoldChoice>;
+
 export interface ToolContext {
   graph: GraphStore;
   policy: AccessPolicy;
@@ -80,4 +93,5 @@ export interface ToolContext {
   bridge: ThreadBridge;
   /** The reducer's state so far. Read-only view for the caregiver receipt. */
   machine: () => MachineState;
+  scaffoldAdvisor?: ScaffoldAdvisor;
 }

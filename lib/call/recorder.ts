@@ -49,9 +49,14 @@ export class ParticipantRecorder {
   private context: AudioContext | null = null;
   private chunks: Int16Array[] = [];
   private finished = false;
+  private out: MediaStreamAudioDestinationNode | null = null;
 
-  /** Start capturing her audio. `stream` is the remote stream from the call; only its audio track is read. */
-  async start(stream: MediaStream): Promise<void> {
+  /**
+   * Start capturing her audio. `stream` is the remote stream from the call; only its audio track is read.
+   * `onChunk` sees each chunk as it arrives, so a live session can send it on for transcription. That is
+   * a stream in flight to Relay's own server, held under the same rule there; it is not a way to keep it.
+   */
+  async start(stream: MediaStream, onChunk?: (pcm: Int16Array) => void): Promise<void> {
     if (this.context) throw new Error("already recording");
     const [audio] = stream.getAudioTracks();
     if (!audio) throw new Error("the call has no audio track to capture");
@@ -64,11 +69,51 @@ export class ParticipantRecorder {
     }
     const node = new AudioWorkletNode(context, "relay-capture");
     node.port.onmessage = (e: MessageEvent<Float32Array>) => {
-      if (!this.finished) this.chunks.push(floatToPcm16(e.data));
+      if (this.finished) return;
+      const pcm = floatToPcm16(e.data);
+      this.chunks.push(pcm);
+      onChunk?.(pcm);
     };
     // Audio only: a new stream holding just that one track, so the video track is never even connected.
     context.createMediaStreamSource(new MediaStream([audio])).connect(node);
     this.context = context;
+  }
+
+  /** Relay's outgoing audio track. The only thing ever played into it is her own recording, played back to her. */
+  outgoingTrack(): MediaStreamTrack {
+    if (!this.context) throw new Error("not recording");
+    this.out ??= this.context.createMediaStreamDestination();
+    return this.out.stream.getAudioTracks()[0]!;
+  }
+
+  /**
+   * Play these spans of her own audio back to her, in order, into the call. Played, never synthesized, and
+   * never returned: this sends her samples to her own ears and hands nothing to the caller.
+   */
+  async play(spans: readonly MediaSpan[]): Promise<void> {
+    const context = this.context;
+    if (!context || this.finished) return;
+    this.outgoingTrack();
+    const all = new Float32Array(this.chunks.reduce((n, c) => n + c.length, 0));
+    let at = 0;
+    for (const chunk of this.chunks) {
+      for (let i = 0; i < chunk.length; i++) all[at + i] = chunk[i]! / 0x8000;
+      at += chunk.length;
+    }
+    let when = context.currentTime + 0.05;
+    for (const span of spans) {
+      const [from, to] = [Math.round((span.start_ms / 1000) * CAPTURE_SAMPLE_RATE), Math.min(all.length, Math.round((span.end_ms / 1000) * CAPTURE_SAMPLE_RATE))];
+      if (to <= from) continue;
+      const buffer = context.createBuffer(1, to - from, CAPTURE_SAMPLE_RATE);
+      buffer.copyToChannel(all.subarray(from, to), 0);
+      const source = context.createBufferSource();
+      source.buffer = buffer;
+      source.connect(this.out!);
+      source.start(when);
+      when += buffer.duration;
+    }
+    all.fill(0);
+    await new Promise((resolve) => setTimeout(resolve, Math.max(0, (when - context.currentTime) * 1000)));
   }
 
   /** How much has been captured so far, in call time. */

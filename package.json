@@ -19,6 +19,7 @@
     "graph:seed": "tsx scripts/seed-graph.ts",
     "telegram": "tsx scripts/telegram.ts",
     "e2e:call": "node scripts/e2e-call.mjs",
+    "e2e:live": "node scripts/e2e-live.mjs",
     "verify": "tsx scripts/verify.ts",
     "verify:strict": "tsx scripts/verify.ts --strict",
     "check": "npm run typecheck && npm run test && npm run verify"

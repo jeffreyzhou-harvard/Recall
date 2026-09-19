@@ -7,6 +7,7 @@
  * for the optional side demo would implement the same interface.
  */
 import type { FixtureClock } from "@/lib/clock";
+import type { MediaSpan } from "@/lib/graph/types";
 import type { AudioWindow, CallTranscript, Turn } from "@/lib/providers/transcription";
 import { turnText } from "@/lib/providers/transcription";
 
@@ -20,8 +21,8 @@ export interface CallDriver {
   connect(): Promise<void>;
   /** Relay speaks, in Relay's own labeled voice. Resolves when the line has finished. */
   speak(prompt: SpokenPrompt): Promise<void>;
-  /** Play her own recorded audio back to her. Never synthesized. */
-  playback(): Promise<void>;
+  /** Play her own recorded audio back to her - the exact kept spans of the pending artifact. Never synthesized. */
+  playback(kept?: { asset_id: string; spans: MediaSpan[] }): Promise<void>;
   /** Wait for her next final turn, or for the silence timeout. Returns the window to assess. */
   listen(): Promise<AudioWindow>;
   hangUp(): Promise<void>;
