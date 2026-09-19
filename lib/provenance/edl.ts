@@ -113,8 +113,7 @@ export function validateEdl(edl: EditDecisionList, words: Word[], options: EdlOp
     if (!edl.intervals.some((iv) => trim.start_ms >= iv.start_ms && trim.end_ms <= iv.end_ms)) {
       throw new EdlError(`trim ${i}: lies outside the contribution intervals`);
     }
-    const next = edl.trims[i + 1];
-    if (next && overlaps(trim, next)) throw new EdlError(`trim ${i}: overlaps the next trim`);
+    if (edl.trims.some((other, j) => j !== i && overlaps(trim, other))) throw new EdlError(`trim ${i}: overlaps another trim`);
     for (const w of words) {
       if (!overlaps(trim, w)) continue;
       const isWholeFiller =

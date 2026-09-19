@@ -15,10 +15,12 @@ export class MemoryGraphStore implements GraphStore {
   }
 
   private insertNode(node: GraphNode): void {
+    if (this.nodes.has(node.id)) throw new Error(`MemoryGraphStore: node "${node.id}" is already in the graph; nodes are never overwritten`);
     this.nodes.set(node.id, structuredClone(node));
   }
 
   private insertEdge(edge: GraphEdge): void {
+    if (this.edges.has(edge.id)) throw new Error(`MemoryGraphStore: edge "${edge.id}" is already in the graph; edges are never overwritten`);
     if (!this.nodes.has(edge.from) || !this.nodes.has(edge.to)) {
       throw new Error(`MemoryGraphStore: edge "${edge.id}" references a node that is not in the graph`);
     }

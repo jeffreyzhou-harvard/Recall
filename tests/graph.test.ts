@@ -130,6 +130,17 @@ describe("LadybugDB store", () => {
     expect((await lbug.nodesOfType("Event")).map((e) => e.label)).toEqual(["Diwali"]);
   });
 
+  it("both stores refuse to overwrite a node or edge that is already written", async () => {
+    const memory = MemoryGraphStore.from(data);
+    const node = data.nodes.find((n) => n.id === PHOTO)!;
+    const edge = data.edges.find((e) => e.from === PHOTO)!;
+    await expect(memory.putNode({ ...node, label: "rewritten" })).rejects.toThrow(/already in the graph/);
+    await expect(memory.putEdge({ ...edge, props: { rewritten: "yes" } })).rejects.toThrow(/already in the graph/);
+    await expect(lbug.putNode({ ...node, label: "rewritten" })).rejects.toThrow();
+    expect((await memory.getNode(PHOTO))!.label).toBe(node.label);
+    expect((await lbug.getNode(PHOTO))!.label).toBe(node.label);
+  });
+
   it("runs the whole judged path - intake, grant, audit writes - with the same result as the in-memory store", async () => {
     const store = await LadybugGraphStore.open(":memory:");
     try {

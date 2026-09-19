@@ -258,6 +258,15 @@ export function buildGraph(raw: unknown, assets: AssetIndex): GraphData {
     if (prov) edges.push({ id, type: e.type, from: e.from, to: e.to, props: e.props ?? {}, prov });
   }
 
+  // verify_claim_support reads CONTRADICTS edges, so a contradiction noted only in provenance would go unheard.
+  for (const n of seed.nodes) {
+    for (const other of n.contradicts ?? []) {
+      if (!edgeIds.has(edgeId("CONTRADICTS", n.id, other))) {
+        problems.push(`node "${n.id}": contradicts "${other}" but no CONTRADICTS edge links them`);
+      }
+    }
+  }
+
   if (problems.length > 0) throw new SeedValidationError([...new Set(problems)]);
   return { nodes, edges };
 }

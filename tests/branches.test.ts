@@ -9,7 +9,7 @@ import { runFixture, type FixtureOptions } from "@/fixtures/harness";
 import { NOTICE_TEXT } from "@/lib/bridge/thread-bridge";
 import type { RelayState } from "@/lib/state/machine";
 import { replay, visitedStates } from "@/lib/state/reducer";
-import { BLOCKED_TOPIC_FORWARD, CONFLICTING_CLAIMS, CONFLICT_MANIFEST, THREAD, diwaliForward, doubleLostCall, toolTimeoutCall, unclearAssentCall } from "./fixtures";
+import { BLOCKED_TOPIC_FORWARD, CONFLICTING_CLAIMS, CONFLICT_MANIFEST, THREAD, assentReplyCall, diwaliForward, doubleLostCall, toolTimeoutCall, unclearAssentCall } from "./fixtures";
 
 const TO_REANCHORED: RelayState[] = ["idle", "ask_received", "policy_passed", "connected", "following", "lost", "reanchored"];
 
@@ -80,6 +80,25 @@ describe("unclear assent", () => {
     const { nodes } = await run.graph.snapshot();
     expect(nodes.filter((n) => n.type === "Contribution" || n.type === "Assent")).toEqual([]);
     expect(run.recording.provenance_receipt).toBeNull();
+  });
+});
+
+describe("assent that is not a clean yes", () => {
+  const decisionFor = async (reply: string): Promise<string> => {
+    const run = await runFixture({ transcript: assentReplyCall(reply) });
+    expect(run.bridge.voiceCards()).toEqual([]);
+    return (run.runtime.log.find((c) => c.tool === "request_assent")!.output as { decision: string }).decision;
+  };
+
+  it("treats a yes followed by a refusal as unclear, wherever the refusal falls", async () => {
+    for (const reply of ["Yes, not now.", "Yes. Stop.", "Yeah, nope.", "Okay, do not send it."]) {
+      expect(await decisionFor(reply), reply).toBe("unclear");
+    }
+  });
+
+  it("hears a refusal that does not open the reply", async () => {
+    expect(await decisionFor("Please don't.")).toBe("no");
+    expect(await decisionFor("Hmm, no.")).toBe("no");
   });
 });
 

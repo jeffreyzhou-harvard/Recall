@@ -88,6 +88,14 @@ describe("the edit-decision list", () => {
     expect(() => validateEdl(edl, answer.words)).toThrow(EdlError);
   });
 
+  it("rejects overlapping trims wherever they sit in the list", () => {
+    const edl = base();
+    const first = edl.trims[0]!;
+    // Appended out of order, so a check that only compares neighbours would miss it.
+    edl.trims = [...edl.trims, { ...first, start_ms: first.start_ms + 10, end_ms: first.end_ms + 10 }];
+    expect(() => validateEdl(edl, answer.words)).toThrow(/overlaps another trim/);
+  });
+
   it("trims a standalone filler as a listed disfluency, and only a filler", () => {
     const words = [
       { w: "Um", start_ms: 0, end_ms: 300 },

@@ -82,13 +82,14 @@ export const capture_exact_contribution: ToolImpl<"capture_exact_contribution"> 
   return contribution;
 };
 
-const YES = /^(yes|yeah|yep|yes please|please do|send it|ok|okay|sure|go ahead)\b/;
-const NO = /^(no|nope|don't|do not|not now|wait|stop)\b/;
+const YES = /^(yes|yeah|yep|please do|send it|ok|okay|sure|go ahead)\b/;
+/** A refusal anywhere in the reply counts, not only one that opens it: "yes, wait" is not a yes. */
+const NO = /\b(no|nope|not|don't|dont|wait|stop)\b/;
 
 function classifyAssent(transcript: string): AssentDecision {
   const said = tokens(transcript).join(" ");
   const yes = YES.test(said);
-  const no = NO.test(said) || /\b(no|don't|wait)\b/.test(said);
+  const no = NO.test(said);
   // Anything short of a clean yes is not a yes. A mixed reply is unclear, and unclear never sends.
   if (yes && !no) return "yes";
   if (no && !yes) return "no";
@@ -156,7 +157,7 @@ async function writeAudit(ctx: ToolContext, c: Contribution, assent: ToolOutput<
     supersedes: [],
     contradicts: [],
   });
-  const overall = { start_ms: c.intervals[0]!.start_ms, end_ms: c.intervals[c.intervals.length - 1]!.end_ms };
+  const overall = { start_ms: Math.min(...c.intervals.map((i) => i.start_ms)), end_ms: Math.max(...c.intervals.map((i) => i.end_ms)) };
   const nodes: GraphNode[] = [
     { id: callArtifactId, type: "Artifact", label: "Approved call audio", props: { kind: "audio", text: null, alt: "The approved spans of the call" }, prov: prov(c.speaker_id, overall) },
     { id: c.contribution_id, type: "Contribution", label: c.literal_transcript, props: { content_hash: c.content_hash, literal_transcript: c.literal_transcript, generated_first_person_words: 0 }, prov: prov(c.speaker_id, overall) },
