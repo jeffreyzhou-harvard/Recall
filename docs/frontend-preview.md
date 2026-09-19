@@ -1,6 +1,6 @@
 # Recall frontend preview
 
-Built on branch `designs`, after pulling main through f221ea5 and reading its revised AGENTS.md and SPECS.md.
+Built on branch `designs`, merged with main through `16c34d7`, and prepared for the shared frontend handoff. The latest AGENTS.md and SPECS.md were reviewed before integration.
 
 ## Routes
 
@@ -48,3 +48,16 @@ The latest user request explicitly extends the older specs: caregivers may sugge
 For live integration, the backend's existing redirect-only question contract must be revised with the required gate review. A question request needs an invitation/skip choice for Susan and a separate share decision for any returned answer. A pending request is never a memory claim.
 
 Validation before the latest main merge: `npm run check` passed (258 tests, language lint, provenance checks). Browser checks covered 1440px, 1088px and 390px layouts, wheel selection, previous/next, Home/End, historical counts and insufficient-history summaries. Existing placeholder media and word timings still prevent strict demo readiness. Post-merge verification is recorded below.
+
+## Backend handoff
+
+After merging the latest main: `npm run check` passes all 407 tests plus language/provenance checks; `npm run build -- --webpack` passes. Validation used Node 24.19.0; the new onboarding database requires Node >=22.13.
+
+| Surface | Frontend entry | Integration boundary |
+| --- | --- | --- |
+| Patient call | `components/recall/RecallPhone.tsx` | Replace scripted preview turns with call-driver events; preserve separate remember/share decisions. |
+| Caregiver | `app/family/page.tsx`, `components/recall/SessionWaveform.tsx` | Supply authorized session metadata/outcomes, with real dates. `SessionSummary` excludes personal words. |
+| Setup | `app/onboarding/page.tsx` | Adapt local file selections and joint review to the new `/api/onboarding` contracts; no files currently leave the tab. |
+| Conversation requests | `components/recall/MemorySuggestionForm.tsx` | Pending local suggestions only. The live request contract and patient invitation/share flow need implementation and gate review. |
+
+`PreviewProvider` is the isolated fixture/state adapter, not authentication or persistence. No backend secret belongs in the client. The patient and caregiver surfaces are frontend boilerplate; live calling, authorized data loading and persistence remain separate integration work.

@@ -39,6 +39,12 @@ Node 22.13+. No keys, no database, and no network are needed for any of the abov
 | `npm run assets:placeholder` | Generate stand-in media. Never overwrites an existing file. |
 | `npm run graph:seed` | Build an on-disk LadybugDB graph at `.data/recall.lbug` from the family seed, for Cypher poking. |
 
+## Frontend boilerplate
+
+The frontend is ready for backend integration: `/` is the patient call, `/caregiver` is the caregiver session waveform and conversation-suggestion form, `/onboarding` is phone-first setup, and `/revisit` is the next-conversation invitation. `/family` aliases `/caregiver`.
+
+These screens use isolated sample state and local files. They do not yet load authorized household data, schedule calls or persist suggestions. The waveform displays labeled per-topic call counts, not recorded audio or a memory score. The UI permits separately labeled question suggestions; the live backend still has its redirect-only question contract. See [the frontend handoff](docs/frontend-preview.md#backend-handoff) for entry points and integration boundaries.
+
 ## How it fits together
 
 Recall places a scheduled recall call to her, climbs a five-rung support ladder, captures her exact words, and stores them only after she hears the line played back and says yes. A second question asks whether to share that line with family. Family never trigger a same-moment call, and Recall never answers them from the graph.
@@ -59,14 +65,14 @@ Family flows sit outside that reducer: a query is redirected, a contribution is 
 | Memory graph + retrieval layer | `lib/graph` — 18 node types, provenance on every claim and edge, a thinner per-cue effectiveness layer that never decides whether to climb, only which cue to try |
 | Trims, hashes, receipts | `lib/provenance` — an edit-decision list that can only express silence and disfluency trims; hash-chained PROV-style log |
 | Onboarding database | `lib/onboarding` — households, the people in them, stated ties, invitations, and every version of the joint setup, append-only. SQLite (`node:sqlite`) with an in-memory twin; the same rules run over both |
-| Family app | `/family` — contribution form, "Ask about Susan" (redirect only), Weekly Note, per-topic record |
+| Caregiver frontend | `/caregiver` (`/family` alias) — session waveform, optional topic details/Weekly Note, local memory and question suggestions |
 | Judged sandbox | `/present` — autoplay 90-second path; arrow keys step manually |
 
 The model may select tool calls. It cannot bypass gates. Storing a claim without confirmation, speaking an uncited fact, leaking graph content through `handle_family_query`, or climbing the ladder out of order are hard fails.
 
 **Support ladder (least support first):** free recall → context → association → recognition → reorientation. Climb one rung at a time. Rung 1 is an invitation ("I'd love to hear about the summers at Cape May. What comes to mind?"), never "Who is…?" or "Do you remember…?". Family-sourced, unconfirmed claims stop at rung 3 and are spoken only attributed, followed by an open question.
 
-## Family surface
+## Family services (current backend contract)
 
 Family are part of the loop, passively and lightly. Nothing here is shown to her.
 
