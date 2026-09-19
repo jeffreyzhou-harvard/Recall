@@ -22,6 +22,7 @@ coverage/
 .claude/settings.local.json
 .impeccable/config.local.json
 .impeccable/live/
+.impeccable/review/
 
 # unapproved call audio must never persist (AGENTS.md rule 8)
 /tmp-audio/

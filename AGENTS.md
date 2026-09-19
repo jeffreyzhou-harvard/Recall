@@ -421,3 +421,13 @@ These are not settled. Do not implement around them; ask.
 6. **Hang-up at the share question.** Because commit happens after both confirmations (§5), hanging up at the share question stores nothing. This is the conservative reading of rule 12; revisit if it loses too many memories in practice.
 7. **Safety list and outside review.** The starter safety list is a lexical match, so it will miss things and will sometimes fire on harmless phrases. Relay is not an emergency service and must not be described as one. Before any real deployment: have a clinician or speech-language pathologist review the ladder and the safety list, and get a lawyer's review of automated and AI-voice call consent, call-recording and voice-data laws, and the alert channel.
 8. **Golden-path echo.** In the demo, her reply ("We went to Cape May every summer") repeats words from Relay's own opener and is then stored as new. Decide whether to add an echo rule (a reply that only repeats Relay's cue words is not stored as new) and script a detail the cue could not have supplied.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

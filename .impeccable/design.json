@@ -1,0 +1,281 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-19T23:33:56.678741+00:00",
+  "title": "Design System: Recall",
+  "extensions": {
+    "colorMeta": {
+      "ink": {
+        "role": "primary",
+        "displayName": "Ink",
+        "tonalRamp": [
+          "oklch(15.00% 0.01333 163.85)",
+          "oklch(26.43% 0.01333 163.85)",
+          "oklch(37.86% 0.01333 163.85)",
+          "oklch(49.29% 0.01333 163.85)",
+          "oklch(60.71% 0.01333 163.85)",
+          "oklch(72.14% 0.01333 163.85)",
+          "oklch(83.57% 0.01333 163.85)",
+          "oklch(95.00% 0.01333 163.85)"
+        ]
+      },
+      "background": {
+        "role": "neutral",
+        "displayName": "Background",
+        "tonalRamp": [
+          "oklch(15.00% 0.00395 106.47)",
+          "oklch(26.43% 0.00395 106.47)",
+          "oklch(37.86% 0.00395 106.47)",
+          "oklch(49.29% 0.00395 106.47)",
+          "oklch(60.71% 0.00395 106.47)",
+          "oklch(72.14% 0.00395 106.47)",
+          "oklch(83.57% 0.00395 106.47)",
+          "oklch(95.00% 0.00395 106.47)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted",
+        "tonalRamp": [
+          "oklch(15.00% 0.01765 157.75)",
+          "oklch(26.43% 0.01765 157.75)",
+          "oklch(37.86% 0.01765 157.75)",
+          "oklch(49.29% 0.01765 157.75)",
+          "oklch(60.71% 0.01765 157.75)",
+          "oklch(72.14% 0.01765 157.75)",
+          "oklch(83.57% 0.01765 157.75)",
+          "oklch(95.00% 0.01765 157.75)"
+        ]
+      },
+      "soft": {
+        "role": "neutral",
+        "displayName": "Soft",
+        "tonalRamp": [
+          "oklch(15.00% 0.00859 128.56)",
+          "oklch(26.43% 0.00859 128.56)",
+          "oklch(37.86% 0.00859 128.56)",
+          "oklch(49.29% 0.00859 128.56)",
+          "oklch(60.71% 0.00859 128.56)",
+          "oklch(72.14% 0.00859 128.56)",
+          "oklch(83.57% 0.00859 128.56)",
+          "oklch(95.00% 0.00859 128.56)"
+        ]
+      },
+      "rule-accent": {
+        "role": "neutral",
+        "displayName": "Rule Accent",
+        "tonalRamp": [
+          "oklch(15.00% 0.01508 142.22)",
+          "oklch(26.43% 0.01508 142.22)",
+          "oklch(37.86% 0.01508 142.22)",
+          "oklch(49.29% 0.01508 142.22)",
+          "oklch(60.71% 0.01508 142.22)",
+          "oklch(72.14% 0.01508 142.22)",
+          "oklch(83.57% 0.01508 142.22)",
+          "oklch(95.00% 0.01508 142.22)"
+        ]
+      },
+      "tint": {
+        "role": "neutral",
+        "displayName": "Tint",
+        "tonalRamp": [
+          "oklch(15.00% 0.00822 121.63)",
+          "oklch(26.43% 0.00822 121.63)",
+          "oklch(37.86% 0.00822 121.63)",
+          "oklch(49.29% 0.00822 121.63)",
+          "oklch(60.71% 0.00822 121.63)",
+          "oklch(72.14% 0.00822 121.63)",
+          "oklch(83.57% 0.00822 121.63)",
+          "oklch(95.00% 0.00822 121.63)"
+        ]
+      },
+      "focus": {
+        "role": "primary",
+        "displayName": "Focus",
+        "tonalRamp": [
+          "oklch(15.00% 0.03767 164.29)",
+          "oklch(26.43% 0.03767 164.29)",
+          "oklch(37.86% 0.03767 164.29)",
+          "oklch(49.29% 0.03767 164.29)",
+          "oklch(60.71% 0.03767 164.29)",
+          "oklch(72.14% 0.03767 164.29)",
+          "oklch(83.57% 0.03767 164.29)",
+          "oklch(95.00% 0.03767 164.29)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Line",
+        "tonalRamp": [
+          "oklch(15.00% 0.01411 145.44)",
+          "oklch(26.43% 0.01411 145.44)",
+          "oklch(37.86% 0.01411 145.44)",
+          "oklch(49.29% 0.01411 145.44)",
+          "oklch(60.71% 0.01411 145.44)",
+          "oklch(72.14% 0.01411 145.44)",
+          "oklch(83.57% 0.01411 145.44)",
+          "oklch(95.00% 0.01411 145.44)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "cue": {
+        "displayName": "Current words",
+        "purpose": "Literal patient captions and confirmed quotations."
+      },
+      "display": {
+        "displayName": "Caregiver title",
+        "purpose": "42px desktop heading; 36px at 600px and below."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "button-fill",
+        "value": "120ms ease-out",
+        "purpose": "Background color transition."
+      },
+      {
+        "name": "caption-word",
+        "value": "270ms",
+        "purpose": "Reserved-position word reveal; disabled with reduced motion."
+      },
+      {
+        "name": "session-selection",
+        "value": "180ms ease-out",
+        "purpose": "Bar color/opacity and receipt fade with 3px rise; disabled with reduced motion, which also makes programmatic scrolling immediate."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "narrow-phone",
+        "value": "380px"
+      },
+      {
+        "name": "stack",
+        "value": "600px"
+      },
+      {
+        "name": "wide-phone",
+        "value": "700px"
+      },
+      {
+        "name": "caregiver-stack",
+        "value": "800px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Large direct action.",
+      "html": "<button class=\"ds-button-primary\">Answer call</button>",
+      "css": ".ds-button-primary{font-family:\"Atkinson Hyperlegible Next\",\"Atkinson Hyperlegible\",sans-serif;display:flex;align-items:center;justify-content:center;width:100%;min-height:76px;padding:18px;border:1.5px solid #242c28;border-radius:12px;font-size:26px;font-weight:600;line-height:1.2;transition:background-color 120ms ease-out;cursor:pointer;background:#242c28;color:#fafaf7;}.ds-button-primary:hover{background:#535e57;}.ds-button-primary:focus-visible{outline:3px solid #354f43;outline-offset:5px;}.ds-button-primary:active{background:#242c28;}"
+    },
+    {
+      "name": "Secondary button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Equal styling for either consent choice.",
+      "html": "<button class=\"ds-button-secondary\">Yes</button>",
+      "css": ".ds-button-secondary{font-family:\"Atkinson Hyperlegible Next\",\"Atkinson Hyperlegible\",sans-serif;display:flex;align-items:center;justify-content:center;width:100%;min-height:76px;padding:18px;border:1.5px solid #242c28;border-radius:12px;font-size:26px;font-weight:600;line-height:1.2;transition:background-color 120ms ease-out;cursor:pointer;background:#fafaf7;color:#242c28;}.ds-button-secondary:hover{background:#f0f2ec;}.ds-button-secondary:focus-visible{outline:3px solid #354f43;outline-offset:5px;}"
+    },
+    {
+      "name": "Text field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Explicit caregiver input with visible label.",
+      "html": "<label class=\"ds-field\">Name<input placeholder=\"For example, Maya\" /></label>",
+      "css": ".ds-field{font-family:\"Atkinson Hyperlegible Next\",\"Atkinson Hyperlegible\",sans-serif;display:grid;gap:8px;font-size:20px;color:#242c28;}.ds-field input{font-family:\"Atkinson Hyperlegible Next\",\"Atkinson Hyperlegible\",sans-serif;min-width:0;min-height:54px;border:2px solid #242c28;border-radius:6px;padding:10px 12px;background:#fafaf7;color:#242c28;font-size:22px;}.ds-field input::placeholder{color:#535e57;opacity:1;}.ds-field input:focus-visible{outline:3px solid #354f43;outline-offset:5px;}"
+    },
+    {
+      "name": "Caregiver navigation",
+      "kind": "nav",
+      "description": "Underlined destinations with generous targets.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Caregiver sections\"><a href=\"#topic-record\">Recall sessions</a><a href=\"#suggestions\">Suggest a conversation</a><a href=\"/onboarding\">Setup</a></nav>",
+      "css": ".ds-nav{font-family:\"Atkinson Hyperlegible Next\",\"Atkinson Hyperlegible\",sans-serif;display:flex;flex-wrap:wrap;gap:8px 28px;border-bottom:1px solid var(--recall-line, #bdc5bd);padding-block:18px;margin-bottom:30px;font-size:18px;}.ds-nav a{display:inline-flex;align-items:center;min-height:44px;color:var(--recall-ink, #242c28);text-decoration:underline;}.ds-nav a:hover{text-decoration-thickness:2px;}.ds-nav a:focus-visible{outline:3px solid var(--recall-focus, #354f43);outline-offset:5px;}"
+    },
+    {
+      "name": "Selected session receipt",
+      "kind": "custom",
+      "description": "Date, topic, observable support and counts as of that call; no private words.",
+      "html": "<section class=\"ds-receipt\"><div class=\"ds-date\"><time datetime=\"2026-09-19\">Saturday, September 19</time><span>Sample call</span></div><h3>Cape May summers</h3><p class=\"ds-support\">Recall offered a cue to help Susan talk about this topic.</p><p class=\"ds-count\"><strong>6 of 8 recent calls unaided</strong><span>For this topic, up to Sep 19.</span></p><p class=\"ds-privacy\">A brief account of the support used. Personal words stay private.</p></section>",
+      "css": ".ds-receipt{font-family:\"Atkinson Hyperlegible Next\",\"Atkinson Hyperlegible\",sans-serif;color:var(--recall-ink,#242c28);}.ds-date{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 20px;color:var(--recall-muted,#535e57);font-size:17px;}.ds-receipt h3{font-size:32px;font-weight:600;letter-spacing:-.015em;line-height:1.2;margin:18px 0 0;}.ds-support{font-size:21px;line-height:1.4;max-width:45ch;margin:14px 0 0;}.ds-count{margin:24px 0 0;font-size:19px;}.ds-count strong{display:block;font-weight:600;}.ds-count span{display:block;font-size:17px;margin-top:6px;color:var(--recall-muted,#535e57);}.ds-privacy{border-top:1px solid var(--recall-line,#bdc5bd);padding-top:18px;margin-top:12px;font-size:17px;color:var(--recall-muted,#535e57);}@media(max-width:600px){.ds-receipt h3{font-size:28px;}}"
+    },
+    {
+      "name": "Equal consent choices",
+      "kind": "custom",
+      "description": "Same size and treatment for Yes and No.",
+      "html": "<div class=\"ds-choices\"><button>Yes</button><button>No</button></div>",
+      "css": ".ds-choices{display:grid;grid-template-columns:1fr 1fr;gap:12px;}.ds-choices button{font-family:\"Atkinson Hyperlegible Next\",\"Atkinson Hyperlegible\",sans-serif;display:flex;align-items:center;justify-content:center;width:100%;min-height:76px;padding:18px;border:1.5px solid #242c28;border-radius:12px;font-size:26px;font-weight:600;line-height:1.2;transition:background-color 120ms ease-out;cursor:pointer;min-height:64px;padding:14px 18px;font-size:24px;background:#fafaf7;color:#242c28;}.ds-choices button:hover{background:#f0f2ec;}.ds-choices button:focus-visible{outline:3px solid #354f43;outline-offset:5px;}"
+    },
+    {
+      "name": "Inline suggestion panel",
+      "kind": "card",
+      "refersTo": "suggestion-panel",
+      "description": "Contributor form opens within the tinted panel; memory and question remain distinct.",
+      "html": "<aside class=\"ds-suggestion\"><h2>For your next conversation</h2><p>Suggest a memory or a question for Susan’s next agreed Recall call.</p><button type=\"button\">Suggest a conversation</button><p class=\"ds-caption\">Susan chooses whether to discuss it, and whether to share her answer with you.</p></aside>",
+      "css": ".ds-suggestion{font-family:\"Atkinson Hyperlegible Next\",\"Atkinson Hyperlegible\",sans-serif;background:var(--recall-tint, #f0f2ec);color:var(--recall-ink, #242c28);border:1px solid var(--recall-line, #bdc5bd);border-radius:12px;padding:24px;}.ds-suggestion h2{font-size:27px;font-weight:650;line-height:1.2;margin:0;}.ds-suggestion p{font-size:19px;line-height:1.4;margin:16px 0 0;}.ds-suggestion button{font:600 19px \"Atkinson Hyperlegible Next\",sans-serif;display:flex;align-items:center;justify-content:center;min-height:50px;width:100%;margin-top:24px;padding:12px 16px;border:1px solid var(--recall-ink, #242c28);border-radius:8px;background:var(--recall-ink, #242c28);color:var(--recall-bg, #fafaf7);cursor:pointer;}.ds-suggestion button:hover{background:var(--recall-muted, #535e57);}.ds-suggestion button:active{background:var(--recall-ink, #242c28);}.ds-suggestion button:focus-visible{outline:3px solid var(--recall-focus, #354f43);outline-offset:5px;}.ds-suggestion .ds-caption{font-size:17px;line-height:1.45;color:var(--recall-muted, #535e57);}@media(max-width:600px){.ds-suggestion{padding:22px;}}"
+    },
+    {
+      "name": "Topic disclosure",
+      "kind": "custom",
+      "description": "Expandable neutral per-topic counts, separated by rules.",
+      "html": "<details class=\"ds-topic\"><summary><span><strong>Cape May summers</strong><span class=\"ds-caption\">September 2026 · Sample call record</span></span><span class=\"ds-summary\">Open call counts</span><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"m6 9 6 6 6-6\"/></svg></summary><div class=\"ds-detail\">Counts remain specific to this topic and describe calls only.</div></details>",
+      "css": ".ds-topic{font-family:\"Atkinson Hyperlegible Next\",\"Atkinson Hyperlegible\",sans-serif;color:var(--recall-ink, #242c28);border-top:1px solid var(--recall-line, #bdc5bd);border-bottom:1px solid var(--recall-line, #bdc5bd);}.ds-topic summary{display:grid;grid-template-columns:minmax(0,1fr) auto 24px;gap:24px;align-items:center;min-height:104px;padding:20px 8px;list-style:none;cursor:pointer;}.ds-topic summary::-webkit-details-marker{display:none;}.ds-topic summary:hover{background:var(--recall-tint, #f0f2ec);}.ds-topic summary:focus-visible{outline:3px solid var(--recall-focus, #354f43);outline-offset:5px;}.ds-topic strong{display:block;font-size:23px;font-weight:600;}.ds-topic .ds-caption{display:block;margin-top:6px;font-size:17px;color:var(--recall-muted, #535e57);}.ds-summary{font-size:20px;}.ds-topic[open] svg{transform:rotate(180deg);}.ds-detail{padding:0 8px 28px;font-size:20px;}@media(max-width:600px){.ds-topic summary{grid-template-columns:minmax(0,1fr) 24px;gap:8px 12px;}.ds-topic summary>span:first-child{grid-column:1;}.ds-summary{grid-row:2;grid-column:1;font-size:19px;}.ds-topic svg{grid-row:1 / 3;grid-column:2;}}"
+    },
+    {
+      "name": "Session waveform",
+      "kind": "custom",
+      "description": "Visual sample of the native session navigator: fixed playhead, event-count peaks and dashed insufficient history. Selection and receipt synchronization run in SessionWaveform.tsx.",
+      "html": "<div class=\"ds-wave\"><div class=\"ds-track\"><button class=\"ds-stop\" aria-pressed=\"false\" aria-label=\"Sep 12: Not enough calls yet\"><svg viewBox=\"0 0 144 184\" aria-hidden=\"true\"><line x1=\"0\" y1=\"92\" x2=\"144\" y2=\"92\"/><rect class=\"ds-unmeasured\" x=\"6\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-unmeasured\" x=\"13\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-unmeasured\" x=\"20\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-unmeasured\" x=\"27\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-unmeasured\" x=\"34\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-unmeasured\" x=\"41\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-unmeasured\" x=\"48\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-unmeasured\" x=\"55\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-unmeasured\" x=\"62\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-unmeasured\" x=\"69\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-unmeasured\" x=\"76\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-unmeasured\" x=\"83\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-unmeasured\" x=\"90\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-unmeasured\" x=\"97\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-unmeasured\" x=\"104\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-unmeasured\" x=\"111\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-unmeasured\" x=\"118\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-unmeasured\" x=\"125\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-unmeasured\" x=\"132\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/></svg><span>Sep 12</span></button><button class=\"ds-stop\" aria-pressed=\"true\" aria-label=\"Sep 19: 6 of 8 recent calls unaided\"><svg viewBox=\"0 0 144 184\" aria-hidden=\"true\"><line x1=\"0\" y1=\"92\" x2=\"144\" y2=\"92\"/><rect x=\"6\" y=\"80.8\" width=\"4\" height=\"22.4\" rx=\"2\"/><rect x=\"13\" y=\"75.4\" width=\"4\" height=\"33.2\" rx=\"2\"/><rect x=\"20\" y=\"68.8\" width=\"4\" height=\"46.4\" rx=\"2\"/><rect x=\"27\" y=\"71.8\" width=\"4\" height=\"40.4\" rx=\"2\"/><rect x=\"34\" y=\"60.4\" width=\"4\" height=\"63.2\" rx=\"2\"/><rect x=\"41\" y=\"53.2\" width=\"4\" height=\"77.6\" rx=\"2\"/><rect x=\"48\" y=\"58.6\" width=\"4\" height=\"66.8\" rx=\"2\"/><rect x=\"55\" y=\"44.2\" width=\"4\" height=\"95.6\" rx=\"2\"/><rect x=\"62\" y=\"36.4\" width=\"4\" height=\"111.2\" rx=\"2\"/><rect x=\"69\" y=\"28\" width=\"4\" height=\"128\" rx=\"2\"/><rect x=\"76\" y=\"38.8\" width=\"4\" height=\"106.4\" rx=\"2\"/><rect x=\"83\" y=\"46.6\" width=\"4\" height=\"90.8\" rx=\"2\"/><rect x=\"90\" y=\"41.8\" width=\"4\" height=\"100.4\" rx=\"2\"/><rect x=\"97\" y=\"57.4\" width=\"4\" height=\"69.2\" rx=\"2\"/><rect x=\"104\" y=\"62.2\" width=\"4\" height=\"59.6\" rx=\"2\"/><rect x=\"111\" y=\"68.8\" width=\"4\" height=\"46.4\" rx=\"2\"/><rect x=\"118\" y=\"65.2\" width=\"4\" height=\"53.6\" rx=\"2\"/><rect x=\"125\" y=\"75.4\" width=\"4\" height=\"33.2\" rx=\"2\"/><rect x=\"132\" y=\"80.8\" width=\"4\" height=\"22.4\" rx=\"2\"/></svg><span>Sep 19</span></button><button class=\"ds-stop\" aria-pressed=\"false\" aria-label=\"Sep 26: 4 of 8 recent calls unaided\"><svg viewBox=\"0 0 144 184\" aria-hidden=\"true\"><line x1=\"0\" y1=\"92\" x2=\"144\" y2=\"92\"/><rect x=\"6\" y=\"83.2\" width=\"4\" height=\"17.6\" rx=\"2\"/><rect x=\"13\" y=\"79.6\" width=\"4\" height=\"24.8\" rx=\"2\"/><rect x=\"20\" y=\"75.2\" width=\"4\" height=\"33.6\" rx=\"2\"/><rect x=\"27\" y=\"77.2\" width=\"4\" height=\"29.6\" rx=\"2\"/><rect x=\"34\" y=\"69.6\" width=\"4\" height=\"44.8\" rx=\"2\"/><rect x=\"41\" y=\"64.8\" width=\"4\" height=\"54.4\" rx=\"2\"/><rect x=\"48\" y=\"68.4\" width=\"4\" height=\"47.2\" rx=\"2\"/><rect x=\"55\" y=\"58.8\" width=\"4\" height=\"66.4\" rx=\"2\"/><rect x=\"62\" y=\"53.6\" width=\"4\" height=\"76.8\" rx=\"2\"/><rect x=\"69\" y=\"48\" width=\"4\" height=\"88\" rx=\"2\"/><rect x=\"76\" y=\"55.2\" width=\"4\" height=\"73.6\" rx=\"2\"/><rect x=\"83\" y=\"60.4\" width=\"4\" height=\"63.2\" rx=\"2\"/><rect x=\"90\" y=\"57.2\" width=\"4\" height=\"69.6\" rx=\"2\"/><rect x=\"97\" y=\"67.6\" width=\"4\" height=\"48.8\" rx=\"2\"/><rect x=\"104\" y=\"70.8\" width=\"4\" height=\"42.4\" rx=\"2\"/><rect x=\"111\" y=\"75.2\" width=\"4\" height=\"33.6\" rx=\"2\"/><rect x=\"118\" y=\"72.8\" width=\"4\" height=\"38.4\" rx=\"2\"/><rect x=\"125\" y=\"79.6\" width=\"4\" height=\"24.8\" rx=\"2\"/><rect x=\"132\" y=\"83.2\" width=\"4\" height=\"17.6\" rx=\"2\"/></svg><span>Sep 26</span></button></div><div class=\"ds-playhead\" aria-hidden=\"true\"></div></div><p class=\"ds-wave-caption\">Peaks count unaided calls about the same topic, up to 8 as of each date. Dashed marks: fewer than 3 calls.</p>",
+      "css": ".ds-wave{position:relative;font-family:\"Atkinson Hyperlegible Next\",\"Atkinson Hyperlegible\",sans-serif;}.ds-track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;padding-block:8px;}.ds-stop{flex:0 0 144px;min-width:0;scroll-snap-align:center;padding:0 0 12px;border:0;border-radius:8px;background:transparent;color:var(--recall-muted,#535e57);font:17px \"Atkinson Hyperlegible Next\",sans-serif;cursor:pointer;}.ds-stop svg{display:block;width:100%;height:184px;}.ds-stop rect{fill:var(--recall-muted,#535e57);opacity:.78;transition:fill 180ms ease-out,opacity 180ms ease-out;}.ds-stop line{stroke:var(--recall-line,#bdc5bd);stroke-width:.6;}.ds-stop .ds-unmeasured{fill:none;stroke:var(--recall-muted,#535e57);stroke-width:.7;stroke-dasharray:2 2;opacity:1;}.ds-stop[aria-pressed=\"true\"],.ds-stop:hover{background:var(--recall-tint,#f0f2ec);color:var(--recall-ink,#242c28);}.ds-stop[aria-pressed=\"true\"] rect{fill:var(--recall-ink,#242c28);opacity:1;}.ds-stop[aria-pressed=\"true\"] span{font-weight:650;}.ds-stop:hover rect:not(.ds-unmeasured){fill:var(--recall-ink,#242c28);}.ds-stop:focus-visible{outline:3px solid var(--recall-focus,#354f43);outline-offset:-4px;}.ds-playhead{position:absolute;top:8px;bottom:52px;left:50%;width:1px;background:var(--recall-ink,#242c28);pointer-events:none;}.ds-wave-caption{font:15px/1.45 \"Atkinson Hyperlegible Next\",sans-serif;color:var(--recall-muted,#535e57);}@media(max-width:600px){.ds-stop{flex-basis:112px;font-size:16px;}.ds-stop svg{height:160px;}}@media(prefers-reduced-motion:reduce){.ds-stop rect{transition:none;}}"
+    }
+  ],
+  "narrative": {
+    "northStar": "A familiar photograph, one spoken thought",
+    "overview": "Recall uses warm neutral surfaces, dark readable words and quiet controls. The exact self-hosted Atkinson Hyperlegible Next family carries both identity and reading. Familiar imagery remains still; literal words and decisions receive clear space.\n\nThis system describes the frontend boilerplate at `/`, `/caregiver` (also `/family`), `/onboarding` and `/revisit`, as shipped in `app/recall.css` and `components/recall`. It does not describe backend integration or legacy operator/demo surfaces. The user's final quiet direction supersedes the earlier bright palette. Source evidence includes the current phone, caregiver waveform, setup and revisit components; the surface contracts are `.impeccable/surfaces/recall-phone.md` and `.impeccable/surfaces/caregiver-waveform.md`.",
+    "keyCharacteristics": [
+      "Quiet warm neutrals and flat surfaces.",
+      "One exact font family with generous patient text.",
+      "Familiar photographs separate from captions.",
+      "Equal visual weight for consent choices."
+    ],
+    "rules": [
+      {
+        "name": "The Quiet Color Rule",
+        "body": "Use neutral differences and explicit labels; never use good/bad color to grade call records.",
+        "section": "colors"
+      },
+      {
+        "name": "The Exact Typeface Rule",
+        "body": "Keep the self-hosted Atkinson Hyperlegible Next face throughout Recall surfaces.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Surface Rule",
+        "body": "Preserve the user's quiet direction with no visible shadows.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Equal Choice Rule",
+        "body": "Remember/share Yes and No use identical secondary styling and equal columns. End call is a separate underlined action.",
+        "section": "components"
+      }
+    ],
+    "dos": [
+      "Do keep patient captions, decisions and stopping controls visually distinct.",
+      "Do preserve exact words and equal consent choices.",
+      "Do keep photographs still, uncropped and free of text overlays.",
+      "Do retain visible keyboard focus, generous targets and responsive vertical scrolling.",
+      "Do label sample media and preserve source attribution."
+    ],
+    "donts": [
+      "Don't restore bright accents, visible shadows or decorative status dots.",
+      "Don't substitute a serif or system display face for Atkinson Hyperlegible Next.",
+      "Don't turn neutral topic counts into a score or color-coded verdict.",
+      "Don't promote legacy demo styling or generated preview media into product evidence."
+    ]
+  }
+}

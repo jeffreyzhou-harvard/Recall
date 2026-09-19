@@ -1,0 +1,53 @@
+{
+  "kind": "scripted_preview",
+  "person": "Susan",
+  "familyMember": "Maya",
+  "date": "2026-09-19",
+  "topics": [
+    {
+      "id": "cape-may",
+      "name": "Summers at Cape May",
+      "shortName": "Cape May",
+      "invitation": "I’d love to hear about the summers at Cape May. What comes to mind?",
+      "source": "AGENTS.md · section 4 · scripted example",
+      "lines": [
+        { "id": "CAPE-01", "speaker": "Recall", "text": "Hi Susan, I’m Recall, an AI assistant Maya set up to keep you company.", "rung": 0 },
+        { "id": "CAPE-02", "speaker": "Recall", "text": "I’d love to hear about the summers at Cape May. What comes to mind?", "rung": 1 },
+        { "id": "CAPE-03", "speaker": "Susan", "text": "Cape May…?", "rung": 1 },
+        { "id": "CAPE-04", "speaker": "Recall", "text": "It’s a place your family went together.", "rung": 2 },
+        { "id": "CAPE-05", "speaker": "Recall", "text": "You and Maya used to go there together.", "rung": 3 },
+        { "id": "CAPE-06", "speaker": "Susan", "text": "Maya — my daughter!", "rung": 3 },
+        { "id": "CAPE-07", "speaker": "Recall", "text": "What do you remember about those summers?", "rung": 3 },
+        { "id": "CAPE-08", "speaker": "Susan", "text": "We went to Cape May every summer.", "rung": 3 }
+      ],
+      "contributionLineId": "CAPE-08",
+      "history": ["unaided", "cue", "unaided", "unaided", "unaided", "unaided", "cue", "unaided"]
+    },
+    {
+      "id": "lincoln",
+      "name": "Lincoln Elementary",
+      "shortName": "Lincoln Elementary",
+      "invitation": "I’d love to hear about your time at Lincoln Elementary. What comes to mind?",
+      "source": "SPECS.md · workplace example · fictional preview dialogue",
+      "lines": [
+        { "id": "LINCOLN-01", "speaker": "Recall", "text": "Hi Susan, I’m Recall, an AI assistant Maya set up to keep you company.", "rung": 0 },
+        { "id": "LINCOLN-02", "speaker": "Recall", "text": "I’d love to hear about your time at Lincoln Elementary. What comes to mind?", "rung": 1 },
+        { "id": "LINCOLN-03", "speaker": "Susan", "text": "I’m not sure where to start.", "rung": 1 },
+        { "id": "LINCOLN-04", "speaker": "Recall", "text": "It’s a school. What comes to mind about being there?", "rung": 2 },
+        { "id": "LINCOLN-05", "speaker": "Susan", "text": "I worked at Lincoln Elementary.", "rung": 2 }
+      ],
+      "contributionLineId": "LINCOLN-05",
+      "history": ["unaided", "unaided", "unaided", "unaided", "cue", "recognition", "unaided", "cue"]
+    },
+    {
+      "id": "princeton",
+      "name": "Life in Princeton",
+      "shortName": "Princeton",
+      "invitation": "What comes to mind about your time in Princeton?",
+      "source": "SPECS.md · sample topic",
+      "lines": [],
+      "contributionLineId": "",
+      "history": ["unaided", "cue"]
+    }
+  ]
+}

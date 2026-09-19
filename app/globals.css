@@ -1,22 +1,24 @@
 @import "tailwindcss";
 
-/*
- * Design tokens, verbatim from AGENTS.md section 10 ("The Living Thread").
- * Only the tokens live here for now. The visual system itself is built later
- * with the Impeccable design skill (/impeccable init, then the surface work).
- */
+/* Core demo tokens. Recall's quiet preview palette lives in recall.css. */
 @theme {
-  --color-paper: #f6f1e8; /* warm paper */
+  --color-paper: #f6f1e8;
   --color-ink: #18342f;
   --color-sage: #b9cec3;
-  --color-coral: #e4775b; /* authorship: only ever her words */
-  --color-amber: #d5a64a; /* uncertain thread */
+  --color-coral: #e4775b;
+  --color-amber: #d5a64a;
   --radius-card: 18px;
+  --font-sans: "Atkinson Hyperlegible Next", ui-sans-serif, system-ui, sans-serif;
 }
 
-body {
-  background: var(--color-paper);
-  color: var(--color-ink);
+@layer base {
+  html { -webkit-text-size-adjust: 100%; }
+  body { background: var(--color-paper); color: var(--color-ink); }
+  ::selection { background: var(--color-sage); color: var(--color-ink); }
+  :focus-visible { outline: 3px solid var(--color-ink); outline-offset: 3px; border-radius: 2px; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--color-sage); border-radius: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
 }
 
 @media (prefers-reduced-motion: reduce) {

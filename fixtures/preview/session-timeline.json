@@ -1,0 +1,20 @@
+[
+  { "id": "sample-01", "date": "2026-09-01", "topicId": "cape-may", "historyIndex": 0 },
+  { "id": "sample-02", "date": "2026-09-02", "topicId": "lincoln", "historyIndex": 0 },
+  { "id": "sample-03", "date": "2026-09-03", "topicId": "cape-may", "historyIndex": 1 },
+  { "id": "sample-04", "date": "2026-09-04", "topicId": "lincoln", "historyIndex": 1 },
+  { "id": "sample-05", "date": "2026-09-05", "topicId": "cape-may", "historyIndex": 2 },
+  { "id": "sample-06", "date": "2026-09-06", "topicId": "lincoln", "historyIndex": 2 },
+  { "id": "sample-07", "date": "2026-09-07", "topicId": "cape-may", "historyIndex": 3 },
+  { "id": "sample-08", "date": "2026-09-08", "topicId": "lincoln", "historyIndex": 3 },
+  { "id": "sample-09", "date": "2026-09-09", "topicId": "princeton", "historyIndex": 0 },
+  { "id": "sample-10", "date": "2026-09-10", "topicId": "cape-may", "historyIndex": 4 },
+  { "id": "sample-11", "date": "2026-09-11", "topicId": "lincoln", "historyIndex": 4 },
+  { "id": "sample-12", "date": "2026-09-12", "topicId": "cape-may", "historyIndex": 5 },
+  { "id": "sample-13", "date": "2026-09-13", "topicId": "lincoln", "historyIndex": 5 },
+  { "id": "sample-14", "date": "2026-09-14", "topicId": "princeton", "historyIndex": 1 },
+  { "id": "sample-15", "date": "2026-09-15", "topicId": "lincoln", "historyIndex": 6 },
+  { "id": "sample-16", "date": "2026-09-16", "topicId": "cape-may", "historyIndex": 6 },
+  { "id": "sample-17", "date": "2026-09-17", "topicId": "lincoln", "historyIndex": 7 },
+  { "id": "sample-18", "date": "2026-09-18", "topicId": "cape-may", "historyIndex": 7 }
+]

@@ -1,0 +1,5 @@
+# Preview photo
+
+`family-beach.png` was generated with the built-in image generation tool on 2026-09-19. Fictional people and a fictional family scene; layout review only. It is not a source for the memory graph and is not a hashed judged-path asset.
+
+Prompt: Use case: photorealistic-natural. Asset type: fictional sample family photograph for a clearly labeled dementia-accessible web app design preview. Create one landscape 4:3 family album photograph: a mother in her late thirties and her young teenage daughter sitting together on a quiet Atlantic beach, relaxed candid smiles, ocean and pale dunes behind them, circa late 1990s casual everyday clothing. These are fictional people, not based on anyone real. Natural overcast daylight, gently muted colors, authentic amateur 35mm film photograph, subtle grain, sharply legible faces. Simple uncluttered composition, both people centrally framed with generous margins, full heads and hands visible. This is a photograph itself, no surrounding album, border, interface, lettering, captions, watermarks, collage, artificial bokeh or dramatic lighting.
