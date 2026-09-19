@@ -128,5 +128,34 @@ export const normalize = (text: string): string =>
 /** Does the text contain the phrase as whole words? "correction" does not contain "correct". */
 export const containsPhrase = (text: string, phrase: string): boolean => normalize(text).includes(normalize(phrase));
 
+/**
+ * Did she ask to stop? A stop phrase is an instruction when it IS what she said, not when it is a word inside
+ * her story: "We never wanted to stop at the boardwalk" and "We said goodbye to the house" are memories, and
+ * ending the call on them would throw her words away. So a phrase counts when:
+ *
+ *   - it is a whole sentence of its own ("I have to go", "leave me alone": three words or more), anywhere;
+ *   - or the turn is short - six words or fewer ("Please stop.", "No more, thank you.");
+ *   - or it opens the turn ("Stop, I don't want this"), or closes it after a pause ("...that's enough. Goodbye.").
+ *
+ * "Don't stop" is not a stop. When unsure this errs toward stopping: a call that ends early can be made
+ * again, and a stop that is not heard cannot be taken back (rule 12).
+ */
+export function stopPhraseIn(text: string, phrases: readonly string[]): string | null {
+  const said = normalize(text).trim();
+  const short = said.split(" ").filter(Boolean).length <= 6;
+  for (const p of phrases) {
+    const phrase = normalize(p).trim();
+    const whole = phrase.split(" ").length >= 3;
+    for (let at = ` ${said} `.indexOf(` ${phrase} `); at >= 0; at = ` ${said} `.indexOf(` ${phrase} `, at + 1)) {
+      const before = said.slice(0, at).trim();
+      if (/(^| )(don't|dont|do not|never|not|didn't|didnt|won't|wont|wouldn't|wouldnt)$/.test(before)) continue;
+      const opens = before.split(" ").filter(Boolean).length <= 1;
+      const closes = said.endsWith(phrase) && new RegExp(`[.,!?;:\\-]\\s*${phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/ /g, "\\W+")}\\W*$`, "i").test(text.replace(/[‘’]/g, "'"));
+      if (whole || short || opens || closes) return p;
+    }
+  }
+  return null;
+}
+
 /** The first phrase on a list that the text contains, as whole words, or null. */
 export const firstPhraseIn = (text: string, phrases: readonly string[]): string | null => phrases.find((p) => containsPhrase(text, p)) ?? null;

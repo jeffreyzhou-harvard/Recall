@@ -10,6 +10,8 @@ This file is the complete brief for any coding agent (Claude Code, Codex, Cursor
 
 **2026-09-19 revision 4.** The design was checked against the dementia-care literature; `EVIDENCE.md` holds the result, with its gaps stated. Four things changed: the reorientation rung is never used for an autobiographical or identity memory (rule 6; §6.1); calls default to mornings and are 8 minutes by default, 10 at most (§6.2); Recall asks one question per turn in short sentences, and logs what kind of question each reply answered (§6.2); and among topics equally due, the one told most often comes first (tool 1). The video call was removed; the call feature - her speech transcribed on the web app - is being built separately.
 
+**2026-09-19 revision 5.** Two things. (1) **Onboarding has a database** (`lib/onboarding`; §8): households, the people in them, stated ties, invitations, and every version of the joint setup, append-only, in one SQLite file through Node's built-in `node:sqlite` - no new dependency, no service - with an in-memory twin the same rules run over. A setup changes in exactly two ways: a *joint* version, agreed by her and a caregiver, which is the only way to add or widen anything or to touch the safety block (rules 14, 15); and a *tightening*, which she or a caregiver may record alone and which can only revoke, narrow, or pause (rule 12). It holds one phone number - hers - and has no column for anything rule 8 forbids. (2) **A full bug scan** changed some behaviour this file describes: a call she does not pick up is recorded as a `not_answered` session, so the agreed time between calls counts from when her phone last rang and nobody rings again five minutes later (rule 5); a stop phrase is an instruction when it is what she said - a short turn, its opening words, or a whole sentence like "I have to go" - not a word inside her story; a bare "Oh yes." after the open follow-up is not captured as a memory; the safety line is spoken and the handoff happens even if the alert tool fails, which is retried and then surfaced to the operator (rule 15); "who is this?" is answered at the confirmation questions too (rule 16); inside the 7-day cap the dashboard shows the note already posted rather than nothing, and lines she chose to share go out oldest first so none is dropped (§6.4.2); rule 8 outranks §6's tool logging - a family member's question is never in the tool log, and her words leave it when a call ends with nothing confirmed; the family routes and the schedule now need different secrets, so nothing that opens the family side can cause a call (rule 5); and a revoked contributor's stories and photos stop being offered as cues before the next call (rule 12). `tests/regressions.test.ts` pins each one by the input that showed it.
+
 **2026-09-19 rename.** The product is now called **Recall**; it was called Relay until today. The name was changed throughout this file, the code, the fixtures, and the environment variables (`RELAY_*` is now `RECALL_*`), so the history below speaks of "Recall" even where it describes the earlier product. The English word "relay" is kept where it means *pass along* (the family-relay mechanic, a decision-relay bot). Note that `recall` was already a domain word here - a recall call, the `recalled` state, `get_next_recall_topic` - so in code, capitalised **Recall** is the product and lowercase **recall** is the act.
 
 ## 1. Product thesis
@@ -278,6 +280,9 @@ Keep the graph compact and private. Do not import a large ontology or FHIR. This
 /lib/graph           LadybugDB schema, seed loader, citation queries, retrieval layer,
                      whitelist projections
 /lib/provenance      hashing, edit-decision list, PROV-style event log
+/lib/onboarding      households, people, stated ties, invitations, and every version of
+                     the joint setup (SQLite via node:sqlite, plus an in-memory twin);
+                     who may change what; the identity layer of her graph
 /fixtures            deterministic tool outputs, graph seed, policy seed,
                      call-script.json (fixed lines + banned-phrase list),
                      family-copy.json (family-side fixed lines),
@@ -423,3 +428,13 @@ These are not settled. Do not implement around them; ask.
 6. **Hang-up at the share question.** Because commit happens after both confirmations (§5), hanging up at the share question stores nothing. This is the conservative reading of rule 12; revisit if it loses too many memories in practice.
 7. **Safety list and outside review.** The starter safety list is a lexical match, so it will miss things and will sometimes fire on harmless phrases. Recall is not an emergency service and must not be described as one. Before any real deployment: have a clinician or speech-language pathologist review the ladder and the safety list, and get a lawyer's review of automated and AI-voice call consent, call-recording and voice-data laws, and the alert channel.
 8. **Golden-path echo.** In the demo, her reply ("We went to Cape May every summer") repeats words from Recall's own opener and is then stored as new. Decide whether to add an echo rule (a reply that only repeats Recall's cue words is not stored as new) and script a detail the cue could not have supplied.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

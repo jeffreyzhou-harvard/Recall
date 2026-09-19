@@ -241,7 +241,9 @@ const onLadderTurn: Handler<"TURN_ASSESSED"> = (ctx, e) => {
 const onElaboration: Handler<"TURN_ASSESSED"> = (ctx, e) => {
   if (ctx.fallback_active) return { reject: "the fixed script is running; no turn is classified" };
   if (ctx.answer_turn_id !== null) return { reject: "a turn of hers is already waiting to be captured" };
-  if (e.turn_state === "recalled" || e.turn_state === "new_detail_offered") return { to: "recalled", label: "In her own words", patch: { answer_turn_id: e.turn_id } };
+  // Only something she actually TOLD is captured. "Oh yes." shows she is with it, and is not a memory: played back
+  // and kept, it would be a stored claim that says nothing.
+  if (e.turn_state === "new_detail_offered") return { to: "recalled", label: "In her own words", patch: { answer_turn_id: e.turn_id } };
   return { to: "not_stored", label: "Closed kindly", patch: { ending_reason: "she reached it, and offered nothing to remember this time" } };
 };
 

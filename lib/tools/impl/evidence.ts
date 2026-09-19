@@ -117,6 +117,13 @@ export const verify_claim_support: ToolImpl<"verify_claim_support"> = async (inp
       continue;
     }
 
+    // A family contribution stands only while its contributor is approved: revoking them takes effect before the
+    // next call (rule 12), so nothing they told Recall - a story, a photo - is offered to her as a cue after that.
+    if (prov.source_class === "family_contribution" && !mayBind.has(prov.author)) {
+      reject("contributor_not_approved");
+      continue;
+    }
+
     const contradiction = edges.find((e) => e.type === "CONTRADICTS");
     if (contradiction) {
       // Two accounts differ. Recall speaks neither, and never says which is right.

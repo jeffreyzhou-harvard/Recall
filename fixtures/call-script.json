@@ -124,7 +124,12 @@
     "good bye",
     "i have to go",
     "i need to go",
-    "leave me alone"
+    "leave me alone",
+    "i'd like to go",
+    "i would like to go",
+    "i want to go",
+    "i'd like to stop",
+    "i would like to stop"
   ],
   "identity_phrases": [
     "who are you",
@@ -150,7 +155,18 @@
     "i cant remember",
     "i don't remember",
     "i dont remember",
-    "no idea"
+    "no idea",
+    "i do not know",
+    "i do not remember",
+    "i cannot remember",
+    "i can not remember",
+    "i don't recall",
+    "i dont recall",
+    "i do not recall",
+    "i can't recall",
+    "i cant recall",
+    "i cannot recall",
+    "no clue"
   ],
   "banned": [
     {

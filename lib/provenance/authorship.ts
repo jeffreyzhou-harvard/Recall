@@ -28,9 +28,10 @@ export function participantWordsIn(turns: Turn[], intervals: MediaSpan[]): Word[
       const hit = intervals.find((iv) => touches(w, iv));
       if (!hit) continue;
       if (turn.speaker !== "participant") {
-        throw new AuthorshipError(`interval contains ${turn.speaker} speech ("${w.w}"); only her own words may be captured`);
+        // Where, never what: an error lands in logs, and a played-back turn is her own voice (rule 8).
+        throw new AuthorshipError(`interval contains ${turn.speaker} speech at ${w.start_ms} ms; only her own words may be captured`);
       }
-      if (!within(w, hit)) throw new AuthorshipError(`interval clips the word "${w.w}"`);
+      if (!within(w, hit)) throw new AuthorshipError(`interval clips a word at ${w.start_ms}-${w.end_ms} ms`);
       words.push(w);
     }
   }

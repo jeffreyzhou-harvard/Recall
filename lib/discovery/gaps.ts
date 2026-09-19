@@ -43,9 +43,12 @@ export interface Gap {
   photo_count: number;
   /** What kind of thing the answer names. */
   expects: NodeType;
-  /** Already-confirmed people who appear in these same photos: real context for the question. */
-  together_with: Array<{ person_id: string; name: string; shared_photos: number }>;
-  /** The confirmed identification, when there is one. */
+  /**
+   * Named people who appear in these same photos: real context for the question. `edge_id` is the identification that
+   * names them, so a question can check WHOSE word it is - a name only the family has given is never said as a fact (rule 13).
+   */
+  together_with: Array<{ person_id: string; name: string; shared_photos: number; edge_id: string }>;
+  /** Who a person has said this is, when someone has - her, or only the family so far. `edge_id` says which. */
   identified_as: { node_id: string; name: string; edge_id: string } | null;
 }
 
@@ -85,7 +88,7 @@ export async function findGaps(graph: GraphStore, options: GapOptions): Promise<
     const who = identity.get(c.id) ?? null;
     const together = knownPeople
       .filter((k) => k.id !== c.id)
-      .map((k) => ({ person_id: identity.get(k.id)!.node.id, name: displayName(identity.get(k.id)!.node), shared_photos: shared(c.id, k.id) }))
+      .map((k) => ({ person_id: identity.get(k.id)!.node.id, name: displayName(identity.get(k.id)!.node), shared_photos: shared(c.id, k.id), edge_id: identity.get(k.id)!.edge.id }))
       .filter((t) => t.shared_photos > 0 && t.person_id !== options.participant_id)
       .sort((a, b) => b.shared_photos - a.shared_photos || (a.person_id < b.person_id ? -1 : 1));
     const base = {

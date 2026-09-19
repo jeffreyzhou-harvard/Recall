@@ -42,12 +42,19 @@ const INGEST_RULES = `You read what a person said about a photo and list the fac
 Rules, all of them strict:
 - Use ONLY names and words that appear literally in what they said. Never add, complete, translate, or correct a name.
 - "relation" reads source -> target as "target is source's <relation>": {"from": Susan, "relation": "child", "to": Maya} means Maya is Susan's child.
-- "said_as" is the exact word they used for the relation ("daughter"), copied from their words, or null.
+- "said_as" is the exact word they used for the relation ("daughter"), copied from their words, or null. The relation must be what that word means: "daughter" with any relation but "child" is rejected whole. With no such word, the basis is "inferred".
 - "basis" is "stated" only if they said it outright. If you had to work it out - resolving "she", assuming who lives with whom, guessing a family tie - it is "inferred".
 - Refer to someone already known by {"id": ...}; refer to someone new by {"type": ..., "name": ...}.
 - "identify" says what the photo's subject is. Include it only if they named it.
 - "story" only if they told something that happened, not just a name.
 - If they stated nothing usable, return {"facts": []}. Never guess to be helpful.`;
+
+/**
+ * Reading an answer has a time limit too, like the cue advice below. Nobody is on a phone line for this one - it is a
+ * sitting with a photo - and it reads at a higher effort, so the limit is longer; but without one a reply that never comes
+ * leaves the sitting waiting for good. Past it the call fails with a MuseApiError and nothing is written.
+ */
+export const INGEST_BUDGET_MS = 20_000;
 
 export class MuseAnswerInterpreter implements AnswerInterpreter {
   readonly label = "Muse Spark (proposals only; applyAnswer decides)";
@@ -55,6 +62,7 @@ export class MuseAnswerInterpreter implements AnswerInterpreter {
   constructor(
     private readonly spark: MuseSpark,
     private readonly graph: GraphStore,
+    private readonly budgetMs = INGEST_BUDGET_MS,
   ) {}
 
   async interpret(question: Question, answer: Answer, speaker: { id: string; is_participant: boolean }, participantId: string): Promise<ProposedFact[]> {
@@ -69,7 +77,7 @@ export class MuseAnswerInterpreter implements AnswerInterpreter {
       allowed_relations: RELATION_NAMES,
       what_they_said: answer.text,
     };
-    const out = await this.spark.structured("ingest_answer", proposalsSchema, [{ role: "system", content: INGEST_RULES }, { role: "user", content: JSON.stringify(context) }], { reasoning_effort: "low", max_completion_tokens: 4000 });
+    const out = await this.spark.structured("ingest_answer", proposalsSchema, [{ role: "system", content: INGEST_RULES }, { role: "user", content: JSON.stringify(context) }], { reasoning_effort: "low", max_completion_tokens: 4000, timeout_ms: this.budgetMs });
     return out.facts as ProposedFact[];
   }
 }

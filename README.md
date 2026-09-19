@@ -27,7 +27,7 @@ npm run check        # typecheck + tests + language lint + provenance verify
 npm run dev          # http://localhost:3000/present is the judged path
 ```
 
-Node 22+. No keys, no database, and no network are needed for any of the above.
+Node 22.13+. No keys, no database, and no network are needed for any of the above. (Onboarding real households uses one SQLite file through Node's built-in `node:sqlite`: still no service to run and no new dependency. See "Onboarding" below.)
 
 | Command | What it does |
 | --- | --- |
@@ -58,6 +58,7 @@ Family flows sit outside that reducer: a query is redirected, a contribution is 
 | 19 tools and hard gates | `lib/tools` — topic pick, place call, graph query, evidence, ladder, capture, store- and share-confirmation, family redirect, weekly note, topic record, clinician export, safety check |
 | Memory graph + retrieval layer | `lib/graph` — 18 node types, provenance on every claim and edge, a thinner per-cue effectiveness layer that never decides whether to climb, only which cue to try |
 | Trims, hashes, receipts | `lib/provenance` — an edit-decision list that can only express silence and disfluency trims; hash-chained PROV-style log |
+| Onboarding database | `lib/onboarding` — households, the people in them, stated ties, invitations, and every version of the joint setup, append-only. SQLite (`node:sqlite`) with an in-memory twin; the same rules run over both |
 | Family app | `/family` — contribution form, "Ask about Susan" (redirect only), Weekly Note, per-topic record |
 | Judged sandbox | `/present` — autoplay 90-second path; arrow keys step manually |
 
@@ -76,6 +77,18 @@ Family are part of the loop, passively and lightly. Nothing here is shown to her
 - **Export for a doctor.** Member-initiated. The same counts, dates, and header, plus "This record is not a clinical assessment or diagnosis." Recall never sends the file to anyone.
 
 Recall never calls, texts, emails, or pushes family, with one exception: a fixed-text safety alert to designated caregivers if her final turn matches a lexical phrase on the safety list. The alert states a category and time. It never quotes her. Recall is not an emergency service.
+
+## Onboarding
+
+Before Recall's first call, a household is set up: her, the caregiver setting Recall up with her, and whoever they invite. `lib/onboarding` holds it, and the live server can run for a household from it (`RECALL_HOUSEHOLD=household:1`) instead of the committed fixture family.
+
+- **One file, no service.** `SqliteOnboardingStore` uses Node's built-in `node:sqlite`, at `.data/onboarding.db` (git-ignored; `RECALL_ONBOARDING_DB` moves it). `MemoryOnboardingStore` is its twin, and `tests/onboarding.test.ts` runs every rule over both.
+- **Two ways to change the setup, and the difference is the point.** `recordJointSetup` needs her AND a caregiver, and is the only way to add or widen anything. `tightenSetup` is what she, or a caregiver, may do alone at any time: revoke, narrow, pause (rule 12). It compares the new document with the current one and refuses, by name, anything that gives more - above all any change to the safety block (rule 15). Every version is kept, with who agreed and who recorded it; the table is append-only in the schema itself.
+- **Nobody signs themselves up.** Family join by an invitation from her or a caregiver. The token is shown once, to the inviter, to pass on themselves - Recall never contacts family (rule 5) - and only its hash is kept.
+- **Data minimization is in the schema (rule 8).** One phone number - hers - and nothing else about anyone: no diagnosis, stage, birth date, address, or email column exists, a family member's row cannot hold a number, and clinical or state language is refused in any name or note.
+- **Ask, don't assert.** A tie between two people is recorded only because a named member stated it, in the word they used, and `graphSeed()` turns the household into the identity layer of her graph - people, stated ties, the setup - with no memories in it. Those come only from her own confirmed words, or a family contribution in its author's name.
+
+Routes are under `/api/onboarding/*` (operator only until there is a sign-in; accepting an invitation needs only the token).
 
 ## The 90-second golden path
 
@@ -98,7 +111,8 @@ Cast is fixed: Susan, Maya (daughter), Priya (sister), Anika (granddaughter), Ca
 
 - **The interface.** `/family` and `/components` do not exist, and `/` and `/present` are unstyled scaffolds. Direction is "The Living Graph" (`AGENTS.md` §10). The family side is reachable only through `/api/family/*`, which has no sign-in yet.
 - **A live call.** The earlier video call was removed. The call feature - her speech transcribed on the web app - is being built separately; it plugs in as a `CallDriver` plus a `TranscriptionProvider` (`lib/orchestrator/call-driver.ts` says what a driver owes the engine). Until then a call runs only on the prerecorded fixture, and a turn of the schedule is a manual, operator-only request.
-- **Onboarding capture.** The "Who is this?" beat has no flow; her graph comes from the seed.
+- **Onboarding capture.** The database, its rules, and its routes exist (see "Onboarding"); the screens do not, and neither does the "Who is this?" beat. A household onboarded today has people and a setup but no topics yet: topics enter through family contributions, which the API does not yet attach to a topic.
+- **Sign-in.** The family routes take `member` on trust, behind `RECALL_FAMILY_SECRET`; the schedule and onboarding are behind the separate `RECALL_OPERATOR_SECRET`, so that whatever opens the family side can never cause a call (rule 5).
 - **Real media.** Everything in `/assets` is a generated stand-in. Word timings are placeholders. See below.
 - **`legacy/`** holds the earlier family-ask recall (forwarded asks, thread bridge, Telegram). It is out of scope (`AGENTS.md` §14), excluded from the build, and can be deleted once the team agrees.
 

@@ -5,8 +5,11 @@
  */
 import { describe, expect, it } from "vitest";
 import { runFixture } from "@/fixtures/harness";
-import { DeepgramLive, transcribeWav, type HeardTurn, type SocketLike } from "@/lib/providers/deepgram";
-import { museScaffoldAdvisor } from "@/lib/providers/muse/reasoning";
+import type { Answer } from "@/lib/discovery/answers";
+import type { Question } from "@/lib/discovery/questions";
+import { MemoryGraphStore } from "@/lib/graph/memory-store";
+import { DeepgramError, DeepgramLive, transcribeWav, type HeardTurn, type SocketLike, type TimersLike } from "@/lib/providers/deepgram";
+import { INGEST_BUDGET_MS, MuseAnswerInterpreter, SCAFFOLD_ADVICE_BUDGET_MS, museScaffoldAdvisor } from "@/lib/providers/muse/reasoning";
 import { MuseApiError, MuseSpark, type MuseFetch } from "@/lib/providers/muse/spark";
 import type { RecallEvent } from "@/lib/state/machine";
 import { replay } from "@/lib/state/reducer";
@@ -27,11 +30,46 @@ class FakeSocket implements SocketLike {
     this.sent.push(typeof data === "string" ? data : new Uint8Array(data as ArrayBuffer));
   }
   close(): void {
+    if (this.closed) return;
     this.closed = true;
     this.onclose?.({});
   }
+  /** Deepgram speaking. Like a real WebSocket, a socket that has been closed delivers nothing more. */
   say(message: unknown): void {
-    this.onmessage?.({ data: JSON.stringify(message) });
+    if (!this.closed) this.onmessage?.({ data: JSON.stringify(message) });
+  }
+  /** Deepgram closing its end, which is how a stream normally finishes after CloseStream. */
+  serverCloses(): void {
+    this.close();
+  }
+}
+/** A clock run by hand: nothing fires until a test says so. */
+class FakeTimers implements TimersLike {
+  readonly scheduled = new Map<number, { fn: () => void; ms: number; repeats: boolean }>();
+  private next = 1;
+  setTimeout(fn: () => void, ms: number): unknown {
+    this.scheduled.set(this.next, { fn, ms, repeats: false });
+    return this.next++;
+  }
+  setInterval(fn: () => void, ms: number): unknown {
+    this.scheduled.set(this.next, { fn, ms, repeats: true });
+    return this.next++;
+  }
+  clearTimeout(handle: unknown): void {
+    this.scheduled.delete(handle as number);
+  }
+  clearInterval(handle: unknown): void {
+    this.scheduled.delete(handle as number);
+  }
+  waiting(repeats: boolean): number[] {
+    return [...this.scheduled.values()].filter((t) => t.repeats === repeats).map((t) => t.ms);
+  }
+  fire(repeats: boolean): void {
+    for (const [handle, t] of [...this.scheduled]) {
+      if (t.repeats !== repeats) continue;
+      if (!repeats) this.scheduled.delete(handle);
+      t.fn();
+    }
   }
 }
 const result = (words: Array<[string, number, number]>, flags: { is_final: boolean; speech_final?: boolean }) => ({
@@ -43,11 +81,16 @@ const result = (words: Array<[string, number, number]>, flags: { is_final: boole
 describe("Deepgram streaming", () => {
   const open = () => {
     const socket = new FakeSocket();
+    const timers = new FakeTimers();
     const turns: HeardTurn[] = [];
+    const errors: DeepgramError[] = [];
+    let closedCount = 0;
     let opened: { url: string; protocols: string[] } | null = null;
-    const live = new DeepgramLive(KEY, { keyterms: ["kheer"] }, { onTurn: (t) => turns.push(t), onError: () => {} }, (url, protocols) => ((opened = { url, protocols }), socket));
-    return { socket, turns, live, opened: () => opened! };
+    const live = new DeepgramLive(KEY, { keyterms: ["kheer"] }, { onTurn: (t) => turns.push(t), onError: (e) => errors.push(e), onClosed: () => closedCount++ }, (url, protocols) => ((opened = { url, protocols }), socket), timers);
+    return { socket, timers, turns, errors, live, opened: () => opened!, closedCount: () => closedCount };
   };
+  const CLOSE_STREAM = JSON.stringify({ type: "CloseStream" });
+  const KEEP_ALIVE = JSON.stringify({ type: "KeepAlive" });
 
   it("authenticates by subprotocol, so the key is never in a URL, and asks for word timings and endpointing", () => {
     const { opened } = open();
@@ -77,8 +120,85 @@ describe("Deepgram streaming", () => {
     socket.say({ type: "UtteranceEnd", last_word_end: 1.4 });
     expect(turns.map((t) => t.words.map((w) => w.w).join(" "))).toEqual(["Yes."]);
     live.end();
-    expect(socket.sent.at(-1)).toBe(JSON.stringify({ type: "CloseStream" }));
+    expect(socket.sent.at(-1)).toBe(CLOSE_STREAM);
+    live.sendAudio(new Uint8Array([3])); // nothing more is sent once she is done
+    expect(socket.sent.at(-1)).toBe(CLOSE_STREAM);
+    socket.serverCloses();
     expect(socket.closed).toBe(true);
+  });
+
+  it("does not drop her last words: after end() it keeps listening until Deepgram has sent its finals and closed", () => {
+    const { socket, timers, turns, live, closedCount } = open();
+    socket.onopen?.({});
+    live.sendAudio(new Uint8Array([1, 2]));
+    live.end();
+    expect(socket.sent.at(-1)).toBe(CLOSE_STREAM);
+    expect(socket.closed, "closing now would discard the results for audio Deepgram still holds").toBe(false);
+    socket.say(result([["Every", 2, 2.3], ["summer.", 2.32, 2.9]], { is_final: true, speech_final: true }));
+    expect(turns.map((t) => t.words.map((w) => w.w).join(" "))).toEqual(["Every summer."]);
+    expect(timers.waiting(false)).toEqual([2500]); // the fallback, in case Deepgram never closes
+    socket.serverCloses();
+    expect(closedCount()).toBe(1);
+    expect(timers.scheduled.size, "nothing is left ticking once the socket has closed").toBe(0);
+  });
+
+  it("closes the socket itself if Deepgram has not, and flushes what it was holding", () => {
+    const { socket, timers, turns, live, closedCount } = open();
+    socket.onopen?.({});
+    socket.say(result([["Cape", 1, 1.2], ["May.", 1.22, 1.6]], { is_final: true })); // final, but no end-of-speech signal yet
+    live.end();
+    expect(socket.closed).toBe(false);
+    timers.fire(false);
+    expect(socket.closed).toBe(true);
+    expect(turns.map((t) => t.words.map((w) => w.w).join(" "))).toEqual(["Cape May."]);
+    expect(closedCount()).toBe(1);
+    // A socket that never opened has nothing buffered at Deepgram to wait for.
+    const unopened = open();
+    unopened.live.end();
+    expect(unopened.socket.closed).toBe(true);
+    expect(unopened.socket.sent).toEqual([]);
+  });
+
+  it("keeps the socket alive through her silences, and stops when the stream ends", () => {
+    const { socket, timers, live } = open();
+    expect(timers.waiting(true)).toEqual([]); // nothing to keep alive until it opens
+    socket.onopen?.({});
+    expect(timers.waiting(true)).toEqual([5000]);
+    timers.fire(true);
+    timers.fire(true);
+    expect(socket.sent).toEqual([KEEP_ALIVE, KEEP_ALIVE]);
+    live.end();
+    expect(timers.waiting(true)).toEqual([]);
+    timers.fire(true);
+    expect(socket.sent.at(-1)).toBe(CLOSE_STREAM);
+  });
+
+  it("closes the turn when UtteranceEnd arrives before the final result that carries its words", () => {
+    const { socket, turns } = open();
+    socket.onopen?.({});
+    socket.say(result([["Yes.", 1, 1.4]], { is_final: false }));
+    socket.say({ type: "UtteranceEnd", last_word_end: 1.4 }); // worked out from interim timings: the final is still on its way
+    expect(turns).toEqual([]);
+    socket.say(result([["Yes.", 1, 1.4]], { is_final: true })); // late, and with no speech_final of its own
+    expect(turns.map((t) => t.words.map((w) => w.w).join(" "))).toEqual(["Yes."]);
+
+    // The ordinary order - speech_final, then the UtteranceEnd for those same words - must not cut the NEXT turn short.
+    socket.say(result([["We", 5, 5.2], ["went", 5.22, 5.5]], { is_final: true, speech_final: true }));
+    socket.say({ type: "UtteranceEnd", last_word_end: 5.5 });
+    socket.say(result([["every", 8, 8.3]], { is_final: true })); // she is still talking
+    expect(turns).toHaveLength(2);
+    socket.say(result([["summer.", 8.32, 8.9]], { is_final: true, speech_final: true }));
+    expect(turns.map((t) => t.words.map((w) => w.w).join(" "))).toEqual(["Yes.", "We went", "every summer."]);
+  });
+
+  it("says so, once, when audio arrives faster than the socket opens - it is never dropped silently", () => {
+    const { socket, errors, live } = open();
+    for (let i = 0; i < 405; i++) live.sendAudio(new Uint8Array([i % 256]));
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toBeInstanceOf(DeepgramError);
+    expect(errors[0]!.message).toMatch(/not open/);
+    socket.onopen?.({});
+    expect(socket.sent).toHaveLength(400); // what was held is still sent, in order
   });
 
   it("measures word timings for a whole recording", async () => {
@@ -129,6 +249,36 @@ describe("Muse Spark", () => {
     await expect(new MuseSpark(KEY, never).chat([{ role: "user", content: "hi" }], { timeout_ms: 20 })).rejects.toThrow(/no reply within 20 ms/);
     expect(sent!.signal).toBeInstanceOf(AbortSignal);
     expect(sent!.body).not.toContain("timeout_ms");
+  });
+
+  it("turns a reply that is not JSON, or a body that never finishes arriving, into its own error", async () => {
+    const notJson: MuseFetch = async () => ({ ok: true, status: 200, text: async () => "<html>", json: async () => Promise.reject(new SyntaxError("Unexpected token < in JSON at position 0")) });
+    await expect(new MuseSpark(KEY, notJson).chat([])).rejects.toBeInstanceOf(MuseApiError);
+    const stalled: MuseFetch = async () => ({ ok: true, status: 200, text: async () => "", json: async () => Promise.reject(Object.assign(new Error("The operation was aborted due to timeout"), { name: "TimeoutError" })) });
+    await expect(new MuseSpark(KEY, stalled).chat([], { timeout_ms: 20 })).rejects.toThrow(/Muse API error.*no reply within 20 ms/);
+  });
+
+  it("never repeats the provider's error body, which can echo the request - and the request can hold her words (rule 8)", async () => {
+    const echoing: MuseFetch = async () => ({ ok: false, status: 400, json: async () => ({}), text: async () => `{"error":"invalid request","request":{"what_they_said":"That's my daughter Maya."}}` });
+    const refused: unknown = await new MuseSpark(KEY, echoing).chat([{ role: "user", content: "That's my daughter Maya." }]).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(refused).toBeInstanceOf(MuseApiError);
+    expect((refused as MuseApiError).status).toBe(400);
+    expect((refused as MuseApiError).message).toMatch(/400/);
+    expect((refused as MuseApiError).message).not.toMatch(/Maya|daughter|what_they_said/);
+  });
+
+  it("gives graph ingestion a time limit too: a sitting is never left waiting on a reply that is not coming", async () => {
+    const question = { expects: "Person", gap: { identified_as: null } } as unknown as Question;
+    const answer: Answer = { answer_id: "a1", by: "person:susan", text: "That's my daughter Maya.", at: "2026-11-01T15:00:00.000Z", recording: null };
+    let signal: AbortSignal | undefined;
+    const never: MuseFetch = (_url, init) => ((signal = init.signal), new Promise((_, reject) => init.signal?.addEventListener("abort", () => reject(init.signal!.reason))));
+    const interpret = (budgetMs?: number) => new MuseAnswerInterpreter(new MuseSpark(KEY, never), new MemoryGraphStore(), budgetMs).interpret(question, answer, { id: "person:susan", is_participant: true }, "person:susan");
+    await expect(interpret(20)).rejects.toThrow(/no reply within 20 ms/);
+    expect(signal).toBeInstanceOf(AbortSignal);
+    expect(INGEST_BUDGET_MS).toBeGreaterThanOrEqual(SCAFFOLD_ADVICE_BUDGET_MS); // nobody is on the line for this one, and it reads at a higher effort
   });
 
   it("says so plainly when the model reasoned through its whole token limit and never answered", async () => {

@@ -5,7 +5,7 @@
   "description": "Recall - an adaptive participation layer for one live family interaction. Access changed. Authorship didn't.",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.13"
   },
   "scripts": {
     "dev": "next dev",

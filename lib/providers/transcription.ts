@@ -79,6 +79,7 @@ export const turnText = (turn: Pick<Turn, "words">): string => turn.words.map((w
 export const tokens = (text: string): string[] =>
   text
     .toLowerCase()
+    .replace(/[‘’]/g, "'") // a curly apostrophe is an apostrophe: "I’d" is one word, as `normalize` already has it
     .replace(/[^\p{L}\p{N}'\s]/gu, " ")
     .split(/\s+/)
     .filter(Boolean);
