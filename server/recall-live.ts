@@ -24,7 +24,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { CALL_SCRIPT, FAMILY_COPY, FAMILY_SEED, GOLDEN_TRANSCRIPT, JUDGED_TIMING, MANIFEST, POLICY, RECORD_THRESHOLDS, SAFETY_PHRASES } from "@/fixtures";
-import { FixtureClock } from "@/lib/clock";
+import { FixtureClock, SystemClock } from "@/lib/clock";
 import { MemoryGraphStore } from "@/lib/graph/memory-store";
 import { buildGraph } from "@/lib/graph/seed";
 import { FixtureCallDriver } from "@/lib/orchestrator/call-driver";
@@ -105,7 +105,8 @@ export async function createLiveRecall(config: LiveConfig): Promise<LiveRecall> 
   };
   const graph = MemoryGraphStore.from(buildGraph(onboarding ? await onboarding.graphSeed(config.household!) : FAMILY_SEED, assets));
   const prerecorded = config.callMode === "prerecorded";
-  const clock = new FixtureClock(config.now ?? JUDGED_TIMING.start_at);
+  const fixtureClock = prerecorded ? new FixtureClock(config.now ?? JUDGED_TIMING.start_at) : null;
+  const clock = fixtureClock ?? new SystemClock();
   const setup = new SetupStore(onboarding ? await agreed() : config.policyFile ? JSON.parse(readFileSync(join(config.root, config.policyFile), "utf8")) : POLICY);
   const refreshSetup = async (): Promise<void> => {
     if (onboarding) setup.replace(await agreed());
@@ -126,8 +127,8 @@ export async function createLiveRecall(config: LiveConfig): Promise<LiveRecall> 
     safetyPhrases: SAFETY_PHRASES,
     alerts,
     // Only ever invoked by the orchestrator, and only after the joint setup has granted the call.
-    callDriver: prerecorded ? () => new FixtureCallDriver(GOLDEN_TRANSCRIPT, clock, JUDGED_TIMING.call_connect_delay_ms) : null,
-    runtime: { fixtureLatency: { clock, ms, default_ms } },
+    callDriver: prerecorded ? () => new FixtureCallDriver(GOLDEN_TRANSCRIPT, fixtureClock!, JUDGED_TIMING.call_connect_delay_ms) : null,
+    runtime: fixtureClock ? { fixtureLatency: { clock: fixtureClock, ms, default_ms } } : { timeout_ms: 15_000 },
     // Muse Spark, when a key is present: which cue to offer (never whether to climb), and reading facts out of an
     // answer. Both only propose; the guards in lib/ decide. Without a key the deterministic choices run instead.
     ...(spark ? { answerInterpreter: new MuseAnswerInterpreter(spark, graph), scaffoldAdvisor: loudly(museScaffoldAdvisor(spark)) } : {}),

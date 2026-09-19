@@ -70,7 +70,7 @@ export interface RuntimeOptions {
   faults?: Fault[];
   /** Judged path only: advance the fixture clock by a fixed latency per call so timings replay identically. */
   fixtureLatency?: { clock: FixtureClock; ms: Partial<Record<ToolName, number>>; default_ms: number };
-  /** Live side demo only: real timeout per call. */
+  /** Live only: deadline for each transcription/model request. Storage and alerts are awaited to completion. */
   timeout_ms?: number;
   /** Keep only the most recent calls. For a runtime that lives as long as the server does (the family side). */
   max_log?: number;
@@ -116,6 +116,29 @@ export class ToolRuntime {
     return ctx as ContextFor<T>;
   }
 
+  /**
+   * Only race dependencies that return data and cannot mutate the tool context. Racing the whole
+   * implementation leaves graph writes and consent updates running after a timeout exit. Writes and
+   * alert delivery are instead awaited, so the caller always observes their actual outcome.
+   */
+  private contextForExecution<T extends ToolName>(tool: T): ContextFor<T> {
+    const context = this.contextFor(tool);
+    if (isFamilyTool(tool) || !this.options.timeout_ms) return context;
+    const ctx = context as ToolContext;
+    const transcription = ctx.transcription;
+    return {
+      ...ctx,
+      transcription: {
+        label: transcription.label,
+        turnsIn: (window) => this.withTimeout(tool, transcription.turnsIn(window)),
+        allTurns: (assetId) => this.withTimeout(tool, transcription.allTurns(assetId)),
+      },
+      scaffoldAdvisor: ctx.scaffoldAdvisor
+        ? (advice) => this.withTimeout(tool, ctx.scaffoldAdvisor!(structuredClone(advice)))
+        : undefined,
+    } as ContextFor<T>;
+  }
+
   async call<T extends ToolName>(tool: T, rawInput: ToolInput<T>): Promise<ToolOutput<T>> {
     const count = (this.callCounts.get(tool) ?? 0) + 1;
     this.callCounts.set(tool, count);
@@ -146,7 +169,7 @@ export class ToolRuntime {
       if (!input.success) throw new ToolContractError(tool, "input", input.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
 
       const impl = this.impls[tool] as ToolImpl<T>;
-      const raw = await this.withTimeout(tool, impl(input.data as ToolParsedInput<T>, this.contextFor(tool)));
+      const raw = await impl(input.data as ToolParsedInput<T>, this.contextForExecution(tool));
 
       const output = contracts[tool].output.safeParse(raw);
       if (!output.success) throw new ToolContractError(tool, "output", output.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));

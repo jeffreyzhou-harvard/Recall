@@ -13,6 +13,8 @@ export async function GET(request: Request): Promise<Response> {
   if (refused) return refused;
   const member = new URL(request.url).searchParams.get("member");
   if (!member) return Response.json({ error: "expected ?member=" }, { status: 400 });
+  const deniedMember = guard(request, member);
+  if (deniedMember) return deniedMember;
   const recall = await liveRecall();
   const designated = recall.setup.current().safety.designated_caregivers.some((c) => c.person_id === member);
   return Response.json({
