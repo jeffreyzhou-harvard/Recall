@@ -25,9 +25,9 @@ describe("the 90-second golden path", () => {
     expect(replay(r.trace).context.reached_at_rung).toBe(3);
   });
 
-  it("says exactly the lines section 4 fixes, in order, and the first one says what Relay is", () => {
+  it("says exactly the lines section 4 fixes, in order, and the first one says what Recall is", () => {
     expect(run.recording.spoken.map((s) => s.text)).toEqual([SAID.greeting, SAID.rung1, SAID.rung2, SAID.rung3, SAID.elaborate, SAID.storeQuestion, SAID.shareQuestion, SAID.closeWarm]);
-    expect(SAID.greeting).toBe("Hi Susan, I'm Relay, an AI assistant Maya set up to keep you company.");
+    expect(SAID.greeting).toBe("Hi Susan, I'm Recall, an AI assistant Maya set up to keep you company.");
     expect(SAID.rung1).toBe("I'd love to hear about the summers at Cape May. What comes to mind?");
     expect(SAID.rung3).toBe("You and Maya used to go there together.");
   });
@@ -35,8 +35,8 @@ describe("the 90-second golden path", () => {
   it("logs free recall as a genuine miss before any cue is given", () => {
     const assessed = run.recording.tool_log.filter((c) => c.tool === "assess_conversation_state").map((c) => (c.output as { state: string; evidence: { matched_rule: string } }));
     expect(assessed.map((a) => a.state)).toEqual(["no_answer", "no_answer", "recalled", "new_detail_offered"]);
-    expect(assessed[0]!.evidence.matched_rule).toBe("echo_of_relay_words"); // "Cape May...?"
-    expect(assessed[2]!.evidence.matched_rule).toBe("named_something_relay_had_not_said"); // "Maya, my daughter!"
+    expect(assessed[0]!.evidence.matched_rule).toBe("echo_of_recall_words"); // "Cape May...?"
+    expect(assessed[2]!.evidence.matched_rule).toBe("named_something_recall_had_not_said"); // "Maya, my daughter!"
   });
 
   it("every transition emits exactly one trace event, and tool-caused ones carry their tool-call id", () => {
@@ -52,7 +52,7 @@ describe("the 90-second golden path", () => {
 
   it("runs the tools in the enforced order, with the safety check ahead of every turn of hers", () => {
     const tools = run.recording.tool_log.map((c) => c.tool);
-    // Dependency order. (Relay renders its opening and its closing lines BEFORE the call, so that ending a call
+    // Dependency order. (Recall renders its opening and its closing lines BEFORE the call, so that ending a call
     // kindly never depends on a tool responding - which is why render_prompt first appears ahead of the listening tools.)
     const first = (t: string): number => tools.indexOf(t as never);
     const last = (t: string): number => tools.lastIndexOf(t as never);
@@ -96,13 +96,13 @@ describe("the 90-second golden path", () => {
 
     const note = await run.service.weeklyNote("person:maya");
     expect(note.note!.lines.slice(0, 2).map((l) => [l.kind, l.text])).toEqual([
-      ["warm", "Relay talked with Susan about the summers at Cape May this week. Want to give her a call?"],
+      ["warm", "Recall talked with Susan about the summers at Cape May this week. Want to give her a call?"],
       ["share", HER_LINE],
     ]);
     expect(note.note!.lines[1]!.attribution).toMatchObject({ speaker_name: "Susan", content_hash: run.recording.provenance_receipt!.content_hash });
 
     const record = await run.service.topicRecord("person:maya");
-    expect(record.header!.text).toBe("This is a record of what happened in Relay calls, not a measure of Susan's memory overall. Practice on a topic, call quality, and time of day all affect it.");
+    expect(record.header!.text).toBe("This is a record of what happened in Recall calls, not a measure of Susan's memory overall. Practice on a topic, call quality, and time of day all affect it.");
     expect(record.topics.find((t) => t.topic_name === "Cape May summers")!.lines[0]!.text).toBe("Cape May summers - recalled unaided in 6 of 8 recent calls.");
     expect(run.recording.caregiver_receipt!.lines.map((l) => l.text)).toEqual(["Cape May summers - recalled after one contextual cue (Maya) in this call.", "No correction, no distress."]);
   });

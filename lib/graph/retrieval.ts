@@ -11,7 +11,7 @@ import { SPEAKABLE_AS_FACT, type EdgeType, type GraphEdge, type GraphNode, type 
 
 /**
  * Only topical edges are walked. Walking SPOKEN_BY or CONTRIBUTED_BY would put everything she or her
- * family ever said two hops from every topic: a memory archive to browse, which is exactly what Relay
+ * family ever said two hops from every topic: a memory archive to browse, which is exactly what Recall
  * is not (AGENTS.md section 14).
  */
 const TRAVERSABLE: ReadonlySet<EdgeType> = new Set(["ABOUT", "DEPICTS", "EVIDENCE_FOR", "RELATED_TO"]);

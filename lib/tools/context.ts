@@ -26,7 +26,7 @@ import type { SetupStore } from "./policy";
 
 /**
  * Accessibility telemetry, and only that (rule 8): how long a reply took, and which rung fired.
- * Nothing here describes her; it describes how well Relay's support fit.
+ * Nothing here describes her; it describes how well Recall's support fit.
  */
 export interface AccessibilityTelemetry {
   response_latencies_ms: number[];
@@ -45,7 +45,7 @@ export interface SessionRecord {
   verified: VerifiedEvidence[];
   /** Everything rendered, including fixed lines prepared before the call that may never be needed. */
   prompts: Array<ToolOutput<"render_prompt">>;
-  /** What Relay actually said, in order. This - not `prompts` - is what any "what Relay said" view must read. */
+  /** What Recall actually said, in order. This - not `prompts` - is what any "what Recall said" view must read. */
   spoken: Array<{ prompt_id: string; script_id: string; rung: number | null; text: string; at: string }>;
   assessments: Array<ToolOutput<"assess_conversation_state">>;
   contribution: ToolOutput<"capture_contribution"> | null;

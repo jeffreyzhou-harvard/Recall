@@ -1,17 +1,17 @@
 /**
- * Telegram -> Relay. One update in, at most one forwarded ask out.
+ * Telegram -> Recall. One update in, at most one forwarded ask out.
  *
  * LIVE ONLY - never on the judged path.
  *
  * This is an adapter and holds no policy of its own. It maps Telegram ids to
  * the people and thread the family set up, fetches the one photo if there is
- * one, and hands `RelayService.forwardAsk` exactly the payload intake expects.
+ * one, and hands `RecallService.forwardAsk` exactly the payload intake expects.
  * Whether the asker is approved, the topic allowed, or the hour acceptable is
  * decided where it always is: the identity gate and the access policy.
  */
 import type { AssetIndex } from "@/lib/provenance/assets";
 import { sha256Bytes } from "@/lib/provenance/hash";
-import type { ForwardOutcome, RelayService } from "@/lib/service/relay-service";
+import type { ForwardOutcome, RecallService } from "@/lib/service/recall-service";
 import type { TelegramClient, TgUpdate } from "./api";
 import { unboundUser, type TelegramBindings } from "./bindings";
 import type { TelegramThreadBridge } from "./bridge";
@@ -30,7 +30,7 @@ export type HandledUpdate =
 export interface TelegramInboundDeps {
   client: TelegramClient;
   bridge: TelegramThreadBridge;
-  service: RelayService;
+  service: RecallService;
   assets: AssetIndex;
   media: MediaStore;
   bindings: TelegramBindings;
@@ -45,7 +45,7 @@ export class TelegramInbound {
     const parsed = parseUpdate(update, botUsername);
     if (parsed.kind === "ignored") return parsed;
 
-    // A chat nobody set up gets no reply of any kind - not even usage help. Relay does not speak in
+    // A chat nobody set up gets no reply of any kind - not even usage help. Recall does not speak in
     // rooms it was not invited into by the joint setup.
     const chat = bindings.chats[String(parsed.chat_id)];
     if (!chat) return { kind: "ignored", reason: "this chat is not bound to a family thread" };

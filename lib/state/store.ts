@@ -4,17 +4,17 @@
  * state object and one trace.
  */
 import { createStore, type StoreApi } from "zustand/vanilla";
-import type { RelayEvent } from "./machine";
+import type { RecallEvent } from "./machine";
 import { InvalidTransitionError, initialState, reduce, type DispatchMeta, type MachineState } from "./reducer";
 
-export interface RelayStore {
+export interface RecallStore {
   machine: MachineState;
-  dispatch: (event: RelayEvent, meta: DispatchMeta) => MachineState;
+  dispatch: (event: RecallEvent, meta: DispatchMeta) => MachineState;
   reset: () => void;
 }
 
-export function createRelayStore(): StoreApi<RelayStore> {
-  return createStore<RelayStore>((set, get) => ({
+export function createRecallStore(): StoreApi<RecallStore> {
+  return createStore<RecallStore>((set, get) => ({
     machine: initialState(),
     // The refusal is stored first, then thrown: an unknown (state, event) pair throws AND logs (section 5).
     dispatch: (event, meta) => {

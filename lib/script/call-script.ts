@@ -1,5 +1,5 @@
 /**
- * Relay's fixed lines (AGENTS.md section 6.2). Every line Relay can say that
+ * Recall's fixed lines (AGENTS.md section 6.2). Every line Recall can say that
  * carries no factual claim lives in /fixtures/call-script.json under a stable
  * script id; this module validates that file and fills its slots.
  *
@@ -31,7 +31,7 @@ const categoryLines = z
     elaborate: line.optional(),
   })
   .refine((c) => c.memory_kind === "procedural" || c.reorientation === undefined, {
-    message: "an autobiographical category has no reorientation line: Relay never states such a memory outright",
+    message: "an autobiographical category has no reorientation line: Recall never states such a memory outright",
     path: ["reorientation"],
   });
 export type CategoryLines = z.infer<typeof categoryLines>;
@@ -74,10 +74,10 @@ export const callScriptSchema = z.strictObject({
   }),
   stop_phrases: z.array(z.string().min(1)).min(1),
   identity_phrases: z.array(z.string().min(1)).min(1),
-  /** How Relay talks (EVIDENCE.md, section C): one question at a time, and short sentences rather than slow ones. */
+  /** How Recall talks (EVIDENCE.md, section C): one question at a time, and short sentences rather than slow ones. */
   conduct: z.strictObject({ max_questions_per_line: z.number().int().positive(), max_words_per_sentence: z.number().int().positive() }),
   unsure_phrases: z.array(z.string().min(1)).min(1),
-  /** Short replies that say she is with the topic without yet saying anything about it. Relay then asks the open follow-up. */
+  /** Short replies that say she is with the topic without yet saying anything about it. Recall then asks the open follow-up. */
   affirm_phrases: z.array(z.string().min(1)).min(1),
   banned: z.array(bannedEntry).min(1),
 });
@@ -116,7 +116,7 @@ export function allScriptLines(script: CallScript): ScriptLine[] {
   return out;
 }
 
-/** Lowercased, punctuation to spaces, apostrophes kept: the one normal form every lexical rule in Relay matches on. */
+/** Lowercased, punctuation to spaces, apostrophes kept: the one normal form every lexical rule in Recall matches on. */
 export const normalize = (text: string): string =>
   ` ${text
     .toLowerCase()

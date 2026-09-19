@@ -6,7 +6,7 @@
   "turns": [
     {
       "turn_id": "r1",
-      "speaker": "relay",
+      "speaker": "recall",
       "start_ms": 1000,
       "end_ms": 6800,
       "is_final": true,
@@ -27,7 +27,7 @@
           "end_ms": 2203
         },
         {
-          "w": "Relay,",
+          "w": "Recall,",
           "start_ms": 2243,
           "end_ms": 2617
         },
@@ -85,7 +85,7 @@
     },
     {
       "turn_id": "r2",
-      "speaker": "relay",
+      "speaker": "recall",
       "start_ms": 7200,
       "end_ms": 11800,
       "is_final": true,
@@ -183,7 +183,7 @@
     },
     {
       "turn_id": "r3",
-      "speaker": "relay",
+      "speaker": "recall",
       "start_ms": 20400,
       "end_ms": 23000,
       "is_final": true,
@@ -251,7 +251,7 @@
     },
     {
       "turn_id": "r4",
-      "speaker": "relay",
+      "speaker": "recall",
       "start_ms": 27200,
       "end_ms": 29800,
       "is_final": true,
@@ -324,7 +324,7 @@
     },
     {
       "turn_id": "r5",
-      "speaker": "relay",
+      "speaker": "recall",
       "start_ms": 33600,
       "end_ms": 36000,
       "is_final": true,
@@ -420,7 +420,7 @@
     },
     {
       "turn_id": "r6",
-      "speaker": "relay",
+      "speaker": "recall",
       "start_ms": 46300,
       "end_ms": 47800,
       "is_final": true,
@@ -468,7 +468,7 @@
     },
     {
       "turn_id": "r7",
-      "speaker": "relay",
+      "speaker": "recall",
       "start_ms": 50200,
       "end_ms": 52800,
       "is_final": true,
@@ -541,7 +541,7 @@
     },
     {
       "turn_id": "r8",
-      "speaker": "relay",
+      "speaker": "recall",
       "start_ms": 55200,
       "end_ms": 58600,
       "is_final": true,

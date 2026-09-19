@@ -47,7 +47,7 @@ describe("A. which memory, and when", () => {
   });
 });
 
-describe("C. how Relay talks", () => {
+describe("C. how Recall talks", () => {
   it("logs the kind of prompt beside every reply of hers: open, forced choice, or yes/no", async () => {
     const r = await runJudgedPath();
     const formats = r.recording.tool_log.filter((c) => ["assess_conversation_state", "confirm_and_store", "confirm_share"].includes(c.tool)).map((c) => (c.output as { response_format?: string; evidence?: { response_format: string } }).response_format ?? (c.output as { evidence?: { response_format: string } }).evidence?.response_format);

@@ -1,11 +1,11 @@
-# Relay
+# Recall
 
-Most dementia products help families manage the person. Relay helps the person keep reaching her own memories, and keeps the people around her calling her directly to do it.
+Most dementia products help families manage the person. Recall helps the person keep reaching her own memories, and keeps the people around her calling her directly to do it.
 
-Relay has two parts, built on one private memory graph:
+Recall has two parts, built on one private memory graph:
 
 1. **Capture.** She and the people who know her contribute memories — photos, voice, short stories — while those memories are still accessible. The graph holds people, relationships, places, events, stories, and preferences, each with visible provenance: who said it, and when.
-2. **Retrieve.** Relay periodically calls her on an ordinary phone. It picks a personally meaningful memory and helps her reach it herself: free recall first, then progressively more context, only as needed. It also learns which cues actually help *her*, and prefers those next time.
+2. **Retrieve.** Recall periodically calls her on an ordinary phone. It picks a personally meaningful memory and helps her reach it herself: free recall first, then progressively more context, only as needed. It also learns which cues actually help *her*, and prefers those next time.
 
 Family stay in the loop without replacing her. They can contribute memories, open a light weekly note and a per-topic record of what happened in calls, and are pointed back to calling her.
 
@@ -13,9 +13,9 @@ Core loop: **CAPTURE → ORGANIZE → RETRIEVE → REINFORCE → LEARN → REPEA
 
 **Cues, not answers — every memory stays in her own words.**
 
-If Maya wants to know what Susan remembers about her wedding, Relay does not answer from the graph. It says: *"Susan's talked about this before. Want to give her a call?"* and stops there. A product that answers family questions from a database of someone's memories is a reason to stop calling her. Relay exists to be the opposite.
+If Maya wants to know what Susan remembers about her wedding, Recall does not answer from the graph. It says: *"Susan's talked about this before. Want to give her a call?"* and stops there. A product that answers family questions from a database of someone's memories is a reason to stop calling her. Recall exists to be the opposite.
 
-Relay is not a digital replica, a "chat with her" interface, or a bot that relays decisions. It never impersonates her, never fabricates a first-person memory she didn't provide, and never becomes the thing family members talk to instead of her.
+Recall is not a digital replica, a "chat with her" interface, or a bot that relays decisions. It never impersonates her, never fabricates a first-person memory she didn't provide, and never becomes the thing family members talk to instead of her.
 
 `AGENTS.md` is the complete brief, including the non-negotiables. `SPECS.md` is the locked design doc. When they disagree, `AGENTS.md` wins. HackMIT 2026, Healthcare track.
 
@@ -32,16 +32,16 @@ Node 22+. No keys, no database, and no network are needed for any of the above.
 | Command | What it does |
 | --- | --- |
 | `npm run check` | `typecheck` + `test` + `lint:language` + `verify`. Must pass before a task is called done. |
-| `npm run lint:language` | The banned-phrase and conduct lint (`AGENTS.md` §12, test 8) over every fixed line and every line Relay rendered on the golden path. |
+| `npm run lint:language` | The banned-phrase and conduct lint (`AGENTS.md` §12, test 8) over every fixed line and every line Recall rendered on the golden path. |
 | `npm run verify` | Asset hashes, seed validation, citation resolution, the judged path end to end, authorship invariants. |
 | `npm run verify:strict` | The pre-demo gate. Same, but **fails while any placeholder media or placeholder word timing remains.** |
 | `npm run assets:hash` | Re-hash `/assets` into the manifest. Refuses to touch a changed `final` asset without `--allow-replace`. |
 | `npm run assets:placeholder` | Generate stand-in media. Never overwrites an existing file. |
-| `npm run graph:seed` | Build an on-disk LadybugDB graph at `.data/relay.lbug` from the family seed, for Cypher poking. |
+| `npm run graph:seed` | Build an on-disk LadybugDB graph at `.data/recall.lbug` from the family seed, for Cypher poking. |
 
 ## How it fits together
 
-Relay places a scheduled recall call to her, climbs a five-rung support ladder, captures her exact words, and stores them only after she hears the line played back and says yes. A second question asks whether to share that line with family. Family never trigger a same-moment call, and Relay never answers them from the graph.
+Recall places a scheduled recall call to her, climbs a five-rung support ladder, captures her exact words, and stores them only after she hears the line played back and says yes. A second question asks whether to share that line with family. Family never trigger a same-moment call, and Recall never answers them from the graph.
 
 ```
 idle → scheduled → policy_passed → connected → topic_selected → asking
@@ -69,22 +69,22 @@ The model may select tool calls. It cannot bypass gates. Storing a claim without
 
 Family are part of the loop, passively and lightly. Nothing here is shown to her.
 
-- **Tell Relay about a memory.** A one-way form. Stored as the contributor's claim with `patient_confirmed: false`. A question typed here is rejected with a hint to call her.
+- **Tell Recall about a memory.** A one-way form. Stored as the contributor's claim with `patient_confirmed: false`. A question typed here is rejected with a hint to call her.
 - **Ask about Susan.** Redirect only. The entire response is the fixed line pointing them to call her. No graph content, ever.
 - **Weekly Note.** At most one per approved member per 7 days, shown when they open the dashboard. Topic-only, observable; her words only after share-confirmation; at most one gap or difference prompt.
-- **Per-topic record.** Counts and dates from the last 8 calls that included a topic. No total, no score, no color-coded verdict. Fixed header: this is a record of what happened in Relay calls, not a measure of her memory overall.
-- **Export for a doctor.** Member-initiated. The same counts, dates, and header, plus "This record is not a clinical assessment or diagnosis." Relay never sends the file to anyone.
+- **Per-topic record.** Counts and dates from the last 8 calls that included a topic. No total, no score, no color-coded verdict. Fixed header: this is a record of what happened in Recall calls, not a measure of her memory overall.
+- **Export for a doctor.** Member-initiated. The same counts, dates, and header, plus "This record is not a clinical assessment or diagnosis." Recall never sends the file to anyone.
 
-Relay never calls, texts, emails, or pushes family, with one exception: a fixed-text safety alert to designated caregivers if her final turn matches a lexical phrase on the safety list. The alert states a category and time. It never quotes her. Relay is not an emergency service.
+Recall never calls, texts, emails, or pushes family, with one exception: a fixed-text safety alert to designated caregivers if her final turn matches a lexical phrase on the safety list. The alert states a category and time. It never quotes her. Recall is not an emergency service.
 
 ## The 90-second golden path
 
 Cast is fixed: Susan, Maya (daughter), Priya (sister), Anika (granddaughter), Cape May, Lincoln Elementary, Princeton. Do not invent another.
 
 1. Onboarding: Maya's photo, Susan names her, the graph node forms with provenance.
-2. The phone rings as a saved contact, "Relay (from Maya)." Relay discloses it is an AI assistant Maya set up, then invites her to talk about summers at Cape May. It waits. She is unsure.
-3. The ladder climbs: context, then association ("You and Maya used to go there together"). She reaches it. Relay does not rewrite her line. Store-confirmation, then share-confirmation. The graph grows from this call.
-4. Later, Maya types "What did Mom say about her wedding?" Relay's entire response: **"Susan's talked about this before. Want to give her a call?"**
+2. The phone rings as a saved contact, "Recall (from Maya)." Recall discloses it is an AI assistant Maya set up, then invites her to talk about summers at Cape May. It waits. She is unsure.
+3. The ladder climbs: context, then association ("You and Maya used to go there together"). She reaches it. Recall does not rewrite her line. Store-confirmation, then share-confirmation. The graph grows from this call.
+4. Later, Maya types "What did Mom say about her wedding?" Recall's entire response: **"Susan's talked about this before. Want to give her a call?"**
 5. The dashboard shows the weekly note, the line Susan chose to share, and the per-topic record. Never a score.
 6. Provenance receipt: her waveform, literal transcript, 2 silence trims, 0 generated first-person words. Final line: **Cues, not answers — every memory stays in her own words.**
 
@@ -110,4 +110,4 @@ Cast is fixed: Susan, Maya (daughter), Priya (sister), Anika (granddaughter), Ca
 4. Re-derive word timings from the real recording and replace the call transcript fixture, setting `"timing_status": "measured"`. The pauses in her answer must still exceed 700 ms for the receipt to read "2 pauses trimmed".
 5. `npm run verify:strict`
 
-`/assets` is append-only after hashing. Relay's spoken lines in the recording must match `render_prompt` (or a fixed script ID) word for word: if they drift, the run stops rather than letting the audio say one thing while the trace shows another.
+`/assets` is append-only after hashing. Recall's spoken lines in the recording must match `render_prompt` (or a fixed script ID) word for word: if they drift, the run stops rather than letting the audio say one thing while the trace shows another.

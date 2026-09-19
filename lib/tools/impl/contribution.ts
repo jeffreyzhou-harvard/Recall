@@ -4,7 +4,7 @@
  * Then record what happened on the topic. Each step fails closed.
  */
 import { edgeId } from "@/lib/graph/seed";
-import { patientConfirmed, RELAY_AGENT_ID, type EdgeType, type GraphNode, type MediaSpan, type Provenance, type SourceClass } from "@/lib/graph/types";
+import { patientConfirmed, RECALL_AGENT_ID, type EdgeType, type GraphNode, type MediaSpan, type Provenance, type SourceClass } from "@/lib/graph/types";
 import { AuthorshipError, generatedFirstPersonWords, herWordsPct, participantWordsIn } from "@/lib/provenance/authorship";
 import { buildEdl, trimCount } from "@/lib/provenance/edl";
 import { contentHash } from "@/lib/provenance/hash";
@@ -44,7 +44,7 @@ export const capture_contribution: ToolImpl<"capture_contribution"> = async (inp
   const turns = await ctx.transcription.allTurns(asset.id);
   let words;
   try {
-    // Deterministic check: any interval holding Relay's speech, or played-back audio, is rejected outright.
+    // Deterministic check: any interval holding Recall's speech, or played-back audio, is rejected outright.
     words = participantWordsIn(turns, intervals);
   } catch (e) {
     if (e instanceof AuthorshipError) throw new GateError("authorship", e.message);
@@ -89,7 +89,7 @@ export const capture_contribution: ToolImpl<"capture_contribution"> = async (inp
  * it is part of saying yes, and at least one of them actually says it. Anything else she might add, of any
  * kind, makes it not a clean yes (rule 3).
  *
- * The cost is deliberate: "yes, the one about the beach" is unclear, and nothing is kept. Relay can ask
+ * The cost is deliberate: "yes, the one about the beach" is unclear, and nothing is kept. Recall can ask
  * again on another call; a memory stored or shared without her clear yes cannot be un-stored in her eyes.
  * English only, like the rest of the lexical rules here.
  */
@@ -126,7 +126,7 @@ function provFor(ctx: ToolContext, c: Contribution, author: string, span: MediaS
     span,
     observed_at: at,
     author,
-    extraction_method: author === RELAY_AGENT_ID ? "system_event" : "literal_transcript",
+    extraction_method: author === RECALL_AGENT_ID ? "system_event" : "literal_transcript",
     confidence: 1,
     audience_scope: [ctx.setup.current().person_id],
     expires_at: null,
@@ -251,7 +251,7 @@ export const record_retrieval_outcome: ToolImpl<"record_retrieval_outcome"> = as
     media_hash: null,
     span: null,
     observed_at: at,
-    author: RELAY_AGENT_ID,
+    author: RECALL_AGENT_ID,
     extraction_method: "system_event",
     confidence: 1,
     audience_scope: [ctx.setup.current().person_id],
@@ -262,7 +262,7 @@ export const record_retrieval_outcome: ToolImpl<"record_retrieval_outcome"> = as
     patient_confirmed: false,
     confirmations: [],
   };
-  await ctx.graph.putNode({ id: logId, type: "Artifact", label: "Relay's record of this call", props: { kind: "call", text: null, alt: null }, prov });
+  await ctx.graph.putNode({ id: logId, type: "Artifact", label: "Recall's record of this call", props: { kind: "call", text: null, alt: null }, prov });
   await ctx.graph.putNode({ id: sessionNodeId, type: "Session", label: "Recall call", props: { topic_id: topic.topic_id, started_at: ctx.session.started_at ?? at, ended_at: at, outcome: machine.state }, prov });
   const link = async (type: EdgeType, from: string, to: string): Promise<void> => ctx.graph.putEdge({ id: edgeId(type, from, to), type, from, to, props: {}, prov });
   if (ctx.session.stored && c) await link("DERIVED_FROM", c.contribution_id, sessionNodeId);

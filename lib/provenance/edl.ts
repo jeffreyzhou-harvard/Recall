@@ -1,5 +1,5 @@
 /**
- * Edit-decision list. The ONLY edits Relay may make to her contribution are
+ * Edit-decision list. The ONLY edits Recall may make to her contribution are
  * silence trims and disfluency trims, and every one is listed (rule 1). There
  * is no operation here that adds, reorders, substitutes, or re-times a word,
  * so such an edit cannot be expressed, let alone applied.
@@ -100,7 +100,7 @@ export function buildEdl(
 }
 
 /**
- * Independent check, run on every EDL whether Relay built it or not. Throws if
+ * Independent check, run on every EDL whether Recall built it or not. Throws if
  * any trim is of an unknown kind, falls outside the intervals, overlaps
  * another trim, or - the one that matters - removes any part of a word that
  * is not a listed filler.

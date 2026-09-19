@@ -7,8 +7,8 @@
  * and nothing on the judged path may import anything under lib/bridge/telegram
  * (a test enforces both). The judged path talks to MemoryThreadBridge.
  *
- * Only the handful of methods Relay uses are modeled, and only the fields it
- * reads. Relay subscribes to `message` updates alone - not edits, reactions,
+ * Only the handful of methods Recall uses are modeled, and only the fields it
+ * reads. Recall subscribes to `message` updates alone - not edits, reactions,
  * member changes, or anything else Telegram could tell it about the chat.
  */
 
@@ -65,7 +65,7 @@ export interface TgFile {
   file_path?: string;
 }
 
-/** The only update type Relay asks Telegram for. */
+/** The only update type Recall asks Telegram for. */
 export const ALLOWED_UPDATES = ["message"] as const;
 
 /** The header Telegram echoes on every webhook call when a secret was set with setWebhook. */
@@ -90,7 +90,7 @@ export type FetchLike = (url: string, init?: { method?: string; headers?: Record
 }>;
 
 interface Reply {
-  /** Reply to this message, so everything Relay says sits under the ask it answers. */
+  /** Reply to this message, so everything Recall says sits under the ask it answers. */
   reply_to_message_id?: number;
 }
 

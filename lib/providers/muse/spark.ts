@@ -9,7 +9,7 @@
  * LIVE ONLY, SERVER ONLY. The key must never reach a browser, and nothing on
  * the judged path imports this.
  *
- * Relay never lets a model's output act directly. `structured` asks for JSON
+ * Recall never lets a model's output act directly. `structured` asks for JSON
  * matching a zod schema and then VALIDATES what comes back against that same
  * schema: a reply that does not parse is an error, not a best effort. What the
  * validated output is allowed to do is decided by the caller's own guards -

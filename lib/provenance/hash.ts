@@ -56,7 +56,7 @@ export function canonicalJson(value: unknown): string {
   }
 }
 
-/** sha256 over the canonical JSON form. This is what a "content hash" means in Relay. */
+/** sha256 over the canonical JSON form. This is what a "content hash" means in Recall. */
 export async function contentHash(value: unknown): Promise<string> {
   return sha256Text(canonicalJson(value));
 }

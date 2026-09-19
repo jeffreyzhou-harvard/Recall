@@ -13,7 +13,7 @@
  *
  * Keep the bot's group privacy mode ON (BotFather's default). With it on,
  * Telegram delivers only commands addressed to the bot, and the single message
- * such a command replies to. The rest of the conversation never reaches Relay
+ * such a command replies to. The rest of the conversation never reaches Recall
  * at all - rule 8 is enforced by Telegram before it is enforced by us.
  *
  * What is read from an update is exactly: who sent the command, which chat,
@@ -24,13 +24,13 @@ import type { TgMessage, TgPhotoSize, TgUpdate } from "./api";
 export const ASK_COMMAND = "ask";
 const HELP_COMMANDS = new Set(["start", "help"]);
 
-export const USAGE_TEXT = "To ask with Relay, reply to your own question with /ask. If there is a photo, say what it shows: /ask kheer and halwa.";
+export const USAGE_TEXT = "To ask with Recall, reply to your own question with /ask. If there is a photo, say what it shows: /ask kheer and halwa.";
 
 export interface ParsedAsk {
   kind: "ask";
   chat_id: number;
   from_user_id: number;
-  /** The message that carries the question. Replies from Relay attach to it. */
+  /** The message that carries the question. Replies from Recall attach to it. */
   ask_message_id: number;
   text: string;
   photo: { file_id: string; file_unique_id: string } | null;
@@ -86,7 +86,7 @@ export function parseUpdate(update: TgUpdate, botUsername: string): ParsedUpdate
   const base = { kind: "ask" as const, chat_id: message.chat.id, from_user_id: message.from.id, received_at: new Date(message.date * 1000).toISOString() };
   const question = message.reply_to_message;
   if (question) {
-    // You forward your own question. Pointing Relay at someone else's message would make them the
+    // You forward your own question. Pointing Recall at someone else's message would make them the
     // asker without their having asked.
     if (question.from?.id !== message.from.id) return usage("not_your_message");
     const text = (question.text ?? question.caption ?? "").trim();

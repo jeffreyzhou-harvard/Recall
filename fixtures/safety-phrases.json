@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "The fixed safety list (AGENTS.md rule 15). A plain lexical match on her literal words: it will miss things, and it will sometimes fire on harmless phrases - a neutral note to her caregiver is the accepted cost. Relay is not an emergency service. It can be changed only here, through the joint setup with a second reviewer, never by anything said on a call.",
+  "description": "The fixed safety list (AGENTS.md rule 15). A plain lexical match on her literal words: it will miss things, and it will sometimes fire on harmless phrases - a neutral note to her caregiver is the accepted cost. Recall is not an emergency service. It can be changed only here, through the joint setup with a second reviewer, never by anything said on a call.",
   "categories": {
     "fall": {
       "label": "a fall",
@@ -59,6 +59,6 @@
   },
   "alert": {
     "id": "SAFETY-ALERT",
-    "text": "Relay safety note, {time}: during a Relay call, {name} said something on Relay's safety list ({category}). Relay is not an emergency service and cannot tell what is happening. Please call {name}."
+    "text": "Recall safety note, {time}: during a Recall call, {name} said something on Recall's safety list ({category}). Recall is not an emergency service and cannot tell what is happening. Please call {name}."
   }
 }

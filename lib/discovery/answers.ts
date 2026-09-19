@@ -70,7 +70,7 @@ export interface ApplyResult {
   answer_artifact_id: string;
   created: string[];
   confirmed: string[];
-  /** Two people said different things. Both are set aside until a person resolves it; Relay does not pick. */
+  /** Two people said different things. Both are set aside until a person resolves it; Recall does not pick. */
   disputed: string[];
 }
 
@@ -139,7 +139,7 @@ export async function applyAnswer(question: Question, answer: Answer, proposals:
     } else {
       const about = await Promise.all(p.about.map((ref) => resolve(ref, where)));
       const storyId = `story:${answer.answer_id}`;
-      // Her telling, word for word. Relay never writes, tidies, or summarizes it (rule 1).
+      // Her telling, word for word. Recall never writes, tidies, or summarizes it (rule 1).
       plan.push({ make: [{ id: storyId, type: "Story", label: answer.text.slice(0, 60), props: { text: answer.text } } as unknown as GraphNode, ...about.flatMap(stub)], status: standing, derived: false, edge: null });
       for (const a of about) plan.push({ make: [], status: standing, derived: false, edge: { id: edgeId("ABOUT", storyId, a.id), type: "ABOUT", from: storyId, to: a.id, props: {} } });
       plan.push({ make: [], status: standing, derived: false, edge: { id: edgeId("SPOKEN_BY", storyId, answer.by), type: "SPOKEN_BY", from: storyId, to: answer.by, props: {} } });
@@ -189,7 +189,7 @@ export async function applyAnswer(question: Question, answer: Answer, proposals:
     }
     let status = step.status;
     if (step.edge.type === "IDENTIFIED_AS") {
-      // Someone already said this face is someone else. Relay does not choose between people: both are set aside.
+      // Someone already said this face is someone else. Recall does not choose between people: both are set aside.
       const rival = (await graph.edgesOf(step.edge.from)).find((e) => e.type === "IDENTIFIED_AS" && e.from === step.edge!.from && e.to !== step.edge!.to && e.prov.status !== "disputed");
       if (rival) {
         await graph.confirm(rival.id, { ...confirmation, stance: "disputes" });

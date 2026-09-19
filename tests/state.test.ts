@@ -2,13 +2,13 @@
 import { describe, expect, it } from "vitest";
 import { SAFETY_PHRASES } from "@/fixtures";
 import { matchSafetyPhrase } from "@/lib/safety/phrases";
-import { IN_CALL, MAIN_LINE, NON_TERMINAL, SAFE_ENDINGS, TERMINAL, TRANSITIONS, type RelayEvent, type RelayState } from "@/lib/state/machine";
+import { IN_CALL, MAIN_LINE, NON_TERMINAL, SAFE_ENDINGS, TERMINAL, TRANSITIONS, type RecallEvent, type RecallState } from "@/lib/state/machine";
 import { InvalidTransitionError, initialState, reduce, reduceStrict, replay, type MachineState } from "@/lib/state/reducer";
-import { createRelayStore } from "@/lib/state/store";
+import { createRecallStore } from "@/lib/state/store";
 
 const H = "a".repeat(64);
 const at = (s: number): { at: string } => ({ at: new Date(Date.parse("2026-11-05T15:30:00.000Z") + s * 1000).toISOString() });
-const GOLDEN: RelayEvent[] = [
+const GOLDEN: RecallEvent[] = [
   { type: "CALL_SCHEDULED", person_id: "person:susan", topic_id: "event:x", topic_label: "X", family_sourced: false, reorientation_allowed: false },
   { type: "POLICY_GRANTED", policy_token_id: "token:1", max_call_minutes: 12 },
   { type: "CALL_CONNECTED", session_id: "session:1" },
@@ -27,7 +27,7 @@ const GOLDEN: RelayEvent[] = [
 /** The machine after the first `n` golden events. */
 const upTo = (n: number): MachineState => GOLDEN.slice(0, n).reduce((m, e, i) => reduceStrict(m, e, at(i)), initialState());
 /** One machine parked in each non-terminal state. */
-const parkedIn = (state: RelayState): MachineState => {
+const parkedIn = (state: RecallState): MachineState => {
   for (let n = 0; n <= GOLDEN.length; n++) if (upTo(n).state === state) return upTo(n);
   throw new Error(`the golden walk never rests in ${state}`);
 };
@@ -40,7 +40,7 @@ describe("the transition table", () => {
     for (const state of TERMINAL) expect(TRANSITIONS[state]).toEqual({});
     const done = upTo(GOLDEN.length);
     expect(done.state).toBe("stored");
-    for (const e of [...GOLDEN, { type: "STOP", how: "hang_up" } as RelayEvent, { type: "SAFETY_MATCHED", category: "fall" } as RelayEvent]) expect(reduce(done, e, at(99)).state).toBe("stored");
+    for (const e of [...GOLDEN, { type: "STOP", how: "hang_up" } as RecallEvent, { type: "SAFETY_MATCHED", category: "fall" } as RecallEvent]) expect(reduce(done, e, at(99)).state).toBe("stored");
   });
 
   it("walks the golden line, and a replay of the trace rebuilds every state exactly", () => {
@@ -51,7 +51,7 @@ describe("the transition table", () => {
   });
 
   it("an unknown (state, event) pair throws AND logs, and changes nothing", () => {
-    const store = createRelayStore();
+    const store = createRecallStore();
     expect(() => store.getState().dispatch(GOLDEN[5]!, at(0))).toThrow(InvalidTransitionError);
     const { machine } = store.getState();
     expect(machine.state).toBe("idle");
@@ -95,7 +95,7 @@ describe("the safety handoff", () => {
 });
 
 describe("the ladder's order, enforced here as well as in select_scaffold", () => {
-  const rung = (n: 1 | 2 | 3 | 4 | 5): RelayEvent => ({ type: "RUNG_DELIVERED", rung: n, prompt_id: `p${n}`, citations: [], cue_id: null });
+  const rung = (n: 1 | 2 | 3 | 4 | 5): RecallEvent => ({ type: "RUNG_DELIVERED", rung: n, prompt_id: `p${n}`, citations: [], cue_id: null });
 
   it("a call never opens above rung 1", () => {
     for (const n of [2, 3, 4, 5] as const) expect(() => reduceStrict(parkedIn("topic_selected"), rung(n), at(9))).toThrow(/never starts above rung 1/);
@@ -110,7 +110,7 @@ describe("the ladder's order, enforced here as well as in select_scaffold", () =
   });
 
   it("where the last rung is allowed at all, it never jumps the queue; and a rung is never repeated or revisited", () => {
-    const procedural = [{ ...GOLDEN[0]!, reorientation_allowed: true } as RelayEvent, ...GOLDEN.slice(1, 7)].reduce((m, e, i) => reduceStrict(m, e, at(i)), initialState());
+    const procedural = [{ ...GOLDEN[0]!, reorientation_allowed: true } as RecallEvent, ...GOLDEN.slice(1, 7)].reduce((m, e, i) => reduceStrict(m, e, at(i)), initialState());
     expect(() => reduceStrict(procedural, rung(5), at(9))).toThrow(/rungs 1-4 have each been tried/);
     expect(() => reduceStrict(lost(), rung(1), at(9))).toThrow(/at most once/);
     const afterThree = reduceStrict(reduceStrict(reduceStrict(lost(), rung(2), at(9)), { type: "TURN_ASSESSED", turn_id: "t", turn_state: "no_answer", silent: false }, at(10)), rung(4), at(11));
@@ -121,7 +121,7 @@ describe("the ladder's order, enforced here as well as in select_scaffold", () =
   });
 
   it("stops at rung 3 for a family-sourced, unconfirmed topic", () => {
-    const family = [{ ...GOLDEN[0]!, family_sourced: true } as RelayEvent, ...GOLDEN.slice(1, 7)].reduce((m, e, i) => reduceStrict(m, e, at(i)), initialState());
+    const family = [{ ...GOLDEN[0]!, family_sourced: true } as RecallEvent, ...GOLDEN.slice(1, 7)].reduce((m, e, i) => reduceStrict(m, e, at(i)), initialState());
     const atThree = reduceStrict(reduceStrict(reduceStrict(family, rung(2), at(9)), { type: "TURN_ASSESSED", turn_id: "t", turn_state: "no_answer", silent: false }, at(10)), rung(3), at(11));
     const stillLost = reduceStrict(atThree, { type: "TURN_ASSESSED", turn_id: "u", turn_state: "no_answer", silent: false }, at(12));
     for (const n of [4, 5] as const) expect(() => reduceStrict(stillLost, rung(n), at(13))).toThrow(/rule 13/);
@@ -129,7 +129,7 @@ describe("the ladder's order, enforced here as well as in select_scaffold", () =
   });
 
   it("two quiet windows end the topic gently; spoken misses keep climbing", () => {
-    const quiet: RelayEvent = { type: "TURN_ASSESSED", turn_id: "s", turn_state: "no_answer", silent: true };
+    const quiet: RecallEvent = { type: "TURN_ASSESSED", turn_id: "s", turn_state: "no_answer", silent: true };
     const once = reduceStrict(parkedIn("asking"), quiet, at(9));
     expect(once.state).toBe("lost");
     expect(reduceStrict(reduceStrict(once, rung(2), at(10)), quiet, at(11)).state).toBe("no_answer_today");
@@ -137,7 +137,7 @@ describe("the ladder's order, enforced here as well as in select_scaffold", () =
 });
 
 describe("the greeting comes first, and commit comes last", () => {
-  it("nothing can be said before Relay has said what it is", () => {
+  it("nothing can be said before Recall has said what it is", () => {
     expect(() => reduceStrict(upTo(3), GOLDEN[4]!, at(3))).toThrow(/AI-assistant disclosure/); // connected, not yet greeted
     expect(reduceStrict(upTo(4), GOLDEN[4]!, at(3)).state).toBe("topic_selected");
     expect(() => reduceStrict(upTo(4), GOLDEN[3]!, at(3))).toThrow(/said once/);
@@ -147,9 +147,9 @@ describe("the greeting comes first, and commit comes last", () => {
     const confirmed = upTo(12);
     expect(() => reduceStrict(confirmed, GOLDEN[13]!, at(20))).toThrow(/commit comes last/);
     const resolved = reduceStrict(confirmed, { type: "SHARE_CONFIRMATION_RECORDED", confirmation_id: "c2", decision: "no", contribution_hash: H }, at(20));
-    expect(() => reduceStrict(resolved, { ...GOLDEN[13]!, contribution_hash: "b".repeat(64) } as RelayEvent, at(21))).toThrow(/does not match the confirmed/);
+    expect(() => reduceStrict(resolved, { ...GOLDEN[13]!, contribution_hash: "b".repeat(64) } as RecallEvent, at(21))).toThrow(/does not match the confirmed/);
     expect(() => reduceStrict(resolved, GOLDEN[13]!, at(21))).toThrow(/share flag/); // she said no; "shared: true" is refused
-    expect(reduceStrict(resolved, { ...GOLDEN[13]!, shared: false } as RelayEvent, at(21)).state).toBe("stored");
+    expect(reduceStrict(resolved, { ...GOLDEN[13]!, shared: false } as RecallEvent, at(21)).state).toBe("stored");
   });
 
   it("a no, or an unclear answer, to the store question keeps nothing; no answer to the share question never blocks storing", () => {
@@ -165,7 +165,7 @@ describe("the greeting comes first, and commit comes last", () => {
 
 describe("failure transitions are deterministic", () => {
   it("a missing gate: never placed before the call, narrowed during it, nothing kept after capture", () => {
-    const gate: RelayEvent = { type: "GATE_MISSING", gate: "evidence", detail: "x" };
+    const gate: RecallEvent = { type: "GATE_MISSING", gate: "evidence", detail: "x" };
     expect(reduceStrict(parkedIn("policy_passed"), gate, at(1)).state).toBe("blocked");
     expect(reduceStrict(parkedIn("reanchored"), gate, at(30)).state).toBe("no_answer_today");
     expect(reduceStrict(parkedIn("confirming"), gate, at(30)).state).toBe("not_stored");

@@ -1,9 +1,9 @@
 /**
- * "Ask Mom with Relay", from the web app: one forwarded ask in, the finished session's recording out.
+ * "Ask Mom with Recall", from the web app: one forwarded ask in, the finished session's recording out.
  * The same intake, gates, and session as an ask that arrives over Telegram. Operators only. LIVE ONLY.
  */
 import { mayCreateRoom } from "@/server/call-rooms";
-import { getLiveRelay } from "@/server/relay-live";
+import { getLiveRecall } from "@/server/recall-live";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +18,7 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: "bad request" }, { status: 400 });
   }
   try {
-    return Response.json(await (await getLiveRelay()).ask(payload));
+    return Response.json(await (await getLiveRecall()).ask(payload));
   } catch (e) {
     console.error("[live ask] failed:", e);
     return Response.json({ error: "the session could not be run" }, { status: 500 });
