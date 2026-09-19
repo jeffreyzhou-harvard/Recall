@@ -16,7 +16,7 @@ const notice = (over: Partial<Extract<ThreadMessage, { kind: "family_notice" }>>
   to: { thread_id: THREAD },
   notice: "not_this_time",
   text: NOTICE_TEXT.not_this_time,
-  authored_by: "relay",
+  authored_by: "recall",
   ...over,
 });
 
@@ -36,7 +36,7 @@ describe("no autonomous outreach", () => {
     expect(bridge.posted()).toEqual([]);
   });
 
-  it("will not carry free text as a notice: Relay's words to the family are the two fixed sentences", async () => {
+  it("will not carry free text as a notice: Recall's words to the family are the two fixed sentences", async () => {
     const bridge = new MemoryThreadBridge();
     bridge.registerForward("fwd-1", THREAD);
     await expect(bridge.post(notice({ text: "She seemed confused today." }), AT)).rejects.toThrow(/fixed wording/);

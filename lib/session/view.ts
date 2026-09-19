@@ -13,7 +13,7 @@
  * the family side reads through lib/family/projection only.
  */
 import type { ProvenanceReceipt } from "@/lib/provenance/receipt";
-import { CALL_PHASE, type CallPhase, type RelayState } from "@/lib/state/machine";
+import { CALL_PHASE, type CallPhase, type RecallState } from "@/lib/state/machine";
 import type { ToolName, ToolOutput } from "@/lib/tools";
 import { stateAt, type SessionRecording } from "./recording";
 
@@ -64,18 +64,18 @@ export interface CueCard {
 }
 
 export interface LiveSessionView {
-  state: RelayState;
+  state: RecallState;
   call_phase: CallPhase | null;
-  /** Relay's status in plain speech, for the call stage. Null when Relay is the one talking or the call is over. */
+  /** Recall's status in plain speech, for the call stage. Null when Recall is the one talking or the call is over. */
   status_line: string | null;
   /** "With Susan now" and the one familiar topic, named at all times. */
   headline: { topic: string; spoken_as: string } | null;
-  relay_said: { script_id: string; text: string } | null;
+  recall_said: { script_id: string; text: string } | null;
   cue: CueCard | null;
   trace_cards: TraceCard[];
 }
 
-const STATUS_LINE: Partial<Record<RelayState, string>> = {
+const STATUS_LINE: Partial<Record<RecallState, string>> = {
   asking: "I'm listening",
   reanchored: "I'm listening",
   recalled: "I'm listening",
@@ -97,7 +97,7 @@ export function liveSessionView(recording: SessionRecording, atIso?: string): Li
     call_phase: CALL_PHASE[machine.state] ?? null,
     status_line: STATUS_LINE[machine.state] ?? null,
     headline: recording.topic && machine.state !== "idle" ? { topic: recording.topic.label, spoken_as: recording.topic.spoken_as } : null,
-    relay_said: said ? { script_id: said.script_id, text: said.text } : null,
+    recall_said: said ? { script_id: said.script_id, text: said.text } : null,
     // A cue belongs to the call. Once it ends, the stage clears rather than leaving the last card up.
     cue: lastRung && inCall ? { rung: lastRung.rung!, script_id: lastRung.script_id, text: lastRung.text, citations: citationsOf(lastRung.prompt_id) } : null,
     trace_cards: machine.trace
@@ -109,7 +109,7 @@ export function liveSessionView(recording: SessionRecording, atIso?: string): Li
 // --- receipt and provenance ---------------------------------------------------------
 
 export interface ReceiptView {
-  outcome: RelayState;
+  outcome: RecallState;
   /** The contribution card: her words, exactly, once she confirmed them. Null when nothing was stored. */
   contribution: { speaker_id: string; literal_transcript: string; provenance_rows: string[] } | null;
   /** One session, observable facts only. */

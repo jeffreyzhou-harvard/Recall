@@ -1,5 +1,5 @@
 /**
- * Relay state machine: states, events, and the one transition table
+ * Recall state machine: states, events, and the one transition table
  * (AGENTS.md section 5).
  *
  * Main line:
@@ -44,18 +44,18 @@ export const SAFE_ENDINGS = [
   "safety_handoff", // a phrase on the safety list; the recall flow is dropped and her caregiver is told
 ] as const;
 
-export type RelayState = (typeof MAIN_LINE)[number] | (typeof SAFE_ENDINGS)[number];
+export type RecallState = (typeof MAIN_LINE)[number] | (typeof SAFE_ENDINGS)[number];
 
-export const TERMINAL: ReadonlySet<RelayState> = new Set<RelayState>(["stored", ...SAFE_ENDINGS]);
-export const NON_TERMINAL: readonly RelayState[] = MAIN_LINE.filter((s) => s !== "stored");
+export const TERMINAL: ReadonlySet<RecallState> = new Set<RecallState>(["stored", ...SAFE_ENDINGS]);
+export const NON_TERMINAL: readonly RecallState[] = MAIN_LINE.filter((s) => s !== "stored");
 
 /** States in which she is on the line. A safety match, an identity question, and the call clock apply in exactly these. */
-export const IN_CALL: readonly RelayState[] = ["connected", "topic_selected", "asking", "lost", "reanchored", "recalled", "confirming", "confirmed"];
-const BEFORE_CAPTURE: readonly RelayState[] = ["connected", "topic_selected", "asking", "lost", "reanchored", "recalled"];
-const AFTER_CAPTURE: readonly RelayState[] = ["confirming", "confirmed"];
+export const IN_CALL: readonly RecallState[] = ["connected", "topic_selected", "asking", "lost", "reanchored", "recalled", "confirming", "confirmed"];
+const BEFORE_CAPTURE: readonly RecallState[] = ["connected", "topic_selected", "asking", "lost", "reanchored", "recalled"];
+const AFTER_CAPTURE: readonly RecallState[] = ["confirming", "confirmed"];
 
 export type CallPhase = "greet" | "select_topic" | "ladder" | "capture" | "confirm";
-export const CALL_PHASE: Partial<Record<RelayState, CallPhase>> = {
+export const CALL_PHASE: Partial<Record<RecallState, CallPhase>> = {
   connected: "greet",
   topic_selected: "select_topic",
   asking: "ladder",
@@ -82,7 +82,7 @@ export type ShareDecision = "yes" | "no" | "unclear" | "timeout";
 export type StopHow = "hang_up" | "explicit_stop" | "caregiver_pause";
 export type GateName = "identity" | "policy" | "evidence" | "confirmation" | "authorship";
 
-export type RelayEvent =
+export type RecallEvent =
   | { type: "CALL_SCHEDULED"; person_id: string; topic_id: string; topic_label: string; family_sourced: boolean; reorientation_allowed: boolean }
   | { type: "POLICY_GRANTED"; policy_token_id: string; max_call_minutes: number }
   | { type: "POLICY_DENIED"; reason: string }
@@ -106,15 +106,15 @@ export type RelayEvent =
   | { type: "FIXED_RESTATEMENT_DELIVERED"; prompt_id: string }
   | { type: "CALL_CLOSED" };
 
-export type RelayEventType = RelayEvent["type"];
-type EventOf<T extends RelayEventType> = Extract<RelayEvent, { type: T }>;
+export type RecallEventType = RecallEvent["type"];
+type EventOf<T extends RecallEventType> = Extract<RecallEvent, { type: T }>;
 
-export interface RelayContext {
+export interface RecallContext {
   person_id: string | null;
   topic_id: string | null;
   topic_label: string | null;
   family_sourced: boolean;
-  /** False for an autobiographical or identity memory: Relay never states one outright (EVIDENCE.md, section B). */
+  /** False for an autobiographical or identity memory: Recall never states one outright (EVIDENCE.md, section B). */
   reorientation_allowed: boolean;
   policy_token_id: string | null;
   max_call_minutes: number | null;
@@ -146,7 +146,7 @@ export interface RelayContext {
   ending_reason: string | null;
 }
 
-export const INITIAL_CONTEXT: RelayContext = {
+export const INITIAL_CONTEXT: RecallContext = {
   person_id: null,
   topic_id: null,
   topic_label: null,
@@ -176,10 +176,10 @@ export const INITIAL_CONTEXT: RelayContext = {
 };
 
 export interface Accept {
-  to: RelayState;
-  /** Human-readable card text for the "How Relay helped" rail. Never a clinical label. */
+  to: RecallState;
+  /** Human-readable card text for the "How Recall helped" rail. Never a clinical label. */
   label: string;
-  patch?: Partial<RelayContext>;
+  patch?: Partial<RecallContext>;
   citations?: string[];
   note?: string;
 }
@@ -188,13 +188,13 @@ export interface Reject {
 }
 export type Outcome = Accept | Reject;
 
-type Handler<T extends RelayEventType> = (ctx: RelayContext, event: EventOf<T>, state: RelayState, at: string) => Outcome;
-type StateTable = { [T in RelayEventType]?: Handler<T> };
+type Handler<T extends RecallEventType> = (ctx: RecallContext, event: EventOf<T>, state: RecallState, at: string) => Outcome;
+type StateTable = { [T in RecallEventType]?: Handler<T> };
 
-const highest = (ctx: RelayContext): number => Math.max(0, ...ctx.rungs_fired);
+const highest = (ctx: RecallContext): number => Math.max(0, ...ctx.rungs_fired);
 
 /** The ladder's order, enforced here as well as in `select_scaffold`: a forged or out-of-order rung cannot advance the call. */
-function rungProblem(ctx: RelayContext, rung: Rung): string | null {
+function rungProblem(ctx: RecallContext, rung: Rung): string | null {
   if (ctx.rungs_fired.includes(rung)) return `rung ${rung} has already fired on this topic; each rung fires at most once per call`;
   if (rung <= highest(ctx)) return `rung ${rung} is below rung ${highest(ctx)}, which has already been tried`;
   if (ctx.family_sourced && rung > FAMILY_SOURCED_MAX_RUNG) return `rung ${rung} is disabled for a family-sourced, unconfirmed topic (rule 13)`;
@@ -204,10 +204,10 @@ function rungProblem(ctx: RelayContext, rung: Rung): string | null {
 }
 
 const onRung =
-  (to: RelayState, label: string, firstOnly: boolean): Handler<"RUNG_DELIVERED"> =>
+  (to: RecallState, label: string, firstOnly: boolean): Handler<"RUNG_DELIVERED"> =>
   (ctx, e) => {
     if (ctx.fallback_active) return { reject: "the fixed script is running; no further rung may fire" };
-    if (firstOnly && e.rung !== 1) return { reject: "a call opens with free recall: Relay never starts above rung 1" };
+    if (firstOnly && e.rung !== 1) return { reject: "a call opens with free recall: Recall never starts above rung 1" };
     if (!firstOnly && ctx.rungs_fired.length === 0) return { reject: "free recall has not been tried yet" };
     const problem = rungProblem(ctx, e.rung);
     if (problem) return { reject: problem };
@@ -245,7 +245,7 @@ const onElaboration: Handler<"TURN_ASSESSED"> = (ctx, e) => {
   return { to: "not_stored", label: "Closed kindly", patch: { ending_reason: "she reached it, and offered nothing to remember this time" } };
 };
 
-export const TRANSITIONS: Record<RelayState, StateTable> = {
+export const TRANSITIONS: Record<RecallState, StateTable> = {
   idle: {
     CALL_SCHEDULED: (_ctx, e) => ({
       to: "scheduled",
@@ -266,7 +266,7 @@ export const TRANSITIONS: Record<RelayState, StateTable> = {
     CALL_NOT_ANSWERED: (_ctx, e) => ({ to: "no_answer_today", label: "No answer today", patch: { ending_reason: e.detail }, note: "no follow-up call is placed" }),
   },
   connected: {
-    GREETING_DELIVERED: (ctx) => (ctx.greeted ? { reject: "the greeting is said once" } : { to: "connected", label: "Relay said what it is", patch: { greeted: true } }),
+    GREETING_DELIVERED: (ctx) => (ctx.greeted ? { reject: "the greeting is said once" } : { to: "connected", label: "Recall said what it is", patch: { greeted: true } }),
     TOPIC_SELECTED: (ctx, e) => {
       if (!ctx.greeted) return { reject: "the first line of every call is the AI-assistant disclosure (rule 16)" };
       if (e.topic_id !== ctx.topic_id) return { reject: "the topic is not the one the policy granted this call for" };
@@ -322,7 +322,7 @@ export const TRANSITIONS: Record<RelayState, StateTable> = {
  * Order matters and is fixed: a safety match outranks a stop in the same turn (rule 15), and both outrank
  * everything else.
  */
-export function crossCutting(state: RelayState, ctx: RelayContext, event: RelayEvent): Outcome | null {
+export function crossCutting(state: RecallState, ctx: RecallContext, event: RecallEvent): Outcome | null {
   if (TERMINAL.has(state)) return null;
   const inCall = IN_CALL.includes(state);
   switch (event.type) {
@@ -332,13 +332,13 @@ export function crossCutting(state: RelayState, ctx: RelayContext, event: RelayE
     case "STOP":
       return { to: "stopped", label: "Stopped", patch: { stop_how: event.how, ending_reason: event.how.replace("_", " ") }, note: "nothing is stored beyond metadata; no follow-up call" };
     case "IDENTITY_ASKED":
-      return inCall ? { to: state, label: "Relay said what it is", note: "the fixed identity line; the flow continues" } : { reject: "nobody is on the line to ask" };
+      return inCall ? { to: state, label: "Recall said what it is", note: "the fixed identity line; the flow continues" } : { reject: "nobody is on the line to ask" };
     case "CLAIMS_CONFLICT":
       return { to: state, label: "Two accounts differ; neither is spoken", patch: { conflicting_claim_ids: [...new Set([...ctx.conflicting_claim_ids, ...event.claim_ids])] }, citations: event.claim_ids };
     case "GATE_MISSING": {
       const reason = `${event.gate} gate: ${event.detail}`;
       if (AFTER_CAPTURE.includes(state)) return { to: "not_stored", label: "Not kept", patch: { ending_reason: reason } };
-      if (inCall) return { to: "no_answer_today", label: "Narrowed safely", patch: { ending_reason: reason }, note: "Relay says the narrowing line and closes kindly" };
+      if (inCall) return { to: "no_answer_today", label: "Narrowed safely", patch: { ending_reason: reason }, note: "Recall says the narrowing line and closes kindly" };
       return { to: "blocked", label: "Stopped safely", patch: { ending_reason: reason }, note: "the call is never placed" };
     }
     case "TOOL_TIMEOUT": {
@@ -366,7 +366,7 @@ export function crossCutting(state: RelayState, ctx: RelayContext, event: RelayE
  * match still take priority, and a confirmation already under way is allowed to finish: it is two short
  * questions, and cutting it off would throw away something she is in the middle of saying yes to.
  */
-export function enforceCallLength(state: RelayState, ctx: RelayContext, event: RelayEvent, at: string): Outcome | null {
+export function enforceCallLength(state: RecallState, ctx: RecallContext, event: RecallEvent, at: string): Outcome | null {
   if (ctx.call_deadline === null || at < ctx.call_deadline || !BEFORE_CAPTURE.includes(state)) return null;
   if (event.type === "STOP" || event.type === "SAFETY_MATCHED") return null;
   return { to: "no_answer_today", label: "Time to rest", patch: { ending_reason: "the agreed call length was reached" }, note: "a kind close" };

@@ -79,7 +79,7 @@ await attempt("judged path", async () => {
   if (rejected.length > 0) throw new Error(`${rejected.length} event(s) were rejected by the reducer`);
 
   if (run.alerts.count() !== 0) throw new Error("something was sent to family on the golden path; only a safety alert ever may be");
-  if (!recording.spoken[0]?.text.includes("an AI assistant")) throw new Error("the first line of the call does not say Relay is an AI assistant (rule 16)");
+  if (!recording.spoken[0]?.text.includes("an AI assistant")) throw new Error("the first line of the call does not say Recall is an AI assistant (rule 16)");
   const redirect = await run.service.askAboutHer("What did Mom say about her wedding?", "person:maya");
   if (redirect.line.script_id !== "FAMILY-REDIRECT" || redirect.graph_content.length !== 0) throw new Error("the family-redirect path returned something other than the fixed line");
   const c = run.ctx.session.contribution!;

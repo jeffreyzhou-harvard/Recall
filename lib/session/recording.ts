@@ -13,7 +13,7 @@
  */
 import { buildProvLog, buildProvenanceReceipt, type ProvenanceReceipt } from "@/lib/provenance/receipt";
 import type { SealedProvLog } from "@/lib/provenance/prov-log";
-import type { RelayState } from "@/lib/state/machine";
+import type { RecallState } from "@/lib/state/machine";
 import { replay, type MachineState, type TraceEntry } from "@/lib/state/reducer";
 import type { SessionRecord, ToolCallRecord, ToolOutput } from "@/lib/tools";
 
@@ -22,7 +22,7 @@ export interface SessionRecording {
   person_id: string;
   started_at: string;
   ended_at: string;
-  final_state: RelayState;
+  final_state: RecallState;
   topic: SessionRecord["topic"];
   /** Present once she answered. `connected_at` anchors call-relative audio time to the trace's clock. */
   call: { asset_id: string; connected_at: string } | null;

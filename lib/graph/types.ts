@@ -1,12 +1,12 @@
 /**
- * Relay context graph - compact, private, and not a clinical record
+ * Recall context graph - compact, private, and not a clinical record
  * (AGENTS.md section 7). The brief's eighteen node types, plus the three the
  * discovery loop adds (Activity, Story, Cluster), and one provenance shape that
  * every claim and every edge must carry.
  *
  * Vocabulary attribution: provenance concepts follow W3C PROV-O; general
- * entity naming follows Schema.org where useful (CC BY-SA 3.0). Relay-specific
- * extensions live in the `relay:` namespace. Wikidata (CC0) is used only for
+ * entity naming follows Schema.org where useful (CC BY-SA 3.0). Recall-specific
+ * extensions live in the `recall:` namespace. Wikidata (CC0) is used only for
  * public entity IDs (dishes, holidays, ingredients) - never for anything
  * personal.
  */
@@ -54,7 +54,7 @@ export const EDGE_TYPES = [
   "CONTRADICTS",
   "DERIVED_FROM",
   "INCLUDED_SPAN",
-  /** A family member told Relay this. It stays their claim on every read (rule 13). */
+  /** A family member told Recall this. It stays their claim on every read (rule 13). */
   "CONTRIBUTED_BY",
   "RECALLED_IN",
   "CUE_EFFECTIVE_FOR",
@@ -109,13 +109,13 @@ export const NODE_LAYER: Record<NodeType, Layer> = {
  */
 export const SOURCE_CLASSES = [
   "prior_claim_with_source", // something she said earlier, backed by the original recording
-  "recall_call", // something she said on a Relay call, played back to her and confirmed (rule 3)
-  "family_contribution", // something a family member told Relay. Theirs, not hers (rule 13)
+  "recall_call", // something she said on a Recall call, played back to her and confirmed (rule 3)
+  "family_contribution", // something a family member told Recall. Theirs, not hers (rule 13)
   "joint_setup", // the one-time setup the family did together
   "public_reference", // general entities: dishes, holidays, ingredients
-  "session_audit", // layers 3-4, written by Relay during a call
+  "session_audit", // layers 3-4, written by Recall during a call
   "photo_library", // photos the family gave access to, and what was observed across them
-  "discovery_answer", // what she, or an approved relative, said when Relay asked about a gap
+  "discovery_answer", // what she, or an approved relative, said when Recall asked about a gap
 ] as const;
 export type SourceClass = (typeof SOURCE_CLASSES)[number];
 
@@ -125,7 +125,7 @@ export const EXTRACTION_METHODS = [
   "manual_curation", // hand-entered by the family during setup or seeding
   "joint_setup", // agreed in the one-time joint setup
   "public_reference", // public entity data (Wikidata)
-  "system_event", // Relay recording its own action
+  "system_event", // Recall recording its own action
   "photo_analysis", // observed across photos: a recurring face, place, or time. No identity, no meaning
   "answer_interpretation", // read out of a person's answer; grounded in their literal words
   "rule_deduction", // follows by a fixed rule from reference facts and what was stated
@@ -142,7 +142,7 @@ export type ExtractionMethod = (typeof EXTRACTION_METHODS)[number];
  *   family_confirmed       an approved relative said so.
  *   participant_confirmed  she said so herself.
  *   disputed               someone said it is wrong. Used nowhere until a person resolves it.
- *   reference              not a claim about her life: public entities, Relay's own audit records.
+ *   reference              not a claim about her life: public entities, Recall's own audit records.
  */
 export const EPISTEMIC_STATUSES = ["observed", "inferred", "family_confirmed", "participant_confirmed", "disputed", "reference"] as const;
 export type EpistemicStatus = (typeof EPISTEMIC_STATUSES)[number];
@@ -190,7 +190,7 @@ export interface Provenance {
   /** Exact span within the asset, when the evidence is a stretch of audio. */
   span: MediaSpan | null;
   observed_at: string;
-  /** Person id of the speaker or author. `system:relay` for Relay's own records. */
+  /** Person id of the speaker or author. `system:recall` for Recall's own records. */
   author: string;
   extraction_method: ExtractionMethod;
   confidence: number;
@@ -234,7 +234,7 @@ export function initialStatus(sourceClass: SourceClass, authoredByParticipant = 
 export type ArtifactKind = "photo" | "audio" | "setup_record" | "answer" | "family_story" | "call" | "audit_log";
 
 /**
- * What makes a node something Relay can invite her to talk about (section 6.1). Written by a person at
+ * What makes a node something Recall can invite her to talk about (section 6.1). Written by a person at
  * setup, never generated: how to name it aloud, and which set of ladder lines in the call script fits it.
  */
 export interface TopicFacet {
@@ -309,7 +309,7 @@ export type SafetyEventNode = NodeBase<"SafetyEvent", { category: string; at: st
 
 export type PlaceNode = NodeBase<"Place", { aliases: string[]; topic?: TopicFacet }>;
 export type ActivityNode = NodeBase<"Activity", { aliases: string[] }>;
-/** Her own telling, verbatim. Relay never writes, polishes, or summarizes a story (rule 1). */
+/** Her own telling, verbatim. Recall never writes, polishes, or summarizes a story (rule 1). */
 export type StoryNode = NodeBase<"Story", { text: string }>;
 export type ClusterNode = NodeBase<
   "Cluster",
@@ -458,7 +458,7 @@ export const EDGE_SIGNATURES: Record<EdgeType, ReadonlyArray<readonly [NodeType,
   ],
 };
 
-export const RELAY_AGENT_ID = "system:relay";
+export const RECALL_AGENT_ID = "system:recall";
 
 export interface GraphData {
   nodes: GraphNode[];

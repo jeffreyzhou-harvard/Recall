@@ -2,7 +2,7 @@
  * Request intake: one forwarded ask becomes a CurrentAsk in the graph, with
  * its message, its (at most one) photo, and provenance on every node and edge.
  *
- * This is the only way an ask enters Relay (hard rule 6: calls happen only
+ * This is the only way an ask enters Recall (hard rule 6: calls happen only
  * because an approved person forwarded a current ask). Intake does not decide
  * whether the asker is approved or the topic is allowed - the identity gate
  * and the access policy do, and they do it on every run. Intake only refuses
@@ -82,7 +82,7 @@ export async function intakeForwardedAsk(raw: unknown, deps: IntakeDeps): Promis
     expires_at: expiresAt,
     supersedes: [],
     contradicts: [],
-    // The asker said it, or it is an exact match of their words. What Relay worked out by rule from
+    // The asker said it, or it is an exact match of their words. What Recall worked out by rule from
     // public reference facts is marked as exactly that: not something anyone in the family said.
     status: how === "deduced" ? "reference" : initialStatus(sourceClass),
     confirmations: [],

@@ -18,7 +18,7 @@ const touches = (a: MediaSpan, b: MediaSpan): boolean => a.start_ms < b.end_ms &
 
 /**
  * Every word inside the intervals must have been spoken by the participant.
- * Relay's prompts and played-back audio are rejected outright, as is any
+ * Recall's prompts and played-back audio are rejected outright, as is any
  * interval that clips a word at its edge.
  */
 export function participantWordsIn(turns: Turn[], intervals: MediaSpan[]): Word[] {
@@ -41,7 +41,7 @@ export function participantWordsIn(turns: Turn[], intervals: MediaSpan[]): Word[
 /**
  * Words in an outbound artifact that cannot be matched, text and timing both,
  * to a word the participant actually spoke in the source recording. For
- * anything Relay sends this is exactly 0.
+ * anything Recall sends this is exactly 0.
  */
 export function generatedFirstPersonWords(outbound: Word[], sourceTurns: Turn[]): number {
   const spoken = new Set(

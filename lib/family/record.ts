@@ -3,7 +3,7 @@
  *
  * Pure functions over TopicOutcome rows: the same events always produce the
  * same output. Counts and dates, per topic, compared only with her own earlier
- * Relay calls by the fixed rule below. There is deliberately nothing here that
+ * Recall calls by the fixed rule below. There is deliberately nothing here that
  * adds topics together, ranks them, or names a cause - so none of that can
  * appear on a family surface (rule 4).
  *

@@ -4,24 +4,24 @@
  *   npm run telegram -- whoami              check the token; print the bot's username
  *   npm run telegram -- setup               register /ask and /help with Telegram
  *   npm run telegram -- discover            print chat and user ids of incoming commands, replying to nobody
- *                                           (use this to fill in RELAY_TELEGRAM_BINDINGS)
+ *                                           (use this to fill in RECALL_TELEGRAM_BINDINGS)
  *   npm run telegram -- poll                run the bot by long polling: no public URL needed
  *   npm run telegram -- poll --forward <base-url>
  *                                           poll, but hand each update to the web app at <base-url> (your
- *                                           `next dev`/`next start`). REQUIRED for RELAY_CALL=video: the call
+ *                                           `next dev`/`next start`). REQUIRED for RECALL_CALL=video: the call
  *                                           has to be placed by the process that serves the call pages.
  *   npm run telegram -- webhook <base-url>  point Telegram at <base-url>/api/telegram/webhook
  *   npm run telegram -- webhook:off         remove the webhook (required before `poll`)
  *
  * Leave the bot's group privacy mode ON in BotFather. With it on, Telegram only
  * delivers commands addressed to the bot and the one message a command replies
- * to, so the rest of the family's chat never reaches Relay at all.
+ * to, so the rest of the family's chat never reaches Recall at all.
  */
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { TelegramClient, WEBHOOK_SECRET_HEADER, type TgUpdate } from "@/lib/bridge/telegram/api";
 import { ASK_COMMAND } from "@/lib/bridge/telegram/updates";
-import { configFromEnv, createLiveRelay } from "@/server/relay-live";
+import { configFromEnv, createLiveRecall } from "@/server/recall-live";
 import { ROOT } from "./lib/asset-tools";
 
 for (const file of [".env.local", ".env"]) {
@@ -50,10 +50,10 @@ async function forward(base: string, update: TgUpdate): Promise<void> {
 
 async function poll(discoverOnly: boolean, forwardTo: string | null = null): Promise<void> {
   const tg = client();
-  const relay = discoverOnly || forwardTo ? null : await createLiveRelay(configFromEnv(process.env, ROOT));
-  if (relay?.callMode === "video") throw new Error("RELAY_CALL=video needs the web app to place the call. Start it, then:  npm run telegram -- poll --forward http://localhost:3000");
+  const recall = discoverOnly || forwardTo ? null : await createLiveRecall(configFromEnv(process.env, ROOT));
+  if (recall?.callMode === "video") throw new Error("RECALL_CALL=video needs the web app to place the call. Start it, then:  npm run telegram -- poll --forward http://localhost:3000");
   const me = await tg.getMe();
-  console.log(discoverOnly ? `discovering ids for @${me.username} - send /${ASK_COMMAND} or /help in the chat you want to bind; nothing will be replied to` : forwardTo ? `@${me.username} is polling and handing updates to ${forwardTo}. Ctrl-C to stop.` : `@${me.username} is polling (RELAY_CALL=${relay!.callMode}). Ctrl-C to stop.`);
+  console.log(discoverOnly ? `discovering ids for @${me.username} - send /${ASK_COMMAND} or /help in the chat you want to bind; nothing will be replied to` : forwardTo ? `@${me.username} is polling and handing updates to ${forwardTo}. Ctrl-C to stop.` : `@${me.username} is polling (RECALL_CALL=${recall!.callMode}). Ctrl-C to stop.`);
 
   let offset: number | undefined;
   for (;;) {
@@ -69,7 +69,7 @@ async function poll(discoverOnly: boolean, forwardTo: string | null = null): Pro
           await forward(forwardTo, update);
           continue;
         }
-        const handled = await relay!.handle(update);
+        const handled = await recall!.handle(update);
         const detail = handled.update.kind === "ignored" ? handled.update.reason : handled.update.kind === "forwarded" ? (handled.update.outcome.accepted ? `accepted ${handled.update.outcome.ask_id}` : `refused: ${handled.update.outcome.code}`) : "";
         console.log(`update ${update.update_id}: ${handled.update.kind}${detail ? ` (${detail})` : ""}${handled.recording ? ` -> ${handled.recording.final_state}` : ""}`);
         for (const failure of handled.recording?.delivery_failures ?? []) console.warn(`  not delivered: ${failure}`);
@@ -89,7 +89,7 @@ switch (command) {
   }
   case "setup":
     await client().setMyCommands([
-      { command: ASK_COMMAND, description: "Reply to your own question with this to ask with Relay" },
+      { command: ASK_COMMAND, description: "Reply to your own question with this to ask with Recall" },
       { command: "help", description: "How to ask" },
     ]);
     console.log(`registered /${ASK_COMMAND} and /help. Keep group privacy mode ON in @BotFather.`);

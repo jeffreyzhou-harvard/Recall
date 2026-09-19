@@ -1,5 +1,5 @@
 /**
- * Knowledge gaps: what the graph shows Relay does not know yet.
+ * Knowledge gaps: what the graph shows Recall does not know yet.
  *
  *   evidence -> graph -> knowledge gap -> question -> answer -> richer graph -> better gap
  *
@@ -7,10 +7,10 @@
  * face with no name; a named person with no stated tie to her), not a topic a
  * model thought would be interesting. The more the graph holds, the more
  * specific the next gap gets - which is why the family's work goes down as
- * Relay's context goes up.
+ * Recall's context goes up.
  *
- * NEVER A TEST. A gap is something Relay does not know. Once she has said who
- * someone is, that fact is never a gap again, so Relay has no way to ask
+ * NEVER A TEST. A gap is something Recall does not know. Once she has said who
+ * someone is, that fact is never a gap again, so Recall has no way to ask
  * "who is this?" to check whether she still remembers. Nothing about how a
  * question went - which rung, how long, whether she answered - is an input
  * here or is stored anywhere (see answers.ts): there is no longitudinal signal
@@ -29,7 +29,7 @@ export type GapKind =
   /** A named person who recurs, and no story of hers about them yet. An invitation, not a question with an answer. */
   | "tell_me_about"
   /**
-   * The family told Relay who this is; she has not said so herself. Inviting her to is an act of
+   * The family told Recall who this is; she has not said so herself. Inviting her to is an act of
    * authorship, not a quiz - but only a family can judge that, so it is off unless the joint setup
    * turned it on, and it is asked at most until she has confirmed it once.
    */
@@ -57,7 +57,7 @@ export interface GapOptions {
   invite_her_confirmation: boolean;
   /** Gaps already raised in this sitting. Session state only; never persisted. */
   asked_this_session?: ReadonlySet<string>;
-  /** A person must recur at least this often before Relay invites a story about them. */
+  /** A person must recur at least this often before Recall invites a story about them. */
   story_min_photos?: number;
 }
 

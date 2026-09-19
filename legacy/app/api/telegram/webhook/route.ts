@@ -8,7 +8,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { after } from "next/server";
 import { WEBHOOK_SECRET_HEADER, type TgUpdate } from "@/lib/bridge/telegram/api";
-import { getLiveRelay } from "@/server/relay-live";
+import { getLiveRecall } from "@/server/recall-live";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,7 +37,7 @@ export async function POST(request: Request): Promise<Response> {
   // (forward ids are idempotent).
   after(async () => {
     try {
-      const handled = await (await getLiveRelay()).handle(update);
+      const handled = await (await getLiveRecall()).handle(update);
       console.log(`[telegram] update ${update.update_id}: ${handled.update.kind}${handled.recording ? ` -> ${handled.recording.final_state}` : ""}`);
     } catch (e) {
       console.error(`[telegram] update ${update.update_id} failed:`, e);

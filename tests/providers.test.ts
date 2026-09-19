@@ -8,7 +8,7 @@ import { runFixture } from "@/fixtures/harness";
 import { DeepgramLive, transcribeWav, type HeardTurn, type SocketLike } from "@/lib/providers/deepgram";
 import { museScaffoldAdvisor } from "@/lib/providers/muse/reasoning";
 import { MuseApiError, MuseSpark, type MuseFetch } from "@/lib/providers/muse/spark";
-import type { RelayEvent } from "@/lib/state/machine";
+import type { RecallEvent } from "@/lib/state/machine";
 import { replay } from "@/lib/state/reducer";
 import type { ScaffoldAdvisor } from "@/lib/tools";
 
@@ -154,7 +154,7 @@ describe("Muse Spark only proposes", () => {
       const b = await bench();
       await b.service.clearRetrievalLayer(); // no preference, so the front-runners are level
       Object.assign(b.ctx, { scaffoldAdvisor: advisor });
-      const events: RelayEvent[] = [
+      const events: RecallEvent[] = [
         { type: "CALL_SCHEDULED", person_id: "person:susan", topic_id: b.topicId, topic_label: "x", family_sourced: false, reorientation_allowed: false },
         { type: "POLICY_GRANTED", policy_token_id: b.tokenId, max_call_minutes: 12 },
         { type: "CALL_CONNECTED", session_id: "s" },

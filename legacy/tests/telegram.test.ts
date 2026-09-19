@@ -10,12 +10,12 @@ import { TelegramThreadBridge } from "@/lib/bridge/telegram/bridge";
 import { USAGE_TEXT, parseUpdate } from "@/lib/bridge/telegram/updates";
 import { BridgeError, NOTICE_TEXT } from "@/lib/bridge/thread-bridge";
 import { cutWav } from "@/lib/provenance/wav";
-import { createLiveRelay } from "@/server/relay-live";
+import { createLiveRecall } from "@/server/recall-live";
 import { THREAD } from "./fixtures";
 
 const ROOT = join(import.meta.dirname, "..");
 const TOKEN = `123456:${"A".repeat(35)}`;
-const BOT = "RelayTestBot";
+const BOT = "RecallTestBot";
 const GROUP = -1001234567890;
 const ANIKA = 111;
 const NOW = "2026-11-05T17:30:00.000Z"; // Thursday 12:30 in New York: inside the call window
@@ -42,7 +42,7 @@ function fakeTelegram(failMethod?: string): { fetchImpl: FetchLike; sent: Sent[]
       init?.body instanceof FormData ? Object.fromEntries([...init.body.entries()].map(([k, v]) => [k, typeof v === "string" ? v : `<file ${(v as File).name} ${(v as File).size}b>`])) : JSON.parse((init?.body as string) ?? "{}");
     if (method !== "getMe") sent.push({ method, fields });
     if (method === failMethod) return respond({ ok: false, error_code: 502, description: "Bad Gateway" }, false);
-    const results: Record<string, unknown> = { getMe: { id: 1, is_bot: true, first_name: "Relay", username: BOT }, getFile: { file_id: "f", file_unique_id: "u", file_path: "photos/file_7.jpg" } };
+    const results: Record<string, unknown> = { getMe: { id: 1, is_bot: true, first_name: "Recall", username: BOT }, getFile: { file_id: "f", file_unique_id: "u", file_path: "photos/file_7.jpg" } };
     return respond({ ok: true, result: results[method] ?? { message_id: 900 + sent.length, chat: { id: GROUP, type: "supergroup" }, date: SENT_AT } });
   };
   return { fetchImpl, sent };
@@ -78,7 +78,7 @@ describe("reading an update", () => {
   });
 
   it("accepts a question written after the command when there is nothing to reply to", () => {
-    expect(parseUpdate(command("/ask@RelayTestBot Mom, kheer or halwa?"), BOT)).toMatchObject({ kind: "ask", ask_message_id: 51, text: "Mom, kheer or halwa?", photo: null, shows: null });
+    expect(parseUpdate(command("/ask@RecallTestBot Mom, kheer or halwa?"), BOT)).toMatchObject({ kind: "ask", ask_message_id: 51, text: "Mom, kheer or halwa?", photo: null, shows: null });
   });
 
   it("ignores ordinary chat, other bots' commands, bots, channels, and edits: only a command addressed to it counts", () => {
@@ -109,13 +109,13 @@ describe("bindings", () => {
 describe("a forward arriving from Telegram", () => {
   const live = async (over: { bindings?: TelegramBindings; callMode?: "none" | "prerecorded"; failMethod?: string } = {}) => {
     const tg = fakeTelegram(over.failMethod);
-    const relay = await createLiveRelay({ token: TOKEN, bindings: over.bindings ?? BINDINGS, callMode: over.callMode ?? "none", root: ROOT, fetchImpl: tg.fetchImpl, now: NOW });
-    return { relay, sent: tg.sent };
+    const recall = await createLiveRecall({ token: TOKEN, bindings: over.bindings ?? BINDINGS, callMode: over.callMode ?? "none", root: ROOT, fetchImpl: tg.fetchImpl, now: NOW });
+    return { recall, sent: tg.sent };
   };
 
   it("goes through real intake: the photo is fetched, hashed, and the ask is understood from her own words", async () => {
-    const { relay, sent } = await live();
-    const { update } = await relay.handle(THE_ASK);
+    const { recall, sent } = await live();
+    const { update } = await recall.handle(THE_ASK);
     expect(update).toMatchObject({ kind: "forwarded", forward_id: `tg:${GROUP}:50`, thread_id: THREAD, outcome: { accepted: true, created: true } });
     if (update.kind !== "forwarded" || !update.outcome.accepted) throw new Error("unreachable");
     expect(update.outcome.interpretation).toMatchObject({ option_topic_ids: ["topic:kheer", "topic:halwa"], subject_topic_ids: ["topic:dessert"], event_ids: ["event:diwali-2026"] });
@@ -123,33 +123,33 @@ describe("a forward arriving from Telegram", () => {
   });
 
   it("is idempotent when Telegram redelivers the same update", async () => {
-    const { relay } = await live();
-    await relay.handle(THE_ASK);
-    expect((await relay.handle(THE_ASK)).update).toMatchObject({ kind: "forwarded", outcome: { accepted: true, created: false } });
+    const { recall } = await live();
+    await recall.handle(THE_ASK);
+    expect((await recall.handle(THE_ASK)).update).toMatchObject({ kind: "forwarded", outcome: { accepted: true, created: false } });
   });
 
   it("says nothing at all in a chat nobody set up - not even usage help", async () => {
-    const { relay, sent } = await live({ bindings: { chats: {}, users: BINDINGS.users } });
-    expect((await relay.handle(THE_ASK)).update).toEqual({ kind: "ignored", reason: "this chat is not bound to a family thread" });
-    expect((await relay.handle(command("/help"))).update.kind).toBe("ignored");
+    const { recall, sent } = await live({ bindings: { chats: {}, users: BINDINGS.users } });
+    expect((await recall.handle(THE_ASK)).update).toEqual({ kind: "ignored", reason: "this chat is not bound to a family thread" });
+    expect((await recall.handle(command("/help"))).update.kind).toBe("ignored");
     expect(sent).toEqual([]);
   });
 
   it("asks the family to clarify, under the question, when the sender is someone the setup does not know", async () => {
-    const { relay, sent } = await live({ bindings: { chats: BINDINGS.chats, users: {} } });
-    expect((await relay.handle(THE_ASK)).update).toMatchObject({ kind: "forwarded", outcome: { accepted: false, code: "unknown_party", clarify_posted: true } });
+    const { recall, sent } = await live({ bindings: { chats: BINDINGS.chats, users: {} } });
+    expect((await recall.handle(THE_ASK)).update).toMatchObject({ kind: "forwarded", outcome: { accepted: false, code: "unknown_party", clarify_posted: true } });
     expect(sent.at(-1)).toEqual({ method: "sendMessage", fields: { chat_id: GROUP, text: NOTICE_TEXT.clarify, reply_parameters: { message_id: 50, allow_sending_without_reply: true } } });
   });
 
   it("answers /help with fixed usage text, as a reply to the command", async () => {
-    const { relay, sent } = await live();
-    expect((await relay.handle(command("/help"))).update).toEqual({ kind: "usage_sent" });
+    const { recall, sent } = await live();
+    expect((await recall.handle(command("/help"))).update).toEqual({ kind: "usage_sent" });
     expect(sent).toEqual([{ method: "sendMessage", fields: { chat_id: GROUP, text: USAGE_TEXT, reply_parameters: { message_id: 51, allow_sending_without_reply: true } } }]);
   });
 
   it("with the prerecorded call: her voice card lands under the question, and the receipt goes to Anika privately", async () => {
-    const { relay, sent } = await live({ callMode: "prerecorded" });
-    const { recording } = await relay.handle(THE_ASK);
+    const { recall, sent } = await live({ callMode: "prerecorded" });
+    const { recording } = await recall.handle(THE_ASK);
     expect(recording).toMatchObject({ final_state: "delivered", delivery_failures: [] });
 
     const [, card, receipt] = sent;
@@ -165,8 +165,8 @@ describe("a forward arriving from Telegram", () => {
   });
 
   it("ends safely, sends nothing, and records why when Telegram cannot be reached at delivery", async () => {
-    const { relay } = await live({ callMode: "prerecorded", failMethod: "sendDocument" });
-    const { recording } = await relay.handle(THE_ASK);
+    const { recall } = await live({ callMode: "prerecorded", failMethod: "sendDocument" });
+    const { recording } = await recall.handle(THE_ASK);
     expect(recording!.final_state).toBe("not_sent");
     expect(recording!.messages.map((m) => m.kind)).toEqual(["family_notice"]);
     expect(recording!.delivery_failures).toEqual([expect.stringContaining("Bad Gateway")]);
@@ -178,7 +178,7 @@ describe("the Telegram bridge", () => {
   it("inherits the guard: it cannot send anything that is not a reply to a forward it received", async () => {
     const { fetchImpl, sent } = fakeTelegram();
     const bridge = new TelegramThreadBridge(new TelegramClient(TOKEN, fetchImpl), BINDINGS);
-    const notice = { kind: "family_notice" as const, in_reply_to: "tg:1:1", to: { thread_id: THREAD }, notice: "not_this_time" as const, text: NOTICE_TEXT.not_this_time, authored_by: "relay" as const };
+    const notice = { kind: "family_notice" as const, in_reply_to: "tg:1:1", to: { thread_id: THREAD }, notice: "not_this_time" as const, text: NOTICE_TEXT.not_this_time, authored_by: "recall" as const };
     await expect(bridge.post(notice, NOW)).rejects.toBeInstanceOf(BridgeError);
     bridge.registerForward("tg:1:1", THREAD);
     await expect(bridge.post({ ...notice, text: "She seemed tired." }, NOW)).rejects.toThrow(/fixed wording/);

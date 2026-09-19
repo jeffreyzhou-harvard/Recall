@@ -20,9 +20,9 @@
 import type { StoreApi } from "zustand/vanilla";
 import type { AudioWindow } from "@/lib/providers/transcription";
 import type { FixedLineKey } from "@/lib/script/call-script";
-import { IN_CALL, TERMINAL, type RelayEvent, type Rung } from "@/lib/state/machine";
+import { IN_CALL, TERMINAL, type RecallEvent, type Rung } from "@/lib/state/machine";
 import type { MachineState } from "@/lib/state/reducer";
-import type { RelayStore } from "@/lib/state/store";
+import type { RecallStore } from "@/lib/state/store";
 import { GateError, ToolTimeoutError, type ToolContext, type ToolOutput, type ToolRuntime } from "@/lib/tools";
 import { CallUnavailableError, type CallDriver } from "./call-driver";
 
@@ -30,7 +30,7 @@ export interface RunEnv {
   person_id: string;
   ctx: ToolContext;
   runtime: ToolRuntime;
-  store: StoreApi<RelayStore>;
+  store: StoreApi<RecallStore>;
   /** Called exactly once, and only after the policy has granted the call: no grant, no call. */
   callDriver: (() => CallDriver) | null;
 }
@@ -83,7 +83,7 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
   let connected = false;
 
   /** Dispatch an event, stamped with the injected clock and linked to the tool call that caused it. */
-  const dispatch = (event: RelayEvent, fromTool = true): MachineState => {
+  const dispatch = (event: RecallEvent, fromTool = true): MachineState => {
     const before = machine().state;
     const seq = fromTool ? runtime.lastSeq() : null;
     const next = store.getState().dispatch(event, { at: ctx.clock.iso(), tool_call_seq: seq });
@@ -132,7 +132,7 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
       claim_ids: [...new Set([topicId, ...retrieval.candidates.map((c) => c.root_id), ...retrieval.relations.map((r) => r.edge_id)])],
       policy_token_id: tokenId,
     });
-    // Two accounts differ: Relay speaks neither of them, and carries on with what is left (section 5).
+    // Two accounts differ: Recall speaks neither of them, and carries on with what is left (section 5).
     if (support.conflicts.length > 0) dispatch({ type: "CLAIMS_CONFLICT", claim_ids: support.conflicts.flatMap((c) => [c.a, c.b]) });
     const verified = support.verified.map((v) => v.claim_id);
     if (!verified.includes(topicId)) throw new GateError("evidence", "the topic itself could not be verified");
@@ -160,7 +160,7 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
     ctx.session.started_at = ctx.clock.iso();
     dispatch({ type: "CALL_CONNECTED", session_id: ctx.session.session_id }, false);
 
-    // The first line of every call says what Relay is (rule 16). Only then the topic, and only as an invitation.
+    // The first line of every call says what Recall is (rule 16). Only then the topic, and only as an invitation.
     await speak(fixed.greeting!);
     dispatch({ type: "GREETING_DELIVERED", prompt_id: fixed.greeting!.prompt_id, discloses_ai: true }, false);
     dispatch({ type: "TOPIC_SELECTED", topic_id: topicId, citations: [topicId] }, false);
@@ -169,7 +169,7 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
 
     /**
      * Wait for her next final turn. The safety check runs on it before anything else (rule 15), and the alert
-     * goes out BEFORE Relay says a word about it, so that a hang-up in the same turn cannot cancel it.
+     * goes out BEFORE Recall says a word about it, so that a hang-up in the same turn cannot cancel it.
      * Returns null when the call is over.
      */
     const hear = async (): Promise<AudioWindow | null> => {
@@ -201,7 +201,7 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
         break;
       }
       if (heard.evidence.conduct_signal === "identity_question") {
-        // Any time she asks, Relay says what it is. No rung is used up; the question on the table still stands.
+        // Any time she asks, Recall says what it is. No rung is used up; the question on the table still stands.
         await speak(fixed.identity!);
         dispatch({ type: "IDENTITY_ASKED", prompt_id: fixed.identity!.prompt_id });
         continue;
@@ -226,7 +226,7 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
       }
       if (machine().state !== "recalled") continue;
       if (machine().context.answer_turn_id === null) {
-        // She is with it. Ask the open follow-up, and capture what she says next - in her words, not Relay's.
+        // She is with it. Ask the open follow-up, and capture what she says next - in her words, not Recall's.
         await speak(fixed.elaborate!);
         continue;
       }
@@ -283,7 +283,7 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
       // She hung up. That is a stop like any other: nothing is stored beyond metadata, and nobody calls back.
       dispatch({ type: "STOP", how: "hang_up" }, false);
     } else if (e instanceof GateError) {
-      // A missing gate stops the flow. Mid-call, Relay says the safe-narrowing line - a success state (rule 7).
+      // A missing gate stops the flow. Mid-call, Recall says the safe-narrowing line - a success state (rule 7).
       const inCall = IN_CALL.includes(machine().state);
       dispatch({ type: "GATE_MISSING", gate: e.gate, detail: e.detail });
       if (inCall && connected) await speakIfThere(fixed.narrowing);

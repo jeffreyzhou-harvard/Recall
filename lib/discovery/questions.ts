@@ -1,5 +1,5 @@
 /**
- * Turning a gap into something Relay can say, with a ladder of support.
+ * Turning a gap into something Recall can say, with a ladder of support.
  *
  *   open         "Who is this?"                  retrieve when possible
  *   cue          "This is someone in your family."
@@ -18,8 +18,8 @@
  *   fact         cites something a PERSON CONFIRMED. Only these may be stated.
  *
  * A rung that would need an unconfirmed fact does not exist for that question.
- * So Relay can only cue with "someone in your family", offer names to choose
- * from, or tell her who it is, when a person has actually told Relay that.
+ * So Recall can only cue with "someone in your family", offer names to choose
+ * from, or tell her who it is, when a person has actually told Recall that.
  */
 import { relationOf } from "@/lib/graph/relations";
 import type { GraphStore } from "@/lib/graph/store";
@@ -93,7 +93,7 @@ export async function questionFor(gap: Gap, graph: GraphStore, participantId: st
     // An invitation with no right answer. There is nothing to cue toward, so it has one rung.
     rungs.push(rung("open", [fact(who.name, who.node_id, who.edge_id), observe(` is in ${howMany(gap.photo_count)} of your photos.`, gap.cluster_id), say(" Would you like to tell me about this one?")]));
   } else {
-    // invite_her_word: the family told Relay who this is. The ladder gives her every chance to say it herself first.
+    // invite_her_word: the family told Recall who this is. The ladder gives her every chance to say it herself first.
     const who = gap.identified_as!;
     rungs.push(rung("open", [recurs, say(` ${OPEN_ASK.Person}`)]));
     const tie = (await graph.edgesOf(who.node_id)).find((e) => e.from === participantId && e.to === who.node_id && relationOf(e) !== null && SPEAKABLE_AS_FACT.has(e.prov.status));
@@ -114,7 +114,7 @@ export async function questionFor(gap: Gap, graph: GraphStore, participantId: st
   return { question_id: `question:${gap.gap_id}`, gap, expects: gap.expects, show_photo_id: photos[0] ?? null, rungs };
 }
 
-/** The next rung of support, or null when there is no more to offer. Reaching the end is not a failure: Relay moves on. */
+/** The next rung of support, or null when there is no more to offer. Reaching the end is not a failure: Recall moves on. */
 export function nextRung(question: Question, after: RungLevel): Rung | null {
   // By level, not by position: a question with no `cue` rung must still move on past it, never back to `open`.
   const reached = RUNG_LEVELS.indexOf(after);

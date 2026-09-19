@@ -1,5 +1,5 @@
 /**
- * Where Muse Spark does Relay's reasoning. Two jobs, both behind seams that
+ * Where Muse Spark does Recall's reasoning. Two jobs, both behind seams that
  * already existed, and in both the model only PROPOSES:
  *
  *   graph ingestion   read facts out of what a person said (AnswerInterpreter).
@@ -7,12 +7,12 @@
  *                     closed relation list, and stated-versus-inferred. A fluent model gets no more
  *                     trust than the lexical matcher it replaces: an ungrounded name is rejected.
  *
- *   cue choice        which cue to offer, once Relay's ladder has ALREADY decided a rung is warranted and
+ *   cue choice        which cue to offer, once Recall's ladder has ALREADY decided a rung is warranted and
  *                     the retrieval layer has no preference between the front-runners (ScaffoldAdvisor).
  *                     Spark never decides whether to climb, or to which rung - section 6.1 does. It picks
  *                     among the cues on offer and must cite verified node ids from that cue. Anything
  *                     else, or any failure, falls back to the deterministic choice. The model can never
- *                     widen what Relay may say.
+ *                     widen what Recall may say.
  *
  * LIVE ONLY, SERVER ONLY. The judged path uses the deterministic implementations of both.
  */

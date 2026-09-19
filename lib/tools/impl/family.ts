@@ -6,7 +6,7 @@
  * they return is fixed lines, topic names, counts, dates - and, in exactly one
  * place, a line she said yes to sharing.
  *
- * Relay never pushes any of this. It appears when an approved member opens the
+ * Recall never pushes any of this. It appears when an approved member opens the
  * dashboard (rule 5).
  */
 import { buildTopicRecord, renderExport } from "@/lib/family/record";
@@ -99,7 +99,7 @@ export const build_weekly_note: ToolImpl<"build_weekly_note"> = async (input, ct
   const shared = (await ctx.view.sharedLines(since, input.member_id))[0] ?? null;
   if (shared) lines.push({ kind: "share", script_id: "SHARED-BY-HER", text: shared.text, attribution: { speaker_name: shared.speaker_name, share_confirmed_at: shared.share_confirmed_at, content_hash: shared.content_hash } });
 
-  // 3. At most one gap or difference prompt. Relay never says which account is right.
+  // 3. At most one gap or difference prompt. Recall never says which account is right.
   const differently = (await ctx.view.membersWhoRememberDifferently())[0];
   const noYear = (await ctx.view.topicsWithoutAYear())[0];
   if (differently) fixed("difference", ctx.copy.lines.note_difference, { name: herName, member: differently });
@@ -114,7 +114,7 @@ export const build_weekly_note: ToolImpl<"build_weekly_note"> = async (input, ct
   // An empty week posts nothing.
   if (lines.length === 0) return { status: "nothing_to_post", note: null };
   const findings = lintLines(lines.filter((l) => l.kind !== "share").map((l) => ({ id: l.script_id, text: l.text, surface: "family" as const })), ctx.script.banned);
-  if (findings.length > 0) throw new Error(`the Weekly Note would contain language Relay never uses: "${findings[0]!.phrase}"`);
+  if (findings.length > 0) throw new Error(`the Weekly Note would contain language Recall never uses: "${findings[0]!.phrase}"`);
 
   await ctx.view.postNote(input.member_id, now, lines.map((l) => ({ script_id: l.script_id, text: l.text })), shared?.ref ?? null);
   return { status: "posted", note: { posted_at: now, lines } };
@@ -133,14 +133,14 @@ export const get_topic_record: ToolImpl<"get_topic_record"> = async (input, ctx)
 
 export const export_record_for_clinician: ToolImpl<"export_record_for_clinician"> = async (input, ctx) => {
   const at = ctx.clock.iso();
-  // Approved members who can see the record, and nobody else. Relay hands the file back; it never sends it anywhere.
+  // Approved members who can see the record, and nobody else. Recall hands the file back; it never sends it anywhere.
   if (dashboardAccess(ctx.setup.current(), input.requester_id) !== "weekly_note_and_record") {
     await ctx.view.logAccess(input.requester_id, "refused", "export", at);
     return { status: "refused", file: null };
   }
   const record = buildTopicRecord(await ctx.view.outcomeRows(), await ctx.view.herName(), ctx.copy, ctx.thresholds);
   await ctx.view.logExport(input.requester_id, at);
-  return { status: "exported", file: { filename: `relay-record-${at.slice(0, 10)}.txt`, generated_at: at, text: renderExport(record, ctx.copy, at) } };
+  return { status: "exported", file: { filename: `recall-record-${at.slice(0, 10)}.txt`, generated_at: at, text: renderExport(record, ctx.copy, at) } };
 };
 
 export type { FamilyToolContext };

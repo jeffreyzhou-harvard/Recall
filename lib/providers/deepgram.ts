@@ -8,16 +8,16 @@
  * LIVE ONLY, SERVER ONLY. The key never reaches a browser: her audio goes
  * browser -> our server -> Deepgram. Nothing on the judged path imports this.
  *
- * What Relay takes from it, and what it leaves:
+ * What Recall takes from it, and what it leaves:
  *   + her literal words, with a start and end time for each. The edit-decision list needs exactly
  *     that to find the pauses it may trim, so a live contribution is trimmed the same way a
  *     prerecorded one is.
- *   + endpointing. Relay assembles a turn only when Deepgram says she has finished speaking, and the
+ *   + endpointing. Recall assembles a turn only when Deepgram says she has finished speaking, and the
  *     state machine classifies answers and assent on those final turns alone - never on a partial.
  *   - confidence scores are read by nobody. They are not stored, shown, or used to judge anything
  *     about her (rule 4; "never surface model confidence").
  *
- * It only goes speech -> text. There is no text -> speech for her anywhere in Relay (rules 1 and 2).
+ * It only goes speech -> text. There is no text -> speech for her anywhere in Recall (rules 1 and 2).
  */
 import { z } from "zod";
 import type { Word } from "./transcription";
@@ -83,7 +83,7 @@ export interface SocketLike {
 export interface LiveHandlers {
   /** She started speaking. Lets a caller tell silence from a pause mid-sentence. */
   onSpeechStarted?: (atMs: number) => void;
-  /** A final, endpointed turn. The only event Relay acts on. */
+  /** A final, endpointed turn. The only event Recall acts on. */
   onTurn: (turn: HeardTurn) => void;
   onError: (error: DeepgramError) => void;
   onClosed?: () => void;

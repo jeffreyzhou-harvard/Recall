@@ -1,9 +1,9 @@
 /**
- * The live Relay process: the same RelayService as the judged path, held for the life of the server so the
+ * The live Recall process: the same RecallService as the judged path, held for the life of the server so the
  * family side and the schedule share one graph. Node only. Nothing on the judged path imports this
  * (AGENTS.md section 9: a live path is an optional side demo, behind a flag).
  *
- * Chosen by RELAY_CALL:
+ * Chosen by RECALL_CALL:
  *
  *   none         (default) no call can be placed. The family side still works.
  *   prerecorded  a turn of the schedule runs the prerecorded golden call. Say so when showing it.
@@ -28,18 +28,18 @@ import { MuseAnswerInterpreter, museScaffoldAdvisor } from "@/lib/providers/muse
 import { MuseSpark, requireMuseKey } from "@/lib/providers/muse/spark";
 import { FixtureTranscription } from "@/lib/providers/transcription";
 import { MemoryAlertChannel } from "@/lib/safety/alert";
-import { RelayService } from "@/lib/service/relay-service";
+import { RecallService } from "@/lib/service/recall-service";
 import type { SessionRecording } from "@/lib/session/recording";
 import { SetupStore, type ScaffoldAdvisor } from "@/lib/tools";
 
-// One live relay per server process: it holds the graph, and a call in progress must outlive a request.
-const cache = globalThis as unknown as { __relayLive?: Promise<LiveRelay> };
-export function getLiveRelay(): Promise<LiveRelay> {
-  cache.__relayLive ??= createLiveRelay(configFromEnv(process.env, process.cwd())).catch((e: unknown) => {
-    cache.__relayLive = undefined; // only a failed start-up is retried
+// One live recall per server process: it holds the graph, and a call in progress must outlive a request.
+const cache = globalThis as unknown as { __recallLive?: Promise<LiveRecall> };
+export function getLiveRecall(): Promise<LiveRecall> {
+  cache.__recallLive ??= createLiveRecall(configFromEnv(process.env, process.cwd())).catch((e: unknown) => {
+    cache.__recallLive = undefined; // only a failed start-up is retried
     throw e;
   });
-  return cache.__relayLive;
+  return cache.__recallLive;
 }
 
 export type CallMode = "none" | "prerecorded";
@@ -55,16 +55,16 @@ export interface LiveConfig {
 }
 
 export function configFromEnv(env: NodeJS.ProcessEnv, root: string): LiveConfig {
-  const callMode = env.RELAY_CALL ?? "none";
-  if (callMode !== "none" && callMode !== "prerecorded") throw new Error(`RELAY_CALL must be "none" or "prerecorded", not "${callMode}"`);
-  return { callMode, root, policyFile: env.RELAY_POLICY_FILE };
+  const callMode = env.RECALL_CALL ?? "none";
+  if (callMode !== "none" && callMode !== "prerecorded") throw new Error(`RECALL_CALL must be "none" or "prerecorded", not "${callMode}"`);
+  return { callMode, root, policyFile: env.RECALL_POLICY_FILE };
 }
 
-export interface LiveRelay {
+export interface LiveRecall {
   callMode: CallMode;
-  service: RelayService;
+  service: RecallService;
   setup: SetupStore;
-  /** Safety alerts, held for the designated caregiver's dashboard card. The only thing Relay ever sends to family (rule 15). */
+  /** Safety alerts, held for the designated caregiver's dashboard card. The only thing Recall ever sends to family (rule 15). */
   alerts: MemoryAlertChannel;
   /** One turn of the schedule. Null when nothing is due, or when this deployment cannot place calls. */
   tick(): Promise<SessionRecording | null>;
@@ -82,7 +82,7 @@ const loudly =
       throw e;
     });
 
-export async function createLiveRelay(config: LiveConfig): Promise<LiveRelay> {
+export async function createLiveRecall(config: LiveConfig): Promise<LiveRecall> {
   const assets = new AssetIndex(MANIFEST);
   const graph = MemoryGraphStore.from(buildGraph(FAMILY_SEED, assets));
   const prerecorded = config.callMode === "prerecorded";
@@ -92,7 +92,7 @@ export async function createLiveRelay(config: LiveConfig): Promise<LiveRelay> {
   const spark = process.env.MUSE_API_KEY ? new MuseSpark(requireMuseKey(process.env.MUSE_API_KEY)) : null;
   const { default: default_ms, ...ms } = JUDGED_TIMING.tool_latency_ms;
 
-  const service = new RelayService({
+  const service = new RecallService({
     graph,
     setup,
     assets,

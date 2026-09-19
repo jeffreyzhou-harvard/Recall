@@ -1,14 +1,14 @@
 ## **Locked product design**
 
-**Relay is a digital memory-retention system for people living with dementia.**
+**Recall is a digital memory-retention system for people living with dementia.**
 
 It has two fundamental pieces:
 
 **1\. Build and preserve the person's memory model.**  
-The person and the people who know them contribute memories while those memories are still accessible. They can do this through photos, voice, simple questions, and family contributions. Relay organizes this information into a provenance-backed memory graph: people, relationships, places, events, stories, preferences, and the evidence connecting them.
+The person and the people who know them contribute memories while those memories are still accessible. They can do this through photos, voice, simple questions, and family contributions. Recall organizes this information into a provenance-backed memory graph: people, relationships, places, events, stories, preferences, and the evidence connecting them.
 
 **2\. Use that model to help the person continue retrieving those memories.**  
-Relay periodically engages the person through an ordinary **phone call**. A conversational agent uses the memory graph to choose personally meaningful memories to revisit and adapts how much help it gives: free recall first, then a contextual cue, then recognition when necessary. The objective is not to grade them. It is to repeatedly bring important parts of their own life back into use.
+Recall periodically engages the person through an ordinary **phone call**. A conversational agent uses the memory graph to choose personally meaningful memories to revisit and adapts how much help it gives: free recall first, then a contextual cue, then recognition when necessary. The objective is not to grade them. It is to repeatedly bring important parts of their own life back into use.
 
 So your core loop is:
 
@@ -103,7 +103,7 @@ No Telegram.
 
 Their phone rings.
 
-> **Relay calling**
+> **Recall calling**
 
 They answer.
 
@@ -117,7 +117,7 @@ If she knows:
 
 Great. Continue naturally.
 
-If she struggles, Relay doesn't say **wrong**.
+If she struggles, Recall doesn't say **wrong**.
 
 It moves down a support ladder:
 
@@ -157,7 +157,7 @@ That is much closer to the experience you want than a quiz app.
 
 ### **And this is where personalization actually matters.**
 
-Relay can learn:
+Recall can learn:
 
 > Susan remembers Maya's identity immediately but struggles with dates.
 
@@ -208,7 +208,7 @@ Maya
 └── ineffective cue: wedding year
 ```
 
-Now Relay learns **how to help this person remember**, rather than merely what they have told it.
+Now Recall learns **how to help this person remember**, rather than merely what they have told it.
 
 That is a much stronger technical thesis.
 
@@ -220,15 +220,15 @@ Your caregiver-facing tracking idea can work, but I'd be careful with its positi
 
 I would **not** initially say:
 
-> “Relay measures the rate at which your mother's dementia is deteriorating.”
+> “Recall measures the rate at which your mother's dementia is deteriorating.”
 
-That turns Relay from a memory-support product into a medical assessment system very quickly.
+That turns Recall from a memory-support product into a medical assessment system very quickly.
 
 Instead:
 
 ### **Caregiver Insights**
 
-Relay can transparently report observations:
+Recall can transparently report observations:
 
 > **Maya**  
 > &nbsp;Recognized independently in 8/9 recent conversations.
@@ -256,7 +256,7 @@ Actual cognitive assessment and diagnosis belong with validated instruments and 
 
 So I'd phrase this feature as:
 
-> **Relay creates a longitudinal record of memory retrieval patterns that families can choose to share with clinicians.**
+> **Recall creates a longitudinal record of memory retrieval patterns that families can choose to share with clinicians.**
 
 Much safer and more credible than “AI detects medical deterioration.”
 
@@ -266,12 +266,12 @@ Much safer and more credible than “AI detects medical deterioration.”
 
 I would actually put these into the design spec.
 
-**Relay remembers information so the person can keep remembering—not so Relay can replace the person.**
+**Recall remembers information so the person can keep remembering—not so Recall can replace the person.**
 
 Therefore:
 
-* Relay **never impersonates the person**.  
-* Relay never generates first-person memories they did not provide.  
+* Recall **never impersonates the person**.  
+* Recall never generates first-person memories they did not provide.  
 * There is no “chat with Susan” interface for relatives.  
 * Family members are encouraged to call and speak with Susan themselves.  
 * Family members can contribute memories but provenance remains visible.  
@@ -285,7 +285,7 @@ And I would preserve your earlier Kitwood principle:
 
 > **The AI should create reasons for humans to interact, not reasons to stop interacting.**
 
-So if Maya wants to hear Susan's story about her wedding, Relay should **not answer Maya from the database**.
+So if Maya wants to hear Susan's story about her wedding, Recall should **not answer Maya from the database**.
 
 It can say:
 
@@ -309,9 +309,9 @@ The graph knows:
 
 Maya can ask:
 
-> “Can Relay ask Mom which sari Anika should wear?”
+> “Can Recall ask Mom which sari Anika should wear?”
 
-Relay calls Susan.
+Recall calls Susan.
 
 Now the same memory-support infrastructure creates **participation in current life**.
 
@@ -336,11 +336,11 @@ That's beautiful because the system isn't preserving memories merely as museum p
 
 ## **I would crystallize the pitch to this**
 
-> **Relay helps people with dementia hold on to the people and moments that make up their lives. Families and patients gradually build a private memory graph from photographs, stories, relationships and everyday conversations. Relay then calls the person like an ordinary phone call and uses that graph to revisit important memories—starting with recall and providing progressively more context only when needed. Over time, it learns not just what matters to someone, but which cues help them reach those memories. Families can see longitudinal changes and contribute missing context, but Relay never speaks in the patient's name or becomes a digital copy of them. The goal is the opposite: use AI to preserve the context that makes continued human connection possible.**
+> **Recall helps people with dementia hold on to the people and moments that make up their lives. Families and patients gradually build a private memory graph from photographs, stories, relationships and everyday conversations. Recall then calls the person like an ordinary phone call and uses that graph to revisit important memories—starting with recall and providing progressively more context only when needed. Over time, it learns not just what matters to someone, but which cues help them reach those memories. Families can see longitudinal changes and contribute missing context, but Recall never speaks in the patient's name or becomes a digital copy of them. The goal is the opposite: use AI to preserve the context that makes continued human connection possible.**
 
 And your cleanest one-line product description may now be:
 
-> **Relay remembers with you, so the people you love stay familiar for longer.**
+> **Recall remembers with you, so the people you love stay familiar for longer.**
 
 I would build everything else around that conception.
 

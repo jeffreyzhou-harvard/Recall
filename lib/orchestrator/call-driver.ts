@@ -1,6 +1,6 @@
 /**
- * The phone call, as the orchestrator sees it: Relay speaks, her own audio is
- * played back, and Relay listens for her next final turn.
+ * The phone call, as the orchestrator sees it: Recall speaks, her own audio is
+ * played back, and Recall listens for her next final turn.
  *
  * The judged path uses FixtureCallDriver over a prerecorded call. Telephony,
  * ASR, and model latency never touch it (AGENTS.md section 9).
@@ -36,7 +36,7 @@ export interface SpokenPrompt {
 export interface CallDriver {
   readonly call_asset_id: string;
   connect(): Promise<void>;
-  /** Relay speaks, in Relay's own labeled voice. Resolves when the line has finished. */
+  /** Recall speaks, in Recall's own labeled voice. Resolves when the line has finished. */
   speak(prompt: SpokenPrompt): Promise<void>;
   /** Play her own recorded audio back to her - the exact kept spans of the pending artifact. Never synthesized. */
   playback(kept?: { asset_id: string; spans: MediaSpan[] }): Promise<void>;
@@ -94,21 +94,21 @@ export class FixtureCallDriver implements CallDriver {
   }
 
   async speak(prompt: SpokenPrompt): Promise<void> {
-    const turn = this.next("relay", `Relay is about to say "${prompt.text}"`);
+    const turn = this.next("recall", `Recall is about to say "${prompt.text}"`);
     const recorded = turnText(turn);
     if (recorded !== prompt.text) {
-      throw new ScriptMismatchError(`Relay rendered "${prompt.text}" but the prerecorded line ${turn.turn_id} is "${recorded}"`);
+      throw new ScriptMismatchError(`Recall rendered "${prompt.text}" but the prerecorded line ${turn.turn_id} is "${recorded}"`);
     }
     this.advanceTo(turn.end_ms);
   }
 
   async playback(): Promise<void> {
-    this.advanceTo(this.next("playback", "Relay is about to play her audio back").end_ms);
+    this.advanceTo(this.next("playback", "Recall is about to play her audio back").end_ms);
   }
 
   async listen(): Promise<AudioWindow> {
     const start = this.lastEndMs;
-    const turn = this.next("participant", "Relay is listening");
+    const turn = this.next("participant", "Recall is listening");
     this.advanceTo(turn.end_ms);
     return { asset_id: this.call_asset_id, start_ms: start, end_ms: turn.end_ms };
   }

@@ -60,7 +60,7 @@ const SETUP = {
   policy_id: "policy:mom-setup",
   person_id: MOM,
   established_by: [MOM, ANIKA],
-  relay_set_up_by: ANIKA,
+  recall_set_up_by: ANIKA,
   approved_people: [ANIKA],
   approved_audiences: [MOM],
   topics: { allow: [], block: [], person_topics_enabled: false },
@@ -265,7 +265,7 @@ describe("never a test", () => {
       "tell: This is Maya, your daughter.",
     ]);
     expect(nextRung(q, "open")!.level).toBe("cue");
-    expect(nextRung(q, "tell")).toBeNull(); // the end of the ladder is not a failure; Relay moves on
+    expect(nextRung(q, "tell")).toBeNull(); // the end of the ladder is not a failure; Recall moves on
   });
 
   it("a ladder missing a rung skips past it, and never circles back to asking her again", async () => {
