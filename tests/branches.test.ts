@@ -182,6 +182,18 @@ describe("a tool does not respond", () => {
     expect(r.recording.call).toBeNull();
   });
 
+  it("at the share question: kept, not shared - her yes to remembering it is never thrown away", async () => {
+    const r = await run([...RECALLED, ...CAPTURE_AND_CONFIRM("Yes.", "Yes.")], { faults: [{ tool: "confirm_share", on_call: 1, kind: "timeout" }] });
+    expect(r.recording.final_state).toBe("stored");
+    expect(replay(r.recording.trace).context).toMatchObject({ share_resolved: true, shared: false, claim_id: "claim:session:judged" });
+    expect(r.recording.trace.filter((t) => t.event === "TOOL_TIMEOUT" && t.accepted)).toHaveLength(1);
+    expect((await nodesOf(r, "Contribution"))[0]!.props.shared).toBe(false);
+    expect((await nodesOf(r, "ShareConfirmation"))[0]!.props.decision).toBe("timeout");
+    expect(spokenText(r).at(-1)).toBe(SAID.closeWarm);
+    const note = await r.service.weeklyNote("person:maya");
+    expect(JSON.stringify(note)).not.toContain("every summer");
+  });
+
   it("at the commit: nothing is stored", async () => {
     const r = await run([...RECALLED, ["her", HER_LINE], ["playback"], ["relay", SAID.storeQuestion], ["her", "Yes."], ["relay", SAID.shareQuestion], ["her", "Yes."]], { faults: [{ tool: "confirm_and_store", on_call: 2, kind: "timeout" }] });
     expect(r.recording.final_state).toBe("not_stored");
