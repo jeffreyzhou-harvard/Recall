@@ -1,0 +1,169 @@
+{
+  "version": 1,
+  "description": "Family graph: the people, the one-time joint setup, the access policy, public topic entities, and one prior source-backed claim. Persists across asks.",
+  "sources": {
+    "artifact:setup-record": {
+      "source_class": "joint_setup",
+      "asset_id": null,
+      "observed_at": "2026-10-12T15:00:00.000Z",
+      "author": "person:mom",
+      "extraction_method": "joint_setup",
+      "confidence": 1,
+      "audience_scope": ["artifact:thread-family"],
+      "expires_at": null
+    },
+    "artifact:clip-cardamom": {
+      "source_class": "prior_claim_with_source",
+      "asset_id": "clip-cardamom",
+      "observed_at": "2025-10-19T22:10:00.000Z",
+      "author": "person:mom",
+      "extraction_method": "literal_transcript",
+      "confidence": 1,
+      "audience_scope": ["artifact:thread-family"],
+      "expires_at": null
+    },
+    "ref:wikidata": {
+      "source_class": "public_reference",
+      "asset_id": null,
+      "observed_at": "2026-09-19T00:00:00.000Z",
+      "author": "ref:wikidata",
+      "extraction_method": "public_reference",
+      "confidence": 1,
+      "audience_scope": ["artifact:thread-family"],
+      "expires_at": null
+    }
+  },
+  "nodes": [
+    {
+      "id": "artifact:setup-record",
+      "type": "Artifact",
+      "label": "Joint setup (Mom with Anika)",
+      "props": { "kind": "setup_record", "text": null, "alt": null },
+      "source": "artifact:setup-record"
+    },
+    {
+      "id": "artifact:thread-family",
+      "type": "Artifact",
+      "label": "Family thread",
+      "props": { "kind": "thread", "text": null, "alt": "The family's existing group thread" },
+      "source": "artifact:setup-record"
+    },
+    {
+      "id": "person:mom",
+      "type": "Person",
+      "label": "Mom",
+      "props": { "display_name": "Mom", "role": "participant", "subject_pronoun": "she" },
+      "source": "artifact:setup-record"
+    },
+    {
+      "id": "person:anika",
+      "type": "Person",
+      "label": "Anika",
+      "props": { "display_name": "Anika", "role": "asker" },
+      "source": "artifact:setup-record"
+    },
+    {
+      "id": "rel:mom-anika",
+      "type": "Relationship",
+      "label": "Mom and Anika",
+      "props": { "kind": "mother_daughter", "verified": true },
+      "source": "artifact:setup-record"
+    },
+    {
+      "id": "policy:mom-default",
+      "type": "AccessPolicy",
+      "label": "Mom's access policy",
+      "props": { "policy_ref": "fixtures/policy/mom-default.json" },
+      "source": "artifact:setup-record"
+    },
+    {
+      "id": "pref:mom-festival-desserts",
+      "type": "PreferenceExpertise",
+      "label": "Festival desserts",
+      "props": { "text": "Mom asked to be consulted about festival desserts" },
+      "source": "artifact:setup-record"
+    },
+    {
+      "id": "artifact:clip-cardamom",
+      "type": "Artifact",
+      "label": "Mom's voice clip about kheer",
+      "props": { "kind": "audio", "text": null, "alt": "Original voice clip of Mom talking about making kheer" },
+      "source": "artifact:clip-cardamom"
+    },
+    {
+      "id": "claim:cardamom-last",
+      "type": "EpisodicClaim",
+      "label": "cardamom goes in last",
+      "props": { "text": "cardamom goes in last" },
+      "source": "artifact:clip-cardamom",
+      "span": { "start_ms": 2100, "end_ms": 4300 }
+    },
+    {
+      "id": "topic:kheer",
+      "type": "Topic",
+      "label": "kheer",
+      "props": { "wikidata_id": "Q59134", "aliases": [ "kheer" ] },
+      "source": "ref:wikidata"
+    },
+    {
+      "id": "topic:halwa",
+      "type": "Topic",
+      "label": "halwa",
+      "props": { "wikidata_id": "Q183599", "aliases": [ "halwa", "halva" ] },
+      "source": "ref:wikidata"
+    },
+    {
+      "id": "topic:cardamom",
+      "type": "Topic",
+      "label": "cardamom",
+      "props": { "wikidata_id": "Q14625808", "aliases": [ "cardamom" ] },
+      "source": "ref:wikidata"
+    },
+    {
+      "id": "topic:dessert",
+      "type": "Topic",
+      "label": "dessert",
+      "props": { "wikidata_id": null, "aliases": [ "dessert" ] },
+      "source": "ref:wikidata"
+    },
+    {
+      "id": "topic:finances",
+      "type": "Topic",
+      "label": "finances",
+      "props": { "wikidata_id": null, "aliases": [ "money", "finances" ] },
+      "source": "ref:wikidata"
+    },
+    {
+      "id": "event:diwali-2026",
+      "type": "Event",
+      "label": "Diwali",
+      "props": { "wikidata_id": "Q10244", "date": "2026-11-08" },
+      "source": "ref:wikidata"
+    }
+  ],
+  "edges": [
+    { "type": "MEMBER_OF_THREAD", "from": "person:mom", "to": "artifact:thread-family", "source": "artifact:setup-record" },
+    { "type": "MEMBER_OF_THREAD", "from": "person:anika", "to": "artifact:thread-family", "source": "artifact:setup-record" },
+    { "type": "RELATED_TO", "from": "rel:mom-anika", "to": "person:mom", "source": "artifact:setup-record", "props": { "role": "mother" } },
+    { "type": "RELATED_TO", "from": "rel:mom-anika", "to": "person:anika", "source": "artifact:setup-record", "props": { "role": "daughter" } },
+    { "type": "EVIDENCE_FOR", "from": "artifact:setup-record", "to": "rel:mom-anika", "source": "artifact:setup-record" },
+    { "type": "PERMITTED_IN", "from": "person:anika", "to": "policy:mom-default", "source": "artifact:setup-record" },
+    { "type": "PERMITTED_IN", "from": "topic:kheer", "to": "policy:mom-default", "source": "artifact:setup-record" },
+    { "type": "PERMITTED_IN", "from": "topic:halwa", "to": "policy:mom-default", "source": "artifact:setup-record" },
+    { "type": "PERMITTED_IN", "from": "topic:cardamom", "to": "policy:mom-default", "source": "artifact:setup-record" },
+    { "type": "PERMITTED_IN", "from": "topic:dessert", "to": "policy:mom-default", "source": "artifact:setup-record" },
+    { "type": "PERMITTED_IN", "from": "artifact:clip-cardamom", "to": "policy:mom-default", "source": "artifact:setup-record" },
+    { "type": "EVIDENCE_FOR", "from": "artifact:setup-record", "to": "pref:mom-festival-desserts", "source": "artifact:setup-record" },
+    { "type": "SPOKEN_BY", "from": "pref:mom-festival-desserts", "to": "person:mom", "source": "artifact:setup-record" },
+    { "type": "ABOUT", "from": "pref:mom-festival-desserts", "to": "topic:dessert", "source": "artifact:setup-record" },
+    { "type": "SPOKEN_BY", "from": "artifact:clip-cardamom", "to": "person:mom", "source": "artifact:clip-cardamom" },
+    { "type": "SPOKEN_BY", "from": "claim:cardamom-last", "to": "person:mom", "source": "artifact:clip-cardamom", "span": { "start_ms": 2100, "end_ms": 4300 } },
+    { "type": "EVIDENCE_FOR", "from": "artifact:clip-cardamom", "to": "claim:cardamom-last", "source": "artifact:clip-cardamom", "span": { "start_ms": 2100, "end_ms": 4300 } },
+    { "type": "DERIVED_FROM", "from": "claim:cardamom-last", "to": "artifact:clip-cardamom", "source": "artifact:clip-cardamom", "span": { "start_ms": 2100, "end_ms": 4300 } },
+    { "type": "ABOUT", "from": "claim:cardamom-last", "to": "topic:cardamom", "source": "artifact:clip-cardamom" },
+    { "type": "ABOUT", "from": "claim:cardamom-last", "to": "topic:kheer", "source": "artifact:clip-cardamom" },
+    { "type": "RELATED_TO", "from": "topic:cardamom", "to": "topic:kheer", "source": "ref:wikidata", "props": { "role": "ingredient_of" } },
+    { "type": "RELATED_TO", "from": "topic:kheer", "to": "topic:dessert", "source": "ref:wikidata", "props": { "role": "kind_of" } },
+    { "type": "RELATED_TO", "from": "topic:halwa", "to": "topic:dessert", "source": "ref:wikidata", "props": { "role": "kind_of" } }
+  ]
+}

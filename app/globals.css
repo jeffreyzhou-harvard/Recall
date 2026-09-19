@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens, verbatim from AGENTS.md section 10 ("The Living Thread").
+ * Only the tokens live here for now. The visual system itself is built later
+ * with the Impeccable design skill (/impeccable init, then the surface work).
+ */
+@theme {
+  --color-paper: #f6f1e8; /* warm paper */
+  --color-ink: #18342f;
+  --color-sage: #b9cec3;
+  --color-coral: #e4775b; /* authorship: only ever her words */
+  --color-amber: #d5a64a; /* uncertain thread */
+  --radius-card: 18px;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

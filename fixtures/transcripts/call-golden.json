@@ -1,0 +1,240 @@
+{
+  "asset_id": "call-golden",
+  "provider": "fixture",
+  "timing_status": "placeholder",
+  "note": "Judged path, call branch 1. Word timings are placeholders until measured from the real recording (Deepgram / Muse Voice Transcribe).",
+  "turns": [
+    {
+      "turn_id": "r1",
+      "speaker": "relay",
+      "start_ms": 1000,
+      "end_ms": 4200,
+      "is_final": true,
+      "words": [
+        {
+          "w": "Anika",
+          "start_ms": 1000,
+          "end_ms": 1419
+        },
+        {
+          "w": "wants",
+          "start_ms": 1449,
+          "end_ms": 1868
+        },
+        {
+          "w": "your",
+          "start_ms": 1898,
+          "end_ms": 2234
+        },
+        {
+          "w": "help",
+          "start_ms": 2264,
+          "end_ms": 2600
+        },
+        {
+          "w": "with",
+          "start_ms": 2630,
+          "end_ms": 2966
+        },
+        {
+          "w": "Diwali",
+          "start_ms": 2996,
+          "end_ms": 3499
+        },
+        {
+          "w": "dessert.",
+          "start_ms": 3529,
+          "end_ms": 4200
+        }
+      ]
+    },
+    {
+      "turn_id": "p1",
+      "speaker": "participant",
+      "start_ms": 6400,
+      "end_ms": 7600,
+      "is_final": true,
+      "words": [
+        {
+          "w": "Which",
+          "start_ms": 6400,
+          "end_ms": 6756
+        },
+        {
+          "w": "thing",
+          "start_ms": 6786,
+          "end_ms": 7142
+        },
+        {
+          "w": "again?",
+          "start_ms": 7172,
+          "end_ms": 7600
+        }
+      ]
+    },
+    {
+      "turn_id": "r2",
+      "speaker": "relay",
+      "start_ms": 9800,
+      "end_ms": 14200,
+      "is_final": true,
+      "words": [
+        {
+          "w": "Kheer",
+          "start_ms": 9800,
+          "end_ms": 10459
+        },
+        {
+          "w": "or",
+          "start_ms": 10489,
+          "end_ms": 10753
+        },
+        {
+          "w": "halwa.",
+          "start_ms": 10783,
+          "end_ms": 11574
+        },
+        {
+          "w": "Anika",
+          "start_ms": 11604,
+          "end_ms": 12263
+        },
+        {
+          "w": "sent",
+          "start_ms": 12293,
+          "end_ms": 12821
+        },
+        {
+          "w": "this",
+          "start_ms": 12851,
+          "end_ms": 13379
+        },
+        {
+          "w": "photo.",
+          "start_ms": 13409,
+          "end_ms": 14200
+        }
+      ]
+    },
+    {
+      "turn_id": "p2",
+      "speaker": "participant",
+      "start_ms": 16500,
+      "end_ms": 23900,
+      "is_final": true,
+      "words": [
+        {
+          "w": "Make",
+          "start_ms": 16500,
+          "end_ms": 16800
+        },
+        {
+          "w": "the",
+          "start_ms": 16820,
+          "end_ms": 16950
+        },
+        {
+          "w": "kheer.",
+          "start_ms": 16980,
+          "end_ms": 17600
+        },
+        {
+          "w": "Your",
+          "start_ms": 19000,
+          "end_ms": 19250
+        },
+        {
+          "w": "grandfather",
+          "start_ms": 19280,
+          "end_ms": 20050
+        },
+        {
+          "w": "always",
+          "start_ms": 20950,
+          "end_ms": 21400
+        },
+        {
+          "w": "added",
+          "start_ms": 21430,
+          "end_ms": 21850
+        },
+        {
+          "w": "cardamom",
+          "start_ms": 22650,
+          "end_ms": 23350
+        },
+        {
+          "w": "last.",
+          "start_ms": 23380,
+          "end_ms": 23900
+        }
+      ]
+    },
+    {
+      "turn_id": "r3",
+      "speaker": "relay",
+      "start_ms": 26500,
+      "end_ms": 28600,
+      "is_final": true,
+      "words": [
+        {
+          "w": "Want",
+          "start_ms": 26500,
+          "end_ms": 26820
+        },
+        {
+          "w": "me",
+          "start_ms": 26850,
+          "end_ms": 27010
+        },
+        {
+          "w": "to",
+          "start_ms": 27040,
+          "end_ms": 27200
+        },
+        {
+          "w": "send",
+          "start_ms": 27230,
+          "end_ms": 27550
+        },
+        {
+          "w": "that",
+          "start_ms": 27580,
+          "end_ms": 27900
+        },
+        {
+          "w": "to",
+          "start_ms": 27930,
+          "end_ms": 28090
+        },
+        {
+          "w": "Anika?",
+          "start_ms": 28120,
+          "end_ms": 28600
+        }
+      ]
+    },
+    {
+      "turn_id": "pb1",
+      "speaker": "playback",
+      "start_ms": 29000,
+      "end_ms": 34200,
+      "is_final": true,
+      "words": []
+    },
+    {
+      "turn_id": "p3",
+      "speaker": "participant",
+      "start_ms": 36200,
+      "end_ms": 36700,
+      "is_final": true,
+      "words": [
+        {
+          "w": "Yes.",
+          "start_ms": 36200,
+          "end_ms": 36700
+        }
+      ]
+    }
+  ]
+}

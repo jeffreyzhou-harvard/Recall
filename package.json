@@ -1,0 +1,45 @@
+{
+  "name": "relay",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Relay - an adaptive participation layer for one live family interaction. Access changed. Authorship didn't.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "assets:placeholder": "tsx scripts/placeholder-assets.ts",
+    "assets:hash": "tsx scripts/hash-assets.ts",
+    "graph:seed": "tsx scripts/seed-graph.ts",
+    "verify": "tsx scripts/verify.ts",
+    "verify:strict": "tsx scripts/verify.ts --strict",
+    "check": "npm run typecheck && npm run test && npm run verify"
+  },
+  "dependencies": {
+    "@ladybugdb/core": "^0.20.4",
+    "framer-motion": "^13.4.0",
+    "graphology": "^0.26.0",
+    "lucide-react": "^1.47.0",
+    "next": "^16.3.5",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "zod": "^4.6.5",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
+  }
+}

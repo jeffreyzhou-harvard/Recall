@@ -1,0 +1,15 @@
+{
+  "forward_id": "fwd-diwali-dessert",
+  "thread_id": "artifact:thread-family",
+  "asker_id": "person:anika",
+  "addressee_id": "person:mom",
+  "text": "Mom, which should I make for Diwali?",
+  "photos": [
+    {
+      "asset_id": "photo-desserts",
+      "caption": "Kheer and halwa"
+    }
+  ],
+  "requested_audience": "artifact:thread-family",
+  "received_at": "2026-11-05T17:25:00.000Z"
+}

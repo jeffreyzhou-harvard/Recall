@@ -1,0 +1,26 @@
+{
+  "policy_id": "policy:mom-default",
+  "version": 1,
+  "description": "Agreed once, together, in the joint setup. Relay never widens it on its own.",
+  "person_id": "person:mom",
+  "established_by": "artifact:setup-record",
+  "approved_people": ["person:anika"],
+  "approved_audiences": ["artifact:thread-family"],
+  "purposes": ["answer_current_ask"],
+  "timezone": "America/New_York",
+  "call_windows": [
+    { "days": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"], "start": "10:00", "end": "19:00" }
+  ],
+  "topics": {
+    "allow": ["topic:kheer", "topic:halwa", "topic:cardamom", "topic:dessert"],
+    "block": ["topic:finances"]
+  },
+  "allowed_source_classes": ["current_ask", "ask_artifact", "prior_claim_with_source"],
+  "forbidden_claims": ["diagnosis", "disease stage", "mood", "competence", "cognition", "health record", "location"],
+  "blocked_terms": ["password", "account number", "pin"],
+  "speech": { "pace": "slow", "max_call_minutes": 6 },
+  "review": { "voice_assent_required": true, "caregiver_review_before_send": false },
+  "token_ttl_minutes": 30,
+  "ask_ttl_hours": 48,
+  "support_receipt": { "recipients": ["person:anika"] }
+}

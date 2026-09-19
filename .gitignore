@@ -1,0 +1,32 @@
+# dependencies
+node_modules/
+
+# next
+.next/
+out/
+next-env.d.ts
+
+# build / test output
+coverage/
+*.tsbuildinfo
+
+# local graph database (rebuilt by `npm run graph:seed` from /fixtures)
+.data/
+
+# env - never commit keys (Deepgram, Muse)
+.env
+.env.*
+!.env.example
+
+# per-machine harness settings (hooks installed by `npx impeccable install`)
+.claude/settings.local.json
+.impeccable/config.local.json
+.impeccable/live/
+
+# unapproved call audio must never persist (AGENTS.md rule 8)
+/tmp-audio/
+*.unapproved.*
+
+# os / editor
+.DS_Store
+*.log

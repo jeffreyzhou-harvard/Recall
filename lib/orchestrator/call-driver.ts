@@ -1,0 +1,102 @@
+/**
+ * The phone call, as the orchestrator sees it: Relay speaks, her own audio is
+ * played back, and Relay listens for her next final turn.
+ *
+ * The judged path uses FixtureCallDriver over a prerecorded call. Telephony,
+ * ASR, and model latency never touch it (AGENTS.md section 9). A live driver
+ * for the optional side demo would implement the same interface.
+ */
+import type { FixtureClock } from "@/lib/clock";
+import type { AudioWindow, CallTranscript, Turn } from "@/lib/providers/transcription";
+import { turnText } from "@/lib/providers/transcription";
+
+export interface SpokenPrompt {
+  prompt_id: string;
+  text: string;
+}
+
+export interface CallDriver {
+  readonly call_asset_id: string;
+  connect(): Promise<void>;
+  /** Relay speaks, in Relay's own labeled voice. Resolves when the line has finished. */
+  speak(prompt: SpokenPrompt): Promise<void>;
+  /** Play her own recorded audio back to her. Never synthesized. */
+  playback(): Promise<void>;
+  /** Wait for her next final turn, or for the silence timeout. Returns the window to assess. */
+  listen(): Promise<AudioWindow>;
+  hangUp(): Promise<void>;
+}
+
+/**
+ * Thrown when what the tools produced and what was prerecorded disagree. On
+ * the judged path that would mean the audio says one thing while the trace
+ * shows another, so it stops the run rather than being papered over.
+ */
+export class ScriptMismatchError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ScriptMismatchError";
+  }
+}
+
+export class FixtureCallDriver implements CallDriver {
+  readonly call_asset_id: string;
+  private cursor = 0;
+  private callStartMs = 0;
+  private lastEndMs = 0;
+
+  constructor(
+    private readonly transcript: CallTranscript,
+    private readonly clock: FixtureClock,
+    private readonly connectDelayMs: number,
+  ) {
+    this.call_asset_id = transcript.asset_id;
+  }
+
+  private next(expected: Turn["speaker"], doing: string): Turn {
+    const turn = this.transcript.turns[this.cursor];
+    if (!turn) throw new ScriptMismatchError(`${doing}, but the prerecorded call has no more turns`);
+    if (turn.speaker !== expected) {
+      throw new ScriptMismatchError(`${doing}, but the next prerecorded turn (${turn.turn_id}) is ${turn.speaker}`);
+    }
+    this.cursor++;
+    return turn;
+  }
+
+  /** Move the fixture clock to where this turn ends in the recording. Tool latency may already have carried it past. */
+  private advanceTo(callMs: number): void {
+    const target = this.callStartMs + callMs;
+    if (target > this.clock.now()) this.clock.advance(target - this.clock.now());
+    this.lastEndMs = callMs;
+  }
+
+  async connect(): Promise<void> {
+    this.clock.advance(this.connectDelayMs);
+    this.callStartMs = this.clock.now();
+  }
+
+  async speak(prompt: SpokenPrompt): Promise<void> {
+    const turn = this.next("relay", `Relay is about to say "${prompt.text}"`);
+    const recorded = turnText(turn);
+    if (recorded !== prompt.text) {
+      throw new ScriptMismatchError(`Relay rendered "${prompt.text}" but the prerecorded line ${turn.turn_id} is "${recorded}"`);
+    }
+    this.advanceTo(turn.end_ms);
+  }
+
+  async playback(): Promise<void> {
+    this.advanceTo(this.next("playback", "Relay is about to play her audio back").end_ms);
+  }
+
+  async listen(): Promise<AudioWindow> {
+    const start = this.lastEndMs;
+    const turn = this.next("participant", "Relay is listening");
+    this.advanceTo(turn.end_ms);
+    return { asset_id: this.call_asset_id, start_ms: start, end_ms: turn.end_ms };
+  }
+
+  async hangUp(): Promise<void> {
+    const left = this.transcript.turns.length - this.cursor;
+    if (left > 0) throw new ScriptMismatchError(`the call ended with ${left} prerecorded turn(s) unplayed`);
+  }
+}
