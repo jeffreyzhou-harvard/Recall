@@ -114,7 +114,7 @@ Cast is fixed: Susan, Maya (daughter), Priya (sister), Anika (granddaughter), Ca
 - **Onboarding capture.** The database, its rules, and its routes exist (see "Onboarding"); the screens do not, and neither does the "Who is this?" beat. A household onboarded today has people and a setup but no topics yet: topics enter through family contributions, which the API does not yet attach to a topic.
 - **Sign-in.** The family routes take `member` on trust, behind `RECALL_FAMILY_SECRET`; the schedule and onboarding are behind the separate `RECALL_OPERATOR_SECRET`, so that whatever opens the family side can never cause a call (rule 5).
 - **Real media.** Everything in `/assets` is a generated stand-in. Word timings are placeholders. See below.
-- **`legacy/`** holds the earlier family-ask recall (forwarded asks, thread bridge, Telegram). It is out of scope (`AGENTS.md` §14), excluded from the build, and can be deleted once the team agrees.
+- **`legacy/`** holds the earlier family-ask recall (forwarded asks, thread bridge). It is out of scope (`AGENTS.md` §14), excluded from the build, and can be deleted once the team agrees.
 
 ## Replacing the placeholder media
 
