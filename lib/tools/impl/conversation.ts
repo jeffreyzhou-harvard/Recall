@@ -87,14 +87,22 @@ export const assess_conversation_state: ToolImpl<"assess_conversation_state"> = 
   if (conduct) return done("no_answer", `conduct:${conduct}`);
   if (firstPhraseIn(transcript, ctx.script.unsure_phrases)) return done("no_answer", "said_unsure");
 
-  // After a recognition rung both options are words Relay just said, so the reply is read against what was offered.
-  const offered = ctx.session.spoken.at(-1)?.rung === 4 ? ctx.session.last_recognition : null;
+  // A recognition pick is read against what was offered, including on the follow-up: repeating the choice is not a memory.
+  const offered = ctx.session.last_recognition;
   if (offered) {
     const saidAs = async (edgeId: string): Promise<string> => ((await ctx.graph.getEdge(edgeId))?.props.said_as as string | null) ?? "";
     const [one, other] = [await saidAs(offered.correct_edge_id), await saidAs(offered.other_edge_id)];
     const named = (w: string): boolean => w !== "" && containsPhrase(transcript, w);
-    if (named(one) && !named(other)) return done("recalled", "named_one_of_the_two_offered");
-    return done("no_answer", "did_not_name_one_of_the_two_offered");
+    const pickAlreadyLogged = ctx.session.assessments.some((a) => a.evidence.matched_rule === "named_one_of_the_two_offered");
+    const onRecognitionReply = ctx.session.spoken.at(-1)?.rung === 4;
+    if (named(one) && !named(other)) {
+      const fillers = new Set(["my", "the", "a", "an", "your", "our", "her", "his"]);
+      const extra = novel.filter((w) => !fillers.has(w));
+      if (pickAlreadyLogged && extra.length === 0) return done("no_answer", "repeat_of_recognition_pick");
+      if (!pickAlreadyLogged) return done("recalled", "named_one_of_the_two_offered");
+    } else if (onRecognitionReply) {
+      return done("no_answer", "did_not_name_one_of_the_two_offered");
+    }
   }
 
   if (said.length > 0 && novel.length === 0) return done("no_answer", "echo_of_relay_words");
@@ -162,6 +170,16 @@ async function gather(ctx: ToolContext, topicId: string, verifiedIds: readonly s
 
 const isHers = (m: Material, claim: GraphNode): boolean => m.verified.get(claim.id)?.speaker === m.personId && m.verified.get(claim.id)?.patient_confirmed === true;
 
+/**
+ * When a person/relationship cue and a place/photo/event cue are both available, the person is said first.
+ * The retrieval layer only orders cues of the same kind - it never promotes a photo over a person.
+ */
+function preferPersonThenCues(cues: RungPlan[], cueOrder: (cues: RungPlan[]) => RungPlan[]): RungPlan[] {
+  const person = cues.filter((c) => c.cue?.kind === "person");
+  const other = cues.filter((c) => c.cue?.kind !== "person");
+  return [...(person.length > 0 ? cueOrder(person) : []), ...(other.length > 0 ? cueOrder(other) : [])];
+}
+
 /** What each rung would say, or why it cannot be said. A rung with nothing verified to stand on is never improvised. */
 function planRung(ctx: ToolContext, rung: Rung, m: Material, familySourced: boolean, cueOrder: (cues: RungPlan[]) => RungPlan[]): RungPlan[] | string {
   const lines = ctx.script.ladder.categories[ctx.session.topic!.category];
@@ -193,7 +211,7 @@ function planRung(ctx: ToolContext, rung: Rung, m: Material, familySourced: bool
           if (m.verified.has(author)) cues.push({ scaffold: lines.association.photo, slot_ids: { author }, citations: [topicId, photo.id, author], cue: { kind: "photo", cue_id: photo.id } });
         }
       }
-      return cues.length > 0 ? cueOrder(cues) : "no verified cue is tied to this topic";
+      return cues.length > 0 ? preferPersonThenCues(cues, cueOrder) : "no verified cue is tied to this topic";
     }
     case 4:
     case 5: {
@@ -237,7 +255,7 @@ export const select_scaffold: ToolImpl<"select_scaffold"> = async (input, ctx) =
   for (const rung of [1, 2, 3, 4, 5] as Rung[]) {
     // A rung that is disabled outright is always logged as disabled, never merely as "held in reserve".
     if (topic.family_sourced && rung > FAMILY_SOURCED_MAX_RUNG) rejected.push({ rung, reason: "disabled: the topic is family-sourced and she has not confirmed it, so a forced choice or a stated fact could plant a memory (rule 13)" });
-    else if (rung === 5 && !topic.reorientation_allowed) rejected.push({ rung, reason: "disabled: this is an autobiographical memory, and stating one outright shades into correction (EVIDENCE.md, section B)" });
+    else if (rung === 5 && !topic.reorientation_allowed) rejected.push({ rung, reason: "disabled: this is an autobiographical memory, and stating one outright shades into correction" });
     else if (chosen) rejected.push({ rung, reason: "more support than needed; held in reserve" });
     else if (rung <= highest) rejected.push({ rung, reason: fired.includes(rung) ? "already tried in this call; a rung is never repeated" : "below a rung that has already been tried" });
     else if (rung === 5 && !([1, 2, 3, 4] as Rung[]).every((r) => fired.includes(r))) rejected.push({ rung, reason: "reorientation is never reached before rungs 1-4 have each been tried in order" });
@@ -250,12 +268,13 @@ export const select_scaffold: ToolImpl<"select_scaffold"> = async (input, ctx) =
 
   if (!chosen) return { rung: null, scaffold_id: null, slot_ids: {}, citations: [], cue: null, family_sourced_limit: topic.family_sourced, rejected, retrieval_hints_used: [], decided_by: "deterministic_ladder" };
 
-  // Which cue, never whether: the retrieval layer has already ordered the candidates. Only where it has no
-  // preference between the front-runners may an advisor pick - and only from exactly those.
+  // Which cue, never whether: person/relationship first, then the retrieval layer among that kind.
+  // An advisor may pick only among the front-runners of that same kind.
   let plan = chosen.plans[0]!;
   let decidedBy: "deterministic_ladder" | "muse_spark" = "deterministic_ladder";
   const tier = (p: RungPlan): string => JSON.stringify([hints.find((h) => h.cue_id === p.cue?.cue_id)?.effective ?? 0, (hints.find((h) => h.cue_id === p.cue?.cue_id)?.ineffective ?? 0) > 0]);
-  const level = chosen.plans.filter((p) => p.cue && tier(p) === tier(plan));
+  const sameKind = chosen.plans.filter((p) => (p.cue?.kind ?? null) === (plan.cue?.kind ?? null));
+  const level = sameKind.filter((p) => p.cue && tier(p) === tier(plan));
   if (ctx.scaffoldAdvisor && level.length > 1) {
     try {
       const pick = await ctx.scaffoldAdvisor({

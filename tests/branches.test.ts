@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildFixtureRig, runFixture } from "@/fixtures/harness";
 import type { NodeOf, NodeType } from "@/lib/graph/types";
 import { replay, visitedStates } from "@/lib/state/reducer";
-import { ACCOUNTS_DIFFER, CAPTURE_AND_CONFIRM, HER_LINE, OPENING, SAID, SAID_RUNG5, SCRIPT_WITH_REORIENTATION, overlay, policyWith, run, spokenText, toolsCalled, type Step } from "./helpers";
+import { ACCOUNTS_DIFFER, CAPTURE_AND_CONFIRM, HER_LINE, OPENING, QUIET_THEN, SAID, SAID_RUNG5, SCRIPT_WITH_REORIENTATION, overlay, policyWith, run, spokenText, toolsCalled, type Step } from "./helpers";
 
 const nodesOf = <T extends NodeType>(r: Awaited<ReturnType<typeof run>>, type: T): Promise<Array<NodeOf<T>>> => r.graph.nodesOfType(type);
 const newClaims = async (r: Awaited<ReturnType<typeof run>>) => (await r.graph.nodesOfType("EpisodicClaim")).filter((c) => c.prov.source_class === "recall_call");
@@ -70,7 +70,7 @@ describe("the ladder", () => {
     expect(spokenText(r).some((t) => /you told me|your daughter maya/i.test(t))).toBe(false); // no correction, and no fact put to her
     const last = r.recording.tool_log.filter((c) => c.tool === "select_scaffold").at(-1)!.output as { rung: number | null; rejected: Array<{ rung: number; reason: string }> };
     expect(last.rung).toBeNull();
-    expect(last.rejected.find((x) => x.rung === 5)!.reason).toMatch(/autobiographical memory.*EVIDENCE\.md, section B/);
+    expect(last.rejected.find((x) => x.rung === 5)!.reason).toMatch(/autobiographical memory/);
     expect(r.recording.topic).toMatchObject({ reorientation_allowed: false });
   });
 
@@ -90,8 +90,17 @@ describe("the ladder", () => {
     expect(picks[1]!.rejected.find((x) => x.rung === 1)!.reason).toMatch(/never repeated/);
   });
 
+  it("a recognition pick is not stored: repeating the choice after the follow-up keeps nothing", async () => {
+    const r = await run([...UP_TO_ASSOCIATION, ["her", "Hmm."], ["relay", SAID.rung4], ["her", "My daughter."], ["relay", SAID.elaborate], ["her", "Daughter."], ["relay", SAID.closeKind]]);
+    expect(r.recording.final_state).toBe("not_stored");
+    expect(replay(r.recording.trace).context).toMatchObject({ rungs_fired: [1, 2, 3, 4], reached_at_rung: 4 });
+    expect(await newClaims(r)).toEqual([]);
+    const last = r.recording.tool_log.filter((c) => c.tool === "assess_conversation_state").at(-1)!.output as { evidence: { matched_rule: string } };
+    expect(last.evidence.matched_rule).toBe("repeat_of_recognition_pick");
+  });
+
   it("two quiet windows on a topic: a gentle wrap-up, nothing kept", async () => {
-    const r = await run([...OPENING, ["silence"], ["relay", SAID.rung2], ["silence"], ["relay", SAID.closeKind]]);
+    const r = await run([...OPENING, ...QUIET_THEN(SAID.rung2), ...QUIET_THEN(SAID.closeKind)]);
     expect(r.recording.final_state).toBe("no_answer_today");
     expect(replay(r.recording.trace).context.ending_reason).toBe("two quiet windows on this topic");
     expect(r.recording.unconfirmed_audio_discarded).toBe(true);
@@ -120,19 +129,19 @@ describe("the ladder", () => {
     expect(last.rejected.filter((x) => x.rung > 3).every((x) => /rule 13/.test(x.reason))).toBe(true);
   });
 
-  it("the retrieval layer only picks WHICH cue: with it, Maya; cleared, plain id order - and the ladder climbs the same either way", async () => {
-    const steps: Step[] = [...OPENING, ["her", "Cape May...?"], ["relay", SAID.rung2], ["her", "I'm not sure."], ["relay", SAID.rung3photo], ["her", "I don't know."], ["relay", SAID.rung4], ["her", "My daughter."], ["relay", SAID.elaborate], ["her", "I'm not sure."], ["relay", SAID.closeKind]];
+  it("the retrieval layer only picks WHICH cue of the same kind: a person cue still beats a photo when preference is cleared", async () => {
+    const steps: Step[] = [...OPENING, ["her", "Cape May...?"], ["relay", SAID.rung2], ["her", "I'm not sure."], ["relay", SAID.rung3], ["her", "I don't know."], ["relay", SAID.rung4], ["her", "My daughter."], ["relay", SAID.elaborate], ["her", "I'm not sure."], ["relay", SAID.closeKind]];
     const rig = await buildFixtureRig({ transcript: (await import("./helpers")).call(steps) });
     const records = await rig.service.clearRetrievalLayer();
     expect(records).toBe(4);
     const r = await rig.service.runScheduledCall("session:no-preference");
-    expect(replay(r!.recording.trace).context.cues_offered[0]).toEqual({ rung: 3, cue_id: "artifact:photo-cape-may" }); // "artifact:..." sorts before "person:..."
+    expect(replay(r!.recording.trace).context.cues_offered[0]).toEqual({ rung: 3, cue_id: "person:maya" });
     expect(replay(r!.recording.trace).context.rungs_fired).toEqual([1, 2, 3, 4]);
     // The per-topic record is a separate store: clearing the retrieval layer left it whole, and the reverse holds too.
     expect((await rig.graph.nodesOfType("TopicOutcome")).length).toBe(22);
     expect(await rig.service.clearTopicRecord()).toBe(22);
-    // This call's own cue records survive it: the photograph at rung 3 (she did not reach it), Maya at rung 4 (she did).
-    expect((await rig.graph.nodesOfType("RetrievalRecord")).map((n) => [n.props.cue_id, n.props.rung, n.props.effective])).toEqual([["artifact:photo-cape-may", 3, false], ["person:maya", 4, true]]);
+    // This call's own cue records survive it: Maya at rung 3 (she did not reach it) and at rung 4 (she did).
+    expect((await rig.graph.nodesOfType("RetrievalRecord")).map((n) => [n.props.cue_id, n.props.rung, n.props.effective])).toEqual([["person:maya", 3, false], ["person:maya", 4, true]]);
   });
 });
 
@@ -355,7 +364,7 @@ describe("the safety handoff", () => {
   it("is never triggered by Relay's own speech", async () => {
     const phrases = structuredClone((await import("@/fixtures")).SAFETY_PHRASES);
     phrases.categories.fall!.phrases.push("what comes to mind"); // words only Relay says
-    const r = await run([...OPENING, ["silence"], ["relay", SAID.rung2], ["silence"], ["relay", SAID.closeKind]], { safetyPhrases: phrases });
+    const r = await run([...OPENING, ...QUIET_THEN(SAID.rung2), ...QUIET_THEN(SAID.closeKind)], { safetyPhrases: phrases });
     expect(r.recording.final_state).toBe("no_answer_today");
     expect(r.alerts.count()).toBe(0);
   });

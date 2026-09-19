@@ -38,7 +38,7 @@ export async function isFamilySourced(ctx: Pick<ToolContext, "graph">, node: Gra
 
 /**
  * How often this memory has been told: the accounts of it, hers and her family's, that a person stands behind.
- * Retrieval frequency, more than age, is what seems to keep a memory reachable (EVIDENCE.md, section A).
+ * Retrieval frequency, more than age, is what seems to keep a memory reachable (AGENTS.md tool 1).
  */
 async function timesTold(ctx: Pick<ToolContext, "graph">, topicId: string): Promise<number> {
   let told = 0;

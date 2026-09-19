@@ -47,7 +47,7 @@ export const policySchema = z
     allowed_source_classes: z.array(z.enum(SOURCE_CLASSES)),
     blocked_terms: z.array(z.string()),
     /**
-     * 10 minutes is a ceiling, not a target: 5-8 is the default to set (EVIDENCE.md, section E). `pace` is kept for
+     * 10 minutes is a ceiling, not a target: 5-8 is the default to set (AGENTS.md §6.2). `pace` is kept for
      * her comfort, but it is sentence length - not speed - that the evidence ties to being understood.
      */
     speech: z.strictObject({ pace: z.enum(["slow", "standard"]), max_call_minutes: z.number().int().positive().max(10) }),

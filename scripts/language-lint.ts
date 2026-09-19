@@ -24,7 +24,7 @@ for (const l of [...(record.header ? [record.header] : []), ...record.topics.fla
 
 // A rendered line keeps its script id for the allow-list: "rendered:FAM-X" is checked as "FAM-X".
 const checked = lines.map((l) => ({ ...l, id: l.id.replace(/^[a-z]+:/, "") }));
-// Banned language everywhere; and, for what is spoken to her, one question a turn and short sentences (EVIDENCE.md, section C).
+// Banned language everywhere; and, for what is spoken to her, one question a turn and short sentences (AGENTS.md §6.2).
 const findings = [...lintLines(checked, CALL_SCRIPT.banned), ...lintConduct(checked, CALL_SCRIPT.conduct)];
 for (const f of findings) console.error(`  ${f.id}: "${f.phrase}" (rule ${f.rule})  in  "${f.text}"`);
 console.log(`language lint: ${fixedCount} fixed line(s) and ${lines.length - fixedCount} rendered line(s) checked, ${findings.length} finding(s).`);

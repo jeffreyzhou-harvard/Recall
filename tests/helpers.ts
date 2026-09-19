@@ -28,13 +28,14 @@ export const SAID = {
   closeNotStored: L.close_not_stored.text,
   narrowing: L.narrowing.text,
   stopAck: L.stop_ack.text,
+  backchannel: L.backchannel_wait.text,
   safety: fill(L.safety, { caregiver: "Maya", emergency_number: "911" }),
 };
 export const HER_LINE = "We went to Cape May every summer.";
 
 /**
  * TEST ONLY. Relay's real script has no reorientation line, because every topic it has is autobiographical and
- * such a memory is never stated outright (EVIDENCE.md, section B). The last rung's machinery still has to be
+ * such a memory is never stated outright (AGENTS.md §6.1). The last rung's machinery still has to be
  * right for the day a procedural topic exists - so this script pretends the golden category is one.
  */
 export const REORIENTATION_TEXT = "You and your {relation} {person} spent summers together at {place}. You told me about them. What do you remember about those?";
@@ -74,6 +75,8 @@ export const OPENING: Step[] = [
   ["relay", SAID.greeting],
   ["relay", SAID.rung1],
 ];
+/** A first pause is a hold, not a miss: Relay says the backchannel and waits again, then `next`. */
+export const QUIET_THEN = (next: string): Step[] => [["silence"], ["relay", SAID.backchannel], ["silence"], ["relay", next]];
 /** From her own words to the warm close, with both yeses. */
 export const CAPTURE_AND_CONFIRM = (store = "Yes.", share = "Yes."): Step[] => [["her", HER_LINE], ["playback"], ["relay", SAID.storeQuestion], ["her", store], ["relay", SAID.shareQuestion], ["her", share], ["relay", SAID.closeWarm]];
 

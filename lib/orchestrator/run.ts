@@ -138,7 +138,7 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
     if (!verified.includes(topicId)) throw new GateError("evidence", "the topic itself could not be verified");
 
     const line = (key: FixedLineKey): Promise<Prompt> => runtime.call("render_prompt", { topic_id: topicId, scaffold_id: ctx.script.lines[key].id, slot_ids: {}, citations: [] });
-    for (const key of ["greeting", "identity", "store_question", "share_question", "close_warm", "close_kind", "close_not_stored", "narrowing", "stop_ack", "safety"] as const) fixed[key] = await line(key);
+    for (const key of ["greeting", "identity", "store_question", "share_question", "close_warm", "close_kind", "close_not_stored", "narrowing", "stop_ack", "backchannel_wait", "safety"] as const) fixed[key] = await line(key);
     const elaborate = ctx.script.ladder.categories[topic.category]?.elaborate ?? ctx.script.ladder.elaborate_default;
     fixed.elaborate = await runtime.call("render_prompt", { topic_id: topicId, scaffold_id: elaborate.id, slot_ids: {}, citations: [] });
     const opening = await runtime.call("select_scaffold", { topic_id: topicId, state: "opening", verified_ids: verified, rungs_fired: [] });
@@ -208,6 +208,12 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
       }
       history.push({ turn_id: heard.turn_id, turn_state: heard.state });
       dispatch({ type: "TURN_ASSESSED", turn_id: heard.turn_id, turn_state: heard.state, silent: heard.silent });
+
+      // First quiet window on this rung: hold, say the backchannel, and wait again. Do not climb.
+      if (heard.silent && machine().context.held_silence && machine().state !== "lost" && machine().state !== "no_answer_today") {
+        await speak(fixed.backchannel_wait!);
+        continue;
+      }
 
       if (machine().state === "lost") {
         const pick = await runtime.call("select_scaffold", { topic_id: topicId, state: heard.state, verified_ids: verified, rungs_fired: machine().context.rungs_fired });

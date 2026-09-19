@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Every line Relay can say that carries no factual claim, each with a stable script id (AGENTS.md section 6.2). Slots in braces are filled only from graph node values and the joint setup. Any other line Relay says must carry citations. Changes need a second reviewer (section 13). The ladder's last rung, stating a fact outright, exists only for `procedural` topic categories: it is never said of an autobiographical or identity memory (EVIDENCE.md, section B).",
+  "description": "Every line Relay can say that carries no factual claim, each with a stable script id (AGENTS.md section 6.2). Slots in braces are filled only from graph node values and the joint setup. Any other line Relay says must carry citations. Changes need a second reviewer (section 13). The ladder's last rung, stating a fact outright, exists only for `procedural` topic categories: it is never said of an autobiographical or identity memory (AGENTS.md §6.1).",
   "lines": {
     "greeting": {
       "id": "GREETING",
@@ -37,6 +37,10 @@
     "stop_ack": {
       "id": "STOP-ACK",
       "text": "Of course. Goodbye for now."
+    },
+    "backchannel_wait": {
+      "id": "BACKCHANNEL-WAIT",
+      "text": "Take your time."
     },
     "safety": {
       "id": "SAFETY",

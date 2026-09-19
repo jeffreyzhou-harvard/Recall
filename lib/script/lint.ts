@@ -41,7 +41,7 @@ export function lintLines(lines: readonly LintLine[], banned: readonly BannedEnt
 }
 
 /**
- * How Relay talks (EVIDENCE.md, section C). One question per turn; and sentences kept short, because it is
+ * How Relay talks (AGENTS.md §6.2). One question per turn; and sentences kept short, because it is
  * syntactic complexity - not speed - that costs comprehension. Checked over every line spoken to her.
  */
 export function lintConduct(lines: readonly LintLine[], conduct: { max_questions_per_line: number; max_words_per_sentence: number }): LintFinding[] {

@@ -43,7 +43,7 @@ export const FAMILY_COPY: FamilyCopy = familyCopySchema.parse(familyCopy);
 export const RECORD_THRESHOLDS: RecordThresholds = recordThresholdsSchema.parse(recordThresholds);
 export const SAFETY_PHRASES: SafetyPhrases = safetyPhrasesSchema.parse(safetyPhrases);
 
-/** Timing for the deterministic replay: 10:30 on a Thursday morning in New York, inside the agreed call window (mornings: EVIDENCE.md, section E). */
+/** Timing for the deterministic replay: 10:30 on a Thursday morning in New York, inside the agreed call window (AGENTS.md §6.2). */
 export const JUDGED_TIMING: {
   start_at: string;
   call_connect_delay_ms: number;

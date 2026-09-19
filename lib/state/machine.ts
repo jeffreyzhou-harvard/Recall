@@ -114,7 +114,7 @@ export interface RelayContext {
   topic_id: string | null;
   topic_label: string | null;
   family_sourced: boolean;
-  /** False for an autobiographical or identity memory: Relay never states one outright (EVIDENCE.md, section B). */
+  /** False for an autobiographical or identity memory: Relay never states one outright (AGENTS.md §6.1). */
   reorientation_allowed: boolean;
   policy_token_id: string | null;
   max_call_minutes: number | null;
@@ -127,7 +127,13 @@ export interface RelayContext {
   rungs_fired: Rung[];
   /** The cue each rung offered, where it offered one. */
   cues_offered: Array<{ rung: Rung; cue_id: string }>;
+  /**
+   * Quiet windows that actually escalated the ladder. A first pause on a rung is a hold, not one of these
+   * (AGENTS.md §6.2): Relay says the backchannel and waits again. Two of these end the topic.
+   */
   silent_windows: number;
+  /** True after a hold on this rung. The next quiet window is a lost-thread signal. Cleared when a new rung is said. */
+  held_silence: boolean;
   /** The rung after which she reached the memory - 1 is free recall, unaided - or null. */
   reached_at_rung: Rung | null;
   answer_turn_id: string | null;
@@ -160,6 +166,7 @@ export const INITIAL_CONTEXT: RelayContext = {
   rungs_fired: [],
   cues_offered: [],
   silent_windows: 0,
+  held_silence: false,
   reached_at_rung: null,
   answer_turn_id: null,
   contribution_hash: null,
@@ -214,28 +221,32 @@ const onRung =
     return {
       to,
       label,
-      patch: { rungs_fired: [...ctx.rungs_fired, e.rung], cues_offered: e.cue_id ? [...ctx.cues_offered, { rung: e.rung, cue_id: e.cue_id }] : ctx.cues_offered },
+      patch: { rungs_fired: [...ctx.rungs_fired, e.rung], cues_offered: e.cue_id ? [...ctx.cues_offered, { rung: e.rung, cue_id: e.cue_id }] : ctx.cues_offered, held_silence: false },
       citations: e.citations,
     };
   };
 
 /** How the machine reacts to an assessed turn while the ladder is in play. */
-const onLadderTurn: Handler<"TURN_ASSESSED"> = (ctx, e) => {
+const onLadderTurn: Handler<"TURN_ASSESSED"> = (ctx, e, state) => {
   if (ctx.fallback_active) return { reject: "the fixed script is running; no turn is classified" };
   if (e.turn_state === "recalled" || e.turn_state === "new_detail_offered") {
     const rung = highest(ctx) as Rung;
     return {
       to: "recalled",
       label: rung === 1 ? "Recalled" : "Recalled, with a little help",
-      patch: { reached_at_rung: rung, answer_turn_id: e.turn_state === "new_detail_offered" ? e.turn_id : null },
+      patch: { reached_at_rung: rung, answer_turn_id: e.turn_state === "new_detail_offered" ? e.turn_id : null, held_silence: false },
       note: e.turn_state === "new_detail_offered" ? "she offered a detail of her own; it can be captured as it is" : undefined,
     };
   }
+  // A first pause is not a miss. Relay holds, says the backchannel, and waits on the same rung.
+  if (e.silent && !ctx.held_silence) {
+    return { to: state, label: "Holding", patch: { held_silence: true }, note: "first quiet window on this rung; the ladder does not climb" };
+  }
   const silent = ctx.silent_windows + (e.silent ? 1 : 0);
   if (silent >= MAX_SILENT_WINDOWS) {
-    return { to: "no_answer_today", label: "Wrapped up gently", patch: { silent_windows: silent, ending_reason: "two quiet windows on this topic" }, note: "second lost-thread signal; a kind close" };
+    return { to: "no_answer_today", label: "Wrapped up gently", patch: { silent_windows: silent, held_silence: false, ending_reason: "two quiet windows on this topic" }, note: "second lost-thread signal; a kind close" };
   }
-  return { to: "lost", label: "More help needed", patch: { silent_windows: silent } };
+  return { to: "lost", label: "More help needed", patch: { silent_windows: silent, held_silence: false } };
 };
 
 const onElaboration: Handler<"TURN_ASSESSED"> = (ctx, e) => {

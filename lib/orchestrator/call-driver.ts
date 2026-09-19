@@ -9,7 +9,7 @@
  * `TranscriptionProvider` that returns her turns for the windows `listen()`
  * hands back. What a live driver owes the engine:
  *   - `listen()` resolves on her next FINAL turn, or on silence. A window with no speech of hers is how
- *     silence is reported; the reducer decides what two of them mean.
+ *     silence is reported; the first quiet window on a rung is a hold, the next is a lost-thread signal.
  *   - `connect()` and `listen()` throw `CallUnavailableError` when nobody answers or the line drops. Any
  *     other error is a bug, and surfaces as one.
  *   - `hangUp()` ends the call AND wipes whatever audio the driver was holding (rule 8). The orchestrator

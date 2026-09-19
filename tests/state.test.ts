@@ -130,9 +130,15 @@ describe("the ladder's order, enforced here as well as in select_scaffold", () =
 
   it("two quiet windows end the topic gently; spoken misses keep climbing", () => {
     const quiet: RelayEvent = { type: "TURN_ASSESSED", turn_id: "s", turn_state: "no_answer", silent: true };
-    const once = reduceStrict(parkedIn("asking"), quiet, at(9));
+    const hold = reduceStrict(parkedIn("asking"), quiet, at(9));
+    expect(hold).toMatchObject({ state: "asking", context: { held_silence: true, silent_windows: 0 } });
+    const once = reduceStrict(hold, quiet, at(10));
     expect(once.state).toBe("lost");
-    expect(reduceStrict(reduceStrict(once, rung(2), at(10)), quiet, at(11)).state).toBe("no_answer_today");
+    const afterRung = reduceStrict(once, rung(2), at(11));
+    expect(afterRung.context.held_silence).toBe(false);
+    const holdAgain = reduceStrict(afterRung, quiet, at(12));
+    expect(holdAgain.state).toBe("reanchored");
+    expect(reduceStrict(holdAgain, quiet, at(13)).state).toBe("no_answer_today");
   });
 });
 

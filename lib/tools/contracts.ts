@@ -63,7 +63,7 @@ export const contracts = {
           spoken_as: z.string(),
           category: z.string(),
           family_sourced: z.boolean(),
-          /** False for every autobiographical or identity memory: the last rung never states one outright (EVIDENCE.md, section B). */
+          /** False for every autobiographical or identity memory: the last rung never states one outright (AGENTS.md §6.1). */
           reorientation_allowed: z.boolean(),
           last_revisited_at: iso.nullable(),
         })
@@ -124,7 +124,7 @@ export const contracts = {
         /** Verified graph ids her words touched that Relay had not yet said in this call. */
         matched_ids: z.array(id),
         conduct_signal: z.enum(CONDUCT_SIGNALS).nullable(),
-        /** What kind of prompt she was answering. Logged beside every reply: a forced choice and an open reply are not equally trustworthy (EVIDENCE.md, section C). */
+        /** What kind of prompt she was answering. Logged beside every reply: a forced choice and an open reply are not equally trustworthy (AGENTS.md §6.2). */
         response_format: z.enum(RESPONSE_FORMATS),
         response_latency_ms: z.number().int().nullable(),
       }),

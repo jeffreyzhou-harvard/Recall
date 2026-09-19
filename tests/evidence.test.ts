@@ -1,4 +1,4 @@
-/** The design choices in EVIDENCE.md that live in the engine, each held in place by a test. */
+/** Revision-4 design choices that live in the engine, each held in place by a test. */
 import { describe, expect, it } from "vitest";
 import { POLICY } from "@/fixtures";
 import { runFixture, runJudgedPath } from "@/fixtures/harness";

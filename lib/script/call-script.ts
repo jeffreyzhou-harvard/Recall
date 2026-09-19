@@ -16,7 +16,7 @@ export type ScriptLine = z.infer<typeof line>;
 /**
  * What kind of memory a topic category holds. Stating a fact outright - the ladder's last rung - has evidence
  * behind it only for procedural or functional information; for an autobiographical or identity memory it
- * shades into correction, which the evidence counsels against (EVIDENCE.md, section B). So a category says
+ * shades into correction (AGENTS.md §6.1). So a category says
  * which it is, and an autobiographical one cannot even carry a reorientation line.
  */
 export const MEMORY_KINDS = ["autobiographical", "procedural"] as const;
@@ -62,6 +62,7 @@ export const callScriptSchema = z.strictObject({
     close_not_stored: line,
     narrowing: line,
     stop_ack: line,
+    backchannel_wait: line,
     safety: line,
     family_redirect: line,
     family_nothing_yet: line,
@@ -74,7 +75,7 @@ export const callScriptSchema = z.strictObject({
   }),
   stop_phrases: z.array(z.string().min(1)).min(1),
   identity_phrases: z.array(z.string().min(1)).min(1),
-  /** How Relay talks (EVIDENCE.md, section C): one question at a time, and short sentences rather than slow ones. */
+  /** How Relay talks (AGENTS.md §6.2): one question at a time, and short sentences rather than slow ones. */
   conduct: z.strictObject({ max_questions_per_line: z.number().int().positive(), max_words_per_sentence: z.number().int().positive() }),
   unsure_phrases: z.array(z.string().min(1)).min(1),
   /** Short replies that say she is with the topic without yet saying anything about it. Relay then asks the open follow-up. */

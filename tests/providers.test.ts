@@ -152,7 +152,7 @@ describe("Muse Spark only proposes", () => {
     const { bench } = await import("./helpers");
     const pickVia = async (advisor: ScaffoldAdvisor) => {
       const b = await bench();
-      await b.service.clearRetrievalLayer(); // no preference, so the front-runners are level
+      await b.service.clearRetrievalLayer(); // no retrieval preference; person-first still keeps Maya ahead of the photo
       Object.assign(b.ctx, { scaffoldAdvisor: advisor });
       const events: RelayEvent[] = [
         { type: "CALL_SCHEDULED", person_id: "person:susan", topic_id: b.topicId, topic_label: "x", family_sourced: false, reorientation_allowed: false },
@@ -168,12 +168,13 @@ describe("Muse Spark only proposes", () => {
       for (const e of events) b.store.getState().dispatch(e, { at: b.clock.iso() });
       return b.runtime.call("select_scaffold", { topic_id: b.topicId, state: "no_answer", verified_ids: b.verified, rungs_fired: [1, 2] });
     };
-    expect(await pickVia(async (a) => ({ cue_id: "person:maya", citations: a.eligible.find((e) => e.cue_id === "person:maya")!.citations }))).toMatchObject({ rung: 3, cue: { cue_id: "person:maya" }, decided_by: "muse_spark" });
-    const fallback = { rung: 3, cue: { cue_id: "artifact:photo-cape-may" }, decided_by: "deterministic_ladder" };
-    expect(await pickVia(async () => ({ cue_id: "person:priya", citations: ["person:priya"] }))).toMatchObject(fallback); // not on offer
-    expect(await pickVia(async (a) => ({ cue_id: a.eligible[0]!.cue_id, citations: ["claim:taught-at-lincoln"] }))).toMatchObject(fallback); // cites outside the cue
-    expect(await pickVia(async () => Promise.reject(new MuseApiError(500, "down")))).toMatchObject(fallback);
-    const { spark } = sparkReturning({ cue_id: "person:maya", citations: ["person:maya"] });
-    expect(await pickVia(museScaffoldAdvisor(spark))).toMatchObject({ rung: 3, cue: { cue_id: "person:maya" }, decided_by: "muse_spark" });
+    // Person first: Maya and the photo are not a tie, so Spark is not asked. A bad or down advisor cannot promote the photo.
+    const personFirst = { rung: 3, cue: { cue_id: "person:maya" }, decided_by: "deterministic_ladder" };
+    expect(await pickVia(async (a) => ({ cue_id: "person:maya", citations: a.eligible.find((e) => e.cue_id === "person:maya")!.citations }))).toMatchObject(personFirst);
+    expect(await pickVia(async () => ({ cue_id: "person:priya", citations: ["person:priya"] }))).toMatchObject(personFirst); // not on offer
+    expect(await pickVia(async (a) => ({ cue_id: a.eligible[0]!.cue_id, citations: ["claim:taught-at-lincoln"] }))).toMatchObject(personFirst); // cites outside the cue
+    expect(await pickVia(async () => Promise.reject(new MuseApiError(500, "down")))).toMatchObject(personFirst);
+    const { spark } = sparkReturning({ cue_id: "artifact:photo-cape-may", citations: ["artifact:photo-cape-may"] });
+    expect(await pickVia(museScaffoldAdvisor(spark))).toMatchObject(personFirst);
   });
 });

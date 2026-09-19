@@ -245,7 +245,7 @@ export interface TopicFacet {
   /**
    * When in her life it is from, if a person has said. Used only to break ties when choosing a topic:
    * memories from roughly ages 6-30 are the most retrievable, then very recent ones, then the years
-   * between (EVIDENCE.md, section A). Never guessed from a date.
+   * between (AGENTS.md tool 1). Never guessed from a date.
    */
   life_period?: LifePeriod;
 }
