@@ -14,9 +14,11 @@ import { AssetIndex } from "@/lib/provenance/assets";
 import {
   EDGE_SIGNATURES,
   EDGE_TYPES,
+  EPISTEMIC_STATUSES,
   EXTRACTION_METHODS,
   NODE_TYPES,
   SOURCE_CLASSES,
+  initialStatus,
   type EdgeType,
   type GraphData,
   type GraphEdge,
@@ -36,6 +38,8 @@ const sourceSchema = z.object({
   confidence: z.number().min(0).max(1),
   audience_scope: z.array(z.string()),
   expires_at: z.iso.datetime().nullable(),
+  /** How facts from this source are known. Defaults from the source class; a seed may only lower it, e.g. to `inferred`. */
+  status: z.enum(EPISTEMIC_STATUSES).optional(),
 });
 export type SeedSource = z.infer<typeof sourceSchema>;
 
@@ -43,7 +47,7 @@ export type SeedSource = z.infer<typeof sourceSchema>;
 const propsSchemas: Record<NodeType, z.ZodType> = {
   Person: z.strictObject({
     display_name: z.string().min(1),
-    role: z.enum(["participant", "asker"]),
+    role: z.enum(["participant", "asker", "known"]),
     subject_pronoun: z.string().min(1).optional(),
   }),
   Relationship: z.strictObject({ kind: z.string().min(1), verified: z.boolean() }),
@@ -56,7 +60,7 @@ const propsSchemas: Record<NodeType, z.ZodType> = {
     received_at: z.iso.datetime(),
   }),
   Artifact: z.strictObject({
-    kind: z.enum(["photo", "audio", "message", "thread", "setup_record"]),
+    kind: z.enum(["photo", "audio", "message", "thread", "setup_record", "answer"]),
     text: z.string().nullable(),
     alt: z.string().nullable(),
   }),
@@ -76,6 +80,10 @@ const propsSchemas: Record<NodeType, z.ZodType> = {
     contribution_hash: z.string(),
     audience: z.string(),
   }),
+  Place: z.strictObject({ aliases: z.array(z.string()) }),
+  Activity: z.strictObject({ aliases: z.array(z.string()) }),
+  Story: z.strictObject({ text: z.string().min(1) }),
+  Cluster: z.strictObject({ kind: z.enum(["face", "place", "time", "theme"]), cluster_key: z.string().min(1), photo_count: z.number().int().nonnegative() }),
 };
 
 const seedNodeSchema = z.strictObject({
@@ -221,6 +229,8 @@ export function buildGraph(raw: unknown, assets: AssetIndex): GraphData {
       expires_at: source.expires_at,
       supersedes: extra.supersedes ?? [],
       contradicts: extra.contradicts ?? [],
+      status: source.status ?? initialStatus(source.source_class),
+      confirmations: [],
     };
   };
 

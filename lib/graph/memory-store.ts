@@ -1,5 +1,5 @@
-import { byId, newestAskFirst, type GraphStore } from "./store";
-import type { CurrentAskNode, GraphData, GraphEdge, GraphNode, NodeOf, NodeType } from "./types";
+import { assertSourced, byId, newestAskFirst, withConfirmation, type GraphStore } from "./store";
+import type { Confirmation, CurrentAskNode, GraphData, GraphEdge, GraphNode, NodeOf, NodeType, Provenance } from "./types";
 
 /** In-memory graph store. No I/O of any kind; safe in the browser and offline. */
 export class MemoryGraphStore implements GraphStore {
@@ -37,6 +37,11 @@ export class MemoryGraphStore implements GraphStore {
     return node ? structuredClone(node) : null;
   }
 
+  async getEdge(id: string): Promise<GraphEdge | null> {
+    const edge = this.edges.get(id);
+    return edge ? structuredClone(edge) : null;
+  }
+
   async edgesOf(id: string): Promise<GraphEdge[]> {
     const ids = this.touching.get(id);
     if (!ids) return [];
@@ -63,6 +68,15 @@ export class MemoryGraphStore implements GraphStore {
 
   async putEdge(edge: GraphEdge): Promise<void> {
     this.insertEdge(edge);
+  }
+
+  async confirm(targetId: string, confirmation: Confirmation): Promise<Provenance> {
+    assertSourced(confirmation);
+    const target = this.nodes.get(targetId) ?? this.edges.get(targetId);
+    if (!target) throw new Error(`MemoryGraphStore: nothing with id "${targetId}" to confirm`);
+    if (!this.nodes.has(confirmation.source_id)) throw new Error(`MemoryGraphStore: confirmation source "${confirmation.source_id}" is not in the graph`);
+    target.prov = withConfirmation(target.prov, confirmation);
+    return structuredClone(target.prov);
   }
 
   async snapshot(): Promise<GraphData> {

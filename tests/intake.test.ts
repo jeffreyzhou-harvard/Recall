@@ -35,11 +35,19 @@ describe("a forwarded ask", () => {
     expect(out.accepted && out.interpretation).toEqual({
       option_topic_ids: ["topic:kheer", "topic:halwa"], // from the caption, in the order she wrote them
       subject_topic_ids: ["topic:dessert"], // what both options are a kind of
+      deduced_subject_topic_ids: ["topic:dessert"], // ...which nobody said: Relay worked it out
       event_ids: ["event:diwali-2026"], // named in the message
+      mention_ids: [], // nothing from discovery is named in this ask
       depicts: { "photo-desserts": ["topic:kheer", "topic:halwa"] },
     });
     const about = (await rig.graph.edgesOf(ASK)).filter((e) => e.type === "ABOUT");
-    expect(about.every((e) => e.prov.extraction_method === "lexical_match" && e.prov.source_class === "current_ask")).toBe(true);
+    // What Anika said is hers. What Relay deduced from public facts is labeled as exactly that, never as her words.
+    expect(Object.fromEntries(about.map((e) => [e.to, `${e.prov.extraction_method}/${e.prov.status}`]))).toEqual({
+      "topic:kheer": "lexical_match/family_confirmed",
+      "topic:halwa": "lexical_match/family_confirmed",
+      "event:diwali-2026": "lexical_match/family_confirmed",
+      "topic:dessert": "rule_deduction/reference",
+    });
     expect(Object.fromEntries(about.map((e) => [e.to, e.props.role]))).toEqual({
       "topic:kheer": "option",
       "topic:halwa": "option",

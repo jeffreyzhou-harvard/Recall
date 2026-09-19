@@ -1,6 +1,6 @@
 /** Tools 4-5: policy-bounded retrieval, then verification. Only what passes both may ever be spoken. */
 import { citationOf, retrieveCandidates, type Citation } from "@/lib/graph/retrieval";
-import type { GraphNode } from "@/lib/graph/types";
+import { SPEAKABLE_AS_FACT, type GraphNode } from "@/lib/graph/types";
 import { GateError } from "../gates";
 import type { ToolImpl } from "../runtime";
 
@@ -59,6 +59,11 @@ export const verify_claim_support: ToolImpl<"verify_claim_support"> = async (inp
     }
     if (node.prov.expires_at !== null && node.prov.expires_at <= nowIso) {
       reject("expired");
+      continue;
+    }
+    // Rule 6, extended: Relay speaks only what a person confirmed. An observation or an inference is never a fact.
+    if (!SPEAKABLE_AS_FACT.has(node.prov.status)) {
+      reject(`not_confirmed:${node.prov.status}`);
       continue;
     }
     if (node.prov.asset_id !== null) {

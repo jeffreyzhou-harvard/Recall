@@ -11,7 +11,17 @@
  * ranking) live once in ./retrieval.ts and run identically over either store;
  * a parity test holds the two to the same answers.
  */
-import type { CurrentAskNode, GraphData, GraphEdge, GraphNode, NodeOf, NodeType } from "./types";
+import { statusAfter, type Confirmation, type CurrentAskNode, type GraphData, type GraphEdge, type GraphNode, type NodeOf, type NodeType, type Provenance } from "./types";
+
+export function assertSourced(c: Confirmation): void {
+  if (!c.source_id) throw new Error("a confirmation needs a source: the artifact holding the person's own words");
+}
+
+/** Shared by both stores so they cannot drift: validate, append, recompute. */
+export function withConfirmation(prov: Provenance, c: Confirmation): Provenance {
+  assertSourced(c);
+  return { ...prov, status: statusAfter(prov.status, c), confirmations: [...prov.confirmations, c] };
+}
 
 /** Newest forward first; id breaks a tie so the choice is deterministic. */
 export const newestAskFirst = (a: CurrentAskNode, b: CurrentAskNode): number =>
@@ -19,6 +29,7 @@ export const newestAskFirst = (a: CurrentAskNode, b: CurrentAskNode): number =>
 
 export interface GraphStore {
   getNode(id: string): Promise<GraphNode | null>;
+  getEdge(id: string): Promise<GraphEdge | null>;
   /** Every edge touching `id`, in either direction, ordered by edge id. */
   edgesOf(id: string): Promise<GraphEdge[]>;
   /** The most recently forwarded ask for a thread. A new forward replaces the one before it as "current". */
@@ -27,6 +38,12 @@ export interface GraphStore {
   nodesOfType<T extends NodeType>(type: T): Promise<Array<NodeOf<T>>>;
   putNode(node: GraphNode): Promise<void>;
   putEdge(edge: GraphEdge): Promise<void>;
+  /**
+   * The one thing that may change after a node or edge is written: a person confirming or disputing
+   * it. The confirmation is appended with its source and the status follows from it (`statusAfter`).
+   * Nothing else about the fact can be edited, and nothing can remove a confirmation.
+   */
+  confirm(targetId: string, confirmation: Confirmation): Promise<Provenance>;
   /** Whole graph, ordered by id. For the judge view and for parity tests. */
   snapshot(): Promise<GraphData>;
 }

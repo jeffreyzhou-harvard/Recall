@@ -165,6 +165,8 @@ async function writeAudit(ctx: ToolContext, c: Contribution, assent: ToolOutput<
     expires_at: null,
     supersedes: [],
     contradicts: [],
+    status: "reference",
+    confirmations: [],
   });
   const overall = { start_ms: Math.min(...c.intervals.map((i) => i.start_ms)), end_ms: Math.max(...c.intervals.map((i) => i.end_ms)) };
   const nodes: GraphNode[] = [

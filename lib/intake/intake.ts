@@ -11,7 +11,7 @@
  */
 import { edgeId } from "@/lib/graph/seed";
 import type { GraphStore } from "@/lib/graph/store";
-import type { EdgeType, GraphEdge, GraphNode, Provenance, SourceClass } from "@/lib/graph/types";
+import { initialStatus, type EdgeType, type GraphEdge, type GraphNode, type Provenance, type SourceClass } from "@/lib/graph/types";
 import { AssetResolutionError, type AssetIndex } from "@/lib/provenance/assets";
 import { IntakeError, parseForwardedAsk, type ForwardedAsk } from "./contract";
 import type { AskInterpretation, AskInterpreter } from "./interpret";
@@ -68,7 +68,7 @@ export async function intakeForwardedAsk(raw: unknown, deps: IntakeDeps): Promis
   const messageId = `artifact:msg:${ask.forward_id}`;
   const photoId = (assetId: string): string => `artifact:photo:${ask.forward_id}:${assetId}`;
 
-  const prov = (sourceId: string, sourceClass: SourceClass, assetId: string | null, matched = false): Provenance => ({
+  const prov = (sourceId: string, sourceClass: SourceClass, assetId: string | null, how: "said" | "matched" | "deduced" = "said"): Provenance => ({
     source_id: sourceId,
     source_class: sourceClass,
     asset_id: assetId,
@@ -76,15 +76,20 @@ export async function intakeForwardedAsk(raw: unknown, deps: IntakeDeps): Promis
     span: null,
     observed_at: ask.received_at,
     author: ask.asker_id,
-    extraction_method: matched ? "lexical_match" : "forwarded_message",
+    extraction_method: how === "said" ? "forwarded_message" : how === "matched" ? "lexical_match" : "rule_deduction",
     confidence: 1,
     audience_scope: [ask.requested_audience],
     expires_at: expiresAt,
     supersedes: [],
     contradicts: [],
+    // The asker said it, or it is an exact match of their words. What Relay worked out by rule from
+    // public reference facts is marked as exactly that: not something anyone in the family said.
+    status: how === "deduced" ? "reference" : initialStatus(sourceClass),
+    confirmations: [],
   });
   const fromMessage = prov(messageId, "current_ask", null);
-  const matchedInMessage = prov(messageId, "current_ask", null, true);
+  const matchedInMessage = prov(messageId, "current_ask", null, "matched");
+  const deducedFromOptions = prov(messageId, "current_ask", null, "deduced");
 
   const nodes: GraphNode[] = [
     { id: messageId, type: "Artifact", label: "Forwarded message", props: { kind: "message", text: ask.text, alt: null }, prov: fromMessage },
@@ -126,12 +131,16 @@ export async function intakeForwardedAsk(raw: unknown, deps: IntakeDeps): Promis
     link("SPOKEN_BY", photoId(p.asset_id), ask.asker_id, own);
     link("EVIDENCE_FOR", photoId(p.asset_id), askId, own);
     for (const topicId of interpretation.depicts[p.asset_id] ?? []) {
-      link("DEPICTS", photoId(p.asset_id), topicId, prov(photoId(p.asset_id), "ask_artifact", p.asset_id, true));
+      link("DEPICTS", photoId(p.asset_id), topicId, prov(photoId(p.asset_id), "ask_artifact", p.asset_id, "matched"));
     }
   }
   for (const topicId of interpretation.option_topic_ids) link("ABOUT", askId, topicId, matchedInMessage, { role: "option" });
-  for (const topicId of interpretation.subject_topic_ids) link("ABOUT", askId, topicId, matchedInMessage, { role: "subject" });
+  for (const topicId of interpretation.subject_topic_ids) {
+    const deduced = interpretation.deduced_subject_topic_ids.includes(topicId);
+    link("ABOUT", askId, topicId, deduced ? deducedFromOptions : matchedInMessage, { role: "subject" });
+  }
   for (const eventId of interpretation.event_ids) link("ABOUT", askId, eventId, matchedInMessage, { role: "occasion" });
+  for (const id of interpretation.mention_ids) link("ABOUT", askId, id, matchedInMessage, { role: "mention" });
 
   for (const node of nodes) await graph.putNode(node);
   for (const edge of edges) await graph.putEdge(edge);

@@ -19,6 +19,11 @@ export interface Bench extends FixtureRig {
 export async function bench(options: FixtureOptions = {}): Promise<Bench> {
   const rig = await buildFixtureRig(options);
   await rig.service.forwardAsk(rig.forward);
+  return benchOn(rig, options);
+}
+
+/** A bare tool runtime over a rig that is already set up, for tests that prepare the graph themselves. */
+export function benchOn(rig: FixtureRig, options: FixtureOptions = {}): Bench {
   const store = createRelayStore();
   const ctx: ToolContext = {
     graph: rig.graph,

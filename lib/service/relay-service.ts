@@ -13,6 +13,10 @@
 import { NOTICE_TEXT, type ThreadBridge } from "@/lib/bridge/thread-bridge";
 import type { Clock, FixtureClock } from "@/lib/clock";
 import type { GraphStore } from "@/lib/graph/store";
+import { LexicalAnswerInterpreter, applyAnswer, type Answer, type AnswerInterpreter, type ApplyResult } from "@/lib/discovery/answers";
+import { findGaps } from "@/lib/discovery/gaps";
+import { ingestLibrary, type IngestResult } from "@/lib/discovery/ingest";
+import { assertSpeakable, questionFor, type Question } from "@/lib/discovery/questions";
 import { IntakeError, type IntakeRejection } from "@/lib/intake/contract";
 import { intakeForwardedAsk, type IntakeResult } from "@/lib/intake/intake";
 import { LexicalAskInterpreter, type AskInterpreter } from "@/lib/intake/interpret";
@@ -35,6 +39,8 @@ export interface RelayDeps {
   /** Places the call once the policy has been granted. Never invoked before that. Null means this deployment cannot call. */
   callDriver: (() => CallDriver) | null;
   interpreter?: AskInterpreter;
+  /** Reads facts out of an answer. It only proposes: applyAnswer decides what is grounded enough to keep. */
+  answerInterpreter?: AnswerInterpreter;
   runtime?: {
     faults?: Fault[];
     fixtureLatency?: { clock: FixtureClock; ms: Partial<Record<ToolName, number>>; default_ms: number };
@@ -55,9 +61,42 @@ export interface SessionRun {
 
 export class RelayService {
   private readonly interpreter: AskInterpreter;
+  private readonly answerInterpreter: AnswerInterpreter;
 
   constructor(private readonly deps: RelayDeps) {
     this.interpreter = deps.interpreter ?? new LexicalAskInterpreter();
+    this.answerInterpreter = deps.answerInterpreter ?? new LexicalAnswerInterpreter();
+  }
+
+  // --- discovery loop: photos -> questions -> answers -> richer graph --------------------------------------
+  // Pull-based on purpose. Relay never schedules a question or starts a conversation: someone opens a
+  // sitting and asks what Relay would like to know. No sitting, no questions.
+
+  /** Observations from a photo library the family shared. Refused unless the joint setup allows it, kind by kind. */
+  ingestLibrary(observations: unknown, grantedBy: string): Promise<IngestResult> {
+    return ingestLibrary(observations, { graph: this.deps.graph, assets: this.deps.assets, policy: this.deps.policy, granted_by: grantedBy });
+  }
+
+  /** What Relay does not know yet, most useful first, each already worded and checked to cite only what it may. */
+  async nextQuestions(limit = 3, askedThisSitting: ReadonlySet<string> = new Set()): Promise<Question[]> {
+    const { graph, policy } = this.deps;
+    if (!policy.discovery.enabled) return [];
+    const gaps = await findGaps(graph, { participant_id: policy.person_id, invite_her_confirmation: policy.discovery.invite_her_confirmation, asked_this_session: askedThisSitting });
+    const questions: Question[] = [];
+    for (const gap of gaps.slice(0, limit)) {
+      const q = await questionFor(gap, graph, policy.person_id);
+      await assertSpeakable(q, graph);
+      questions.push(q);
+    }
+    return questions;
+  }
+
+  /** Someone answered. Only what they literally said is kept as fact; see lib/discovery/answers.ts. */
+  async answerQuestion(question: Question, answer: Answer): Promise<ApplyResult> {
+    const { graph, policy } = this.deps;
+    const speaker = { id: answer.by, is_participant: answer.by === policy.person_id };
+    const proposals = await this.answerInterpreter.interpret(question, answer, speaker, policy.person_id);
+    return applyAnswer(question, answer, proposals, { graph, policy });
   }
 
   /**

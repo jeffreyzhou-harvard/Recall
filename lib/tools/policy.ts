@@ -34,10 +34,27 @@ export const policySchema = z
     ask_ttl_hours: z.number().int().positive(),
     /** Who receives the non-clinical support receipt after a delivery. Sent to them directly, never to the thread. */
     support_receipt: z.strictObject({ recipients: z.array(z.string()) }),
+    /**
+     * The discovery loop: learning her world from photos the family shares, and from what she and they
+     * say about them. Off unless the joint setup turned it on. Each kind of looking is its own consent:
+     * a family can share photos and still say no to faces being grouped, or to places being read.
+     */
+    discovery: z.strictObject({
+      enabled: z.boolean(),
+      /** Who gave access to the photos. Only they - or she - can start an ingest. */
+      photo_access_granted_by: z.array(z.string()),
+      observe: z.strictObject({ faces: z.boolean(), places: z.boolean(), times: z.boolean(), themes: z.boolean() }),
+      /** May Relay invite HER to say who someone is when the family already told it? Off by default: see lib/discovery/gaps.ts. */
+      invite_her_confirmation: z.boolean(),
+    }),
   })
   .refine((p) => p.support_receipt.recipients.every((r) => p.approved_people.includes(r)), {
     message: "support receipt recipients must be approved people",
     path: ["support_receipt", "recipients"],
+  })
+  .refine((p) => p.discovery.photo_access_granted_by.every((g) => g === p.person_id || p.approved_people.includes(g)), {
+    message: "photo access can only be granted by her or by an approved person",
+    path: ["discovery", "photo_access_granted_by"],
   });
 export type AccessPolicy = z.infer<typeof policySchema>;
 

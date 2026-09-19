@@ -68,6 +68,8 @@ export const contracts = {
       option_topic_ids: z.array(id),
       topic_ids: z.array(id),
       event_ids: z.array(id),
+      /** People, places, activities, and preferences the ask names that she or the family already told Relay about. */
+      mention_ids: z.array(id),
       requested_audience: id,
       received_at: iso,
       expires_at: iso.nullable(),

@@ -10,12 +10,13 @@
  * columns so Cypher can use them.
  */
 import { createRequire } from "node:module";
-import { byId, newestAskFirst, type GraphStore } from "./store";
+import { assertSourced, byId, newestAskFirst, withConfirmation, type GraphStore } from "./store";
 import {
   EDGE_SIGNATURES,
   EDGE_TYPES,
   NODE_LAYER,
   NODE_TYPES,
+  type Confirmation,
   type CurrentAskNode,
   type EdgeType,
   type GraphData,
@@ -23,6 +24,7 @@ import {
   type GraphNode,
   type NodeOf,
   type NodeType,
+  type Provenance,
   type SourceClass,
 } from "./types";
 
@@ -99,6 +101,15 @@ export class LadybugGraphStore implements GraphStore {
     return rows[0] ? LadybugGraphStore.toNode(rows[0]) : null;
   }
 
+  async getEdge(id: string): Promise<GraphEdge | null> {
+    const rows = await this.run(
+      "MATCH (a)-[r]->(b) WHERE r.id = $id RETURN r.id AS id, label(r) AS type, a.id AS src, b.id AS dst, r.props AS props, r.prov AS prov",
+      { id },
+    );
+    const r = rows[0];
+    return r ? { id: r.id as string, type: r.type as EdgeType, from: r.src as string, to: r.dst as string, props: JSON.parse(r.props as string), prov: JSON.parse(r.prov as string) } : null;
+  }
+
   async edgesOf(id: string): Promise<GraphEdge[]> {
     const rows = await this.run(
       "MATCH (a)-[r]->(b) WHERE a.id = $id OR b.id = $id " +
@@ -173,6 +184,22 @@ export class LadybugGraphStore implements GraphStore {
         source_class: edge.prov.source_class,
       },
     );
+  }
+
+  async confirm(targetId: string, confirmation: Confirmation): Promise<Provenance> {
+    assertSourced(confirmation);
+    if (!(await this.getNode(confirmation.source_id))) throw new Error(`LadybugGraphStore: confirmation source "${confirmation.source_id}" is not in the graph`);
+    const node = await this.getNode(targetId);
+    if (node) {
+      const prov = withConfirmation(node.prov, confirmation);
+      await this.run(`MATCH (n:${node.type}) WHERE n.id = $id SET n.prov = $prov`, { id: targetId, prov: JSON.stringify(prov) });
+      return prov;
+    }
+    const rows = await this.run("MATCH (a)-[r]->(b) WHERE r.id = $id RETURN label(r) AS type, r.prov AS prov", { id: targetId });
+    if (!rows[0]) throw new Error(`LadybugGraphStore: nothing with id "${targetId}" to confirm`);
+    const prov = withConfirmation(JSON.parse(rows[0].prov as string) as Provenance, confirmation);
+    await this.run(`MATCH (a)-[r:${rows[0].type as string}]->(b) WHERE r.id = $id SET r.prov = $prov`, { id: targetId, prov: JSON.stringify(prov) });
+    return prov;
   }
 
   async snapshot(): Promise<GraphData> {

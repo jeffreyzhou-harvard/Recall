@@ -36,11 +36,12 @@ const params: RetrievalParams = {
 };
 
 describe("schema", () => {
-  it("has the twelve node types and sixteen edge types the brief names, each node in exactly one layer", () => {
-    expect(NODE_TYPES).toHaveLength(12);
-    expect(EDGE_TYPES).toHaveLength(16);
+  it("has the node and edge types the brief names, each node in exactly one layer", () => {
+    // Twelve for the participation loop, plus Place, Activity, Story, and Cluster for the discovery loop.
+    expect(NODE_TYPES).toHaveLength(16);
+    expect(EDGE_TYPES).toHaveLength(17); // the original sixteen, plus IDENTIFIED_AS
     expect(Object.keys(NODE_LAYER).sort()).toEqual([...NODE_TYPES].sort());
-    expect(schemaDdl()).toHaveLength(28);
+    expect(schemaDdl()).toHaveLength(33);
   });
 });
 

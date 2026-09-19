@@ -7,7 +7,7 @@
  * the policy filter doing real work.
  */
 import type { GraphStore } from "./store";
-import type { EdgeType, GraphEdge, GraphNode, MediaSpan, NodeType, SourceClass } from "./types";
+import { SPEAKABLE_AS_FACT, type EdgeType, type GraphEdge, type GraphNode, type MediaSpan, type NodeType, type SourceClass } from "./types";
 
 /**
  * Only topical edges are walked. Walking SPOKEN_BY or ADDRESSED_TO would put
@@ -23,9 +23,11 @@ const CLASS_RANK: Record<SourceClass, number> = {
   current_ask: 0,
   ask_artifact: 1,
   prior_claim_with_source: 2,
-  joint_setup: 3,
-  public_reference: 4,
-  session_audit: 5,
+  discovery_answer: 3,
+  joint_setup: 4,
+  public_reference: 5,
+  photo_library: 6,
+  session_audit: 7,
 };
 
 export interface Citation {
@@ -52,6 +54,7 @@ export interface CandidateSubgraph {
 }
 
 export type ExclusionReason =
+  | "not_confirmed"
   | "source_class_not_allowed"
   | "expired"
   | "audience_out_of_scope"
@@ -106,7 +109,8 @@ async function walk(store: GraphStore, startId: string, maxHops: number): Promis
   for (let hop = 1; hop <= maxHops; hop++) {
     const next: Reached[] = [];
     for (const at of frontier) {
-      const edges: GraphEdge[] = (await store.edgesOf(at.node.id)).filter((e) => TRAVERSABLE.has(e.type));
+      // An unconfirmed edge is not a path: a guess that two things are related must not make one reachable from the other.
+      const edges: GraphEdge[] = (await store.edgesOf(at.node.id)).filter((e) => TRAVERSABLE.has(e.type) && SPEAKABLE_AS_FACT.has(e.prov.status));
       for (const edge of edges) {
         const otherId = edge.from === at.node.id ? edge.to : edge.from;
         if (seen.has(otherId)) continue;
@@ -145,7 +149,9 @@ export async function retrieveCandidates(store: GraphStore, params: RetrievalPar
   for (const r of reached) {
     const p = r.node.prov;
     let reason: ExclusionReason | null = null;
-    if (!allowed.has(p.source_class)) reason = "source_class_not_allowed";
+    // First, always: an observation or an inference is not context, whatever the policy allows.
+    if (!SPEAKABLE_AS_FACT.has(p.status)) reason = "not_confirmed";
+    else if (!allowed.has(p.source_class)) reason = "source_class_not_allowed";
     else if (p.expires_at !== null && p.expires_at <= params.now_iso) reason = "expired";
     else if (!p.audience_scope.includes(params.audience)) reason = "audience_out_of_scope";
     else {

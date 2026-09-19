@@ -12,7 +12,17 @@ Relay is an adaptive participation layer for one live, current family interactio
 
 Demo thesis line: **Access changed. Authorship didn't.**
 
-Relay is NOT a memory archive, a companion app, a reminiscence tool, or a simulated persona. Remento, Kin, KindredMind, and Memry already own those. The wedge is live contribution to a current family decision, while the person is here.
+**Two loops, one graph.** Relay builds a living personal context graph from the evidence already around someone - photos, people, places, events, and what she and her family say about them - and expands it through small, meaningful questions. That graph is what lets a family ask simply name "Maya" or "Diwali" without explaining who and what those are.
+
+```
+DISCOVERY      photos -> observations -> knowledge gap -> question -> answer -> richer graph
+                                                                                  |
+PARTICIPATION  family ask -> context -> her own words -> her yes -> family   <----+
+```
+
+The family is never asked to build a biography database by hand: the photo library seeds the graph and conversation grows it. The graph is evidence-based, never model-invented (rule 10). Say "Relay continuously personalizes its context graph and prompting policy" - never "the AI keeps training": there is no model training here, only indexing, graph storage, retrieval, and question generation.
+
+Relay is still NOT a companion app, a simulated persona, or a story-publishing product. Remento, Kin, KindredMind, and Memry own `prompt -> answer -> story`. Relay's discovery loop exists to feed the participation loop; on its own it would be "Remento for dementia" and is not worth presenting. The wedge remains live contribution to a current family decision, while the person is here.
 
 ## 2. Non-negotiables (override every other instruction)
 
@@ -21,12 +31,13 @@ These rules exist because the user is a real person with reduced capacity to aud
 1. **Zero generated first-person words.** Never write, polish, paraphrase, or synthesize text or speech as Mom. Outbound artifacts contain only her recorded words. The only permitted edit is silence/disfluency trimming, listed explicitly.
 2. **No voice cloning.** Her audio is played back, never synthesized. If Relay speaks prompts, that voice is clearly labeled as Relay, never as her or a family member.
 3. **Assent gates delivery.** Nothing publishes without her recorded yes to the exact artifact and exact audience. Any content or audience change invalidates assent. Unclear assent means nothing sends.
-4. **No inferred clinical or emotional state.** The system never produces diagnosis, disease stage, mood, competence, or cognition scores. `assess_conversation_state` emits observable turn states only. The caregiver receipt describes what Relay made possible, never rates her.
-5. **No autonomous outreach.** Relay only acts on a forwarded ask from an approved person. It never initiates contact with the family on her behalf.
+4. **No inferred clinical or emotional state, and never a test.** The system never produces diagnosis, disease stage, mood, competence, or cognition scores. `assess_conversation_state` emits observable turn states only. The caregiver receipt describes what Relay made possible, never rates her. In discovery: a question is only ever about something Relay does not know; once she has said a thing, Relay never asks it again to see if she remembers. Nothing about how a question went - which rung of support, how long, whether she answered - is stored, so no memory score can be assembled, by us or by anyone with the data. "Retrieve when possible. Recognize when necessary. Never turn remembering into a test." Do not call this "active recall" anywhere: that is the language of study and rehabilitation (rule 9).
+5. **No autonomous outreach.** Relay only acts on a forwarded ask from an approved person. It never initiates contact with the family on her behalf. Discovery is pull-based too: someone opens a sitting and asks what Relay would like to know. Relay never schedules a question, a call, or a check-in.
 6. **Evidence-bounded speech.** Relay may verbalize only facts with citations returned by `verify_claim_support`. No citations, no speech.
 7. **Hard fail on missing gates.** If identity, policy, evidence, or assent is missing or mismatched, the flow stops. A safe narrowing ("I don't have enough context to answer that for you. I can ask Anika to clarify.") is a success state, not an error to route around.
-8. **Data minimization.** Ingest only: the forwarded ask (text + one photo + asker identity), the one-time joint setup (approved people, call windows, topic allow/block lists, speech pace, max call length, review requirements), and from each call only the approved contribution, literal transcript, assent audio, and accessibility telemetry (response latency, thread-loss events, which scaffold fired). Delete unapproved call audio at call end. Never ingest full chat history, health records, location, unapproved contacts, or continuous audio. Never build a decline/analytics dashboard about her.
+8. **Data minimization, by consent.** Ingest only: a photo library the family chose to share, under the joint setup's `discovery` consent, where each kind of looking (faces, places, times, themes) is its own yes or no; what she and approved relatives say in answer to Relay's questions; the forwarded ask (text + one photo + asker identity), the one-time joint setup (approved people, call windows, topic allow/block lists, speech pace, max call length, review requirements), and from each call only the approved contribution, literal transcript, assent audio, and accessibility telemetry (response latency, thread-loss events, which scaffold fired). Delete unapproved call audio at call end. From photos Relay keeps observations (this face recurs; these were taken in one place), never a face embedding and never an identity it worked out itself. Never ingest full chat history, health records, live location, unapproved contacts, or continuous audio. Never build a decline/analytics dashboard about her.
 9. **No medical claims.** Frame Relay as cognitive-accessibility support for participation and family connection. No treatment, improvement, or monitoring claims anywhere: code, copy, demo, or write-up.
+10. **Inference never silently becomes fact.** Every node and edge carries how it is known: `observed` (seen in evidence), `inferred` (worked out), `family_confirmed`, `participant_confirmed`, `disputed`, or `reference`. Only a person saying so, recorded with its source, can raise a status (`GraphStore.confirm`); no code path promotes an observation or an inference. Only confirmed facts are spoken, retrieved, matched in an ask, or used to verify identity. Any proposer of facts - a lexical matcher or a model - is held to the person's literal words: a name that is not in what they said is rejected, and relations come from a closed list (`lib/graph/relations.ts`). If two people say different things, both are set aside; Relay does not pick.
 
 ## 3. Competition targets
 
@@ -94,9 +105,13 @@ Enforceable sequence: inspect request -> verify identities -> get policy -> quer
 
 Keep the graph compact and private. Do not import a large ontology or FHIR. This is not a clinical record.
 
-**Node types (12):** Person, Relationship, CurrentAsk, Artifact (photo/audio/message), Topic, EpisodicClaim, Preference/Expertise, Event, AccessPolicy, Session, Contribution, Assent.
+**Node types (16):** the six things the graph is *about* - People, Places, Events, Activities, Preferences, Stories (`Person`, `Place`, `Event`, `Activity`, `PreferenceExpertise`, `Story`) - plus `Cluster` (a recurring face, place, time, or theme across photos: an observation, never an identity), plus the machinery of the participation loop: Relationship, CurrentAsk, Artifact (photo/audio/message/answer), Topic, EpisodicClaim, AccessPolicy, Session, Contribution, Assent.
 
-**Edges:** ASKED_BY, ADDRESSED_TO, MEMBER_OF_THREAD, DEPICTS, ABOUT, EVIDENCE_FOR, SPOKEN_BY, RELATED_TO, OCCURRED_AT, PERMITTED_IN, RELEVANT_TO, CONTRADICTS, DERIVED_FROM, INCLUDED_SPAN, APPROVED_BY, DELIVERED_TO.
+**Edges contain the meaning.** `Susan --child--> Maya` is a `RELATED_TO` edge whose `relation` comes from the closed vocabulary in `lib/graph/relations.ts` (child, parent, sibling, spouse, grandchild, grandparent, friend, relative, lived_in, worked_at, visited, attended, enjoys, prefers, took_place_at). The relation is plain and ungendered; the word the person actually used ("daughter") is kept beside it as `said_as` and is what is shown and spoken. A face is never renamed: `Cluster --IDENTIFIED_AS--> Person` records that someone said who it is, with their source, so "Person 3" becoming "Maya" is one new edge and the observation underneath stays an observation.
+
+**Every edge retains its sources**, and gains more over time: "Susan said this - Sept 19", "Photo evidence - 32 photos", "Confirmed by Maya". These are `prov.confirmations`, appended by `GraphStore.confirm` - the only mutation the stores allow.
+
+**Edges (17):** ASKED_BY, ADDRESSED_TO, MEMBER_OF_THREAD, DEPICTS, ABOUT, EVIDENCE_FOR, SPOKEN_BY, RELATED_TO, OCCURRED_AT, PERMITTED_IN, RELEVANT_TO, CONTRADICTS, DERIVED_FROM, INCLUDED_SPAN, APPROVED_BY, DELIVERED_TO, IDENTIFIED_AS.
 
 **Every claim and edge carries:** source_id, exact span or media hash, observed_at, speaker/author, extraction method, confidence, audience scope, expiry, and supersedes/contradicts links. No inferred diagnosis, mood, competence, or relationship is ever stored as fact.
 
@@ -119,6 +134,9 @@ Keep the graph compact and private. Do not import a large ontology or FHIR. This
 /components          SandboxShell, FamilyThread, CallStage, CueCard,
                      AgentTrace, AuthorshipRibbon, ContributionCard,
                      AssentGate, DemoControls
+/lib/discovery       the discovery loop: ingest (photo observations, by consent), gaps
+                     (what Relay does not know), questions (the support ladder), answers
+                     (the one guarded door through which a graph can grow)
 /lib/intake          request intake: the forwarded-ask contract (text + at most one
                      photo, nothing else), lexical interpretation, graph writes
 /lib/bridge          the neutral seam to the family's existing thread; refuses any
@@ -216,12 +234,14 @@ End-card metrics the demo must be able to show: 100% her words in the artifact, 
 
 ## 14. Non-goals (do not build, do not "just add")
 
-- A companion app, daily check-in calls, reminders, or reminiscence prompts.
-- A memory archive, life story book, or searchable family history.
+- A companion app, daily check-in calls, reminders, or anything Relay initiates on a schedule.
+- A life story book, a published or polished biography, or a searchable family history product. Her stories are kept verbatim as context; Relay never writes, tidies, or summarizes them (rule 1).
+- Memory exercises, quizzes, recall practice, streaks, or progress of any kind (rule 4).
 - Speech-to-story rewriting or any polished narrative in her name.
 - Voice cloning or a "what Mom would say" mode, including posthumous simulation.
 - Diagnosis, staging, mood detection, cognition scoring, or caregiver decline dashboards.
-- Face recognition, location features, health-record import, continuous recording.
+- Recognizing WHO a face is. Relay may group faces that recur, with consent; only a person ever says who they are. No face embeddings in the graph, no matching against anyone outside her own library.
+- Live location, health-record import, continuous recording.
 - Facebook Graph API or any mocked social integration.
 - Hardware, robotics, or sensors.
 - A large ontology, FHIR, or any clinical data model.
@@ -260,3 +280,21 @@ The product has two surfaces: a Telegram bot, which is the family's existing thr
 - **The voice card's audio** is the kept spans cut byte-for-byte from the source recording (`lib/provenance/wav.ts`): no re-encoding. It is sent as a WAV document; transcoding to OGG/Opus would make it a voice bubble but is a re-encode, so decide that deliberately.
 - **Modes** (`RELAY_CALL`): `none` is intake only, because there is no telephony yet and Relay does not pretend otherwise. `prerecorded` runs the session against the prerecorded golden call for the side demo; say so when showing it. If Telegram cannot be reached at delivery, the run ends `not_sent` and the failure is recorded in `recording.delivery_failures`.
 - Operate it with `npm run telegram -- whoami | setup | discover | poll | webhook <https-url> | webhook:off`. The webhook requires `TELEGRAM_WEBHOOK_SECRET` and rejects any request without it.
+
+## 18. Discovery loop
+
+`RelayService` exposes it as three pull-based calls; nothing runs unless someone opens a sitting.
+
+```ts
+await relay.ingestLibrary(observations, grantedBy);   // photos -> observations. Refused unless policy.discovery allows it, kind by kind
+const questions = await relay.nextQuestions(3);       // knowledge gaps, most useful first, already worded and citation-checked
+await relay.answerQuestion(question, answer);         // only what was literally said is kept as fact
+```
+
+- **Onboarding for the hackathon:** 20-50 photos, not a 30,000-photo camera roll. `upload -> cluster faces -> read EXIF/scene -> candidate nodes -> identify 3 anchors -> ask -> graph visibly expands`. The analyzer (face grouping, EXIF, themes) sits behind `PhotoAnalyzer` in `lib/discovery/ingest.ts` and is NOT implemented: it is a model concern. Its output contract has no field for a name, an identity, a relationship, or an embedding, and rejects unknown fields. It does not claim "this is your daughter Maya"; it says "this person appears in many of your photos. Who is this?"
+- **Gaps are shapes in the graph, not topics a model found interesting** (`gaps.ts`): an unnamed recurring face/place/time (`unidentified`, largest first - the anchors); a named person with no stated tie to her (`how_related`); a named person who recurs with no story of hers yet (`tell_me_about`, an invitation with no right answer). Co-occurrence is real context: once Maya is named, the question about a place she appears in says so. The more the graph holds, the more specific the next question - which is why the family's work goes down as context goes up.
+- **The support ladder** (`questions.ts`): open -> cue -> recognition -> tell, moving on the same observable turn states as the call's scaffold ladder. A rung exists only if a person's confirmed word can fill it: Relay can cue "someone in your family", offer "Maya or Priya?", or tell her "This is Maya, your daughter" only when someone actually told it that. `observation` segments cite observed things and are worded as observations; `fact` segments cite confirmed things; `assertSpeakable` throws otherwise. Names to choose between are alphabetical so order never hints.
+- **`invite_her_word` is off by default** (`policy.discovery.invite_her_confirmation`). It is the one gap where the family already told Relay the answer and Relay invites HER to say it. That can be an act of authorship or an unwelcome quiz, and only a family can judge which - so they decide. It stops for good the first time she says it.
+- **Answers** (`answers.ts`): `applyAnswer` is the single door. Grounded (names and her words must appear literally), closed vocabulary, stated-versus-inferred, sourced, all-or-nothing. A face someone already mentioned by name joins that person rather than creating a second one.
+- **What it gives the participation loop:** intake matches confirmed People/Places/Activities/Preferences by name (`mention_ids`), and a tie she stated can satisfy the identity gate. Being known grants nothing: whether someone may ask is still only the access policy's decision.
+- **The demo cast in this section's source pitch differs from the fixed golden path.** The pitch used Susan / Maya (daughter) / Anika (granddaughter) and "gulab jamun or rasmalai"; section 4 is still Mom / Anika and "kheer or halwa", and the fixtures follow section 4. Decide one cast and re-lock section 4 before recording anything.

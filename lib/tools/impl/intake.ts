@@ -1,6 +1,7 @@
 /** Tools 1-3: inspect the forwarded ask, verify who is involved, and evaluate the policy. */
 import { edgeId } from "@/lib/graph/seed";
-import { RELAY_AGENT_ID, type ArtifactNode, type GraphEdge, type PersonNode, type RelationshipNode } from "@/lib/graph/types";
+import { relationOf } from "@/lib/graph/relations";
+import { RELAY_AGENT_ID, SPEAKABLE_AS_FACT, type ArtifactNode, type GraphEdge, type PersonNode, type RelationshipNode } from "@/lib/graph/types";
 import { GateError } from "../gates";
 import { evaluatePolicy } from "../policy";
 import type { ToolImpl } from "../runtime";
@@ -28,10 +29,12 @@ export const inspect_request: ToolImpl<"inspect_request"> = async (input, ctx) =
 
   const topicIds: string[] = [];
   const eventIds: string[] = [];
+  const mentionIds: string[] = [];
   for (const e of out(edges, "ABOUT", ask.id)) {
     const node = await ctx.graph.getNode(e.to);
     if (node?.type === "Topic") topicIds.push(node.id);
-    if (node?.type === "Event") eventIds.push(node.id);
+    else if (node?.type === "Event") eventIds.push(node.id);
+    else if (node) mentionIds.push(node.id);
   }
 
   const result = {
@@ -46,6 +49,7 @@ export const inspect_request: ToolImpl<"inspect_request"> = async (input, ctx) =
     option_topic_ids: ask.props.option_topic_ids,
     topic_ids: topicIds.sort(),
     event_ids: eventIds.sort(),
+    mention_ids: mentionIds.sort(),
     requested_audience: ask.props.requested_audience,
     received_at: ask.props.received_at,
     expires_at: ask.prov.expires_at,
@@ -96,6 +100,15 @@ export const resolve_identity_and_relationships: ToolImpl<"resolve_identity_and_
         verified_by: rel.prov.source_id,
       });
     }
+  }
+  // ...or by a tie she, or an approved relative, stated in discovery ("That's my daughter Maya"). Only a
+  // CONFIRMED tie counts: a relationship Relay merely inferred verifies nobody. And a verified tie is not
+  // permission - whether this person may ask at all is still the access policy's decision, next.
+  for (const e of await ctx.graph.edgesOf(ask.addressee_id)) {
+    const between = [e.from, e.to];
+    if (relationOf(e) === null || !SPEAKABLE_AS_FACT.has(e.prov.status)) continue;
+    if (!between.includes(ask.asker_id) || !between.includes(ask.addressee_id)) continue;
+    relationships.push({ relationship_id: e.id, kind: relationOf(e)!, between: [ask.addressee_id, ask.asker_id], verified_by: e.prov.source_id });
   }
   if (relationships.length === 0) {
     mismatches.push({ participant: ask.asker_id, reason: "no verified relationship to the addressee" });
@@ -163,7 +176,7 @@ export const get_access_policy: ToolImpl<"get_access_policy"> = async (input, ct
       from: artifact.artifact_id,
       to: token.policy_id,
       props: { policy_token_id: token.token_id },
-      prov: { ...source, author: RELAY_AGENT_ID, extraction_method: "system_event", observed_at: nowIso, span: null },
+      prov: { ...source, author: RELAY_AGENT_ID, extraction_method: "system_event", observed_at: nowIso, span: null, status: "reference", confirmations: [] },
     });
   }
   return {
