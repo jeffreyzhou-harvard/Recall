@@ -44,7 +44,37 @@ export interface RunResult {
 type Prompt = ToolOutput<"render_prompt">;
 const isDropped = (e: unknown): boolean => e instanceof Error && e.name === "CallUnavailableError";
 
+/**
+ * The open line, held apart from the walk below so that it can ALWAYS be closed. Hanging up is what wipes
+ * her audio from wherever the call was held (rule 8), so it must happen on every way out - including an
+ * error nobody planned for - and it happens once.
+ */
+class OpenLine {
+  private driver: CallDriver | null = null;
+  private done = false;
+
+  attach(driver: CallDriver): void {
+    this.driver = driver;
+  }
+
+  readonly hangUp = async (): Promise<void> => {
+    if (!this.driver || this.done) return;
+    this.done = true;
+    await this.driver.hangUp();
+  };
+}
+
 export async function runRecallCall(env: RunEnv): Promise<RunResult> {
+  const openLine = new OpenLine();
+  try {
+    return await walk(env, openLine);
+  } finally {
+    // If an error is on its way out, it is the one that surfaces: a failure to hang up must not replace it.
+    await openLine.hangUp().catch(() => undefined);
+  }
+}
+
+async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
   const { ctx, runtime, store } = env;
   const machine = (): MachineState => store.getState().machine;
   const ended = (): boolean => TERMINAL.has(machine().state);
@@ -116,6 +146,7 @@ export async function runRecallCall(env: RunEnv): Promise<RunResult> {
 
     if (!env.callDriver) throw new Error("the policy granted the call but this deployment has no way to place one");
     driver = env.callDriver();
+    openLine.attach(driver);
     try {
       await driver.connect();
     } catch (e) {
@@ -271,12 +302,12 @@ export async function runRecallCall(env: RunEnv): Promise<RunResult> {
     } else throw e;
   }
 
-  return finish(env, connected ? driver : null, connected);
+  return finish(env, connected ? openLine.hangUp : null, connected);
 }
 
-async function finish(env: RunEnv, driver: CallDriver | null, connected: boolean): Promise<RunResult> {
+async function finish(env: RunEnv, hangUp: (() => Promise<void>) | null, connected: boolean): Promise<RunResult> {
   const { ctx, runtime, store } = env;
-  if (driver) await driver.hangUp();
+  if (hangUp) await hangUp();
 
   // Rule 8: at call end, anything she did not confirm is dropped. Only a committed contribution is kept.
   if (ctx.session.stored === null && (ctx.session.contribution !== null || ctx.session.call_asset_id !== null)) {
