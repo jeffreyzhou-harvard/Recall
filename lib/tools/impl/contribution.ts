@@ -82,18 +82,27 @@ export const capture_exact_contribution: ToolImpl<"capture_exact_contribution"> 
   return contribution;
 };
 
-const YES = /^(yes|yeah|yep|please do|send it|ok|okay|sure|go ahead)\b/;
-/** A refusal anywhere in the reply counts, not only one that opens it: "yes, wait" is not a yes. */
-const NO = /\b(no|nope|not|don't|dont|wait|stop)\b/;
+/**
+ * Assent is an allow-list, not a deny-list. No list of refusal words can be complete - "never mind",
+ * "cancel that", "change it first", "send it to someone else" are all ways of not saying yes - so a
+ * reply counts as yes only when EVERY word in it is part of saying yes, and at least one of them
+ * actually says it. Anything else she might add, of any kind, makes it not a clean yes (rule 3).
+ *
+ * The cost is deliberate: "yes, go ahead and send it along" is unclear, and nothing sends. Relay can
+ * be asked again; her words cannot be unsent. English only, like the rest of the lexical rules here.
+ */
+const YES_WORDS = new Set(["yes", "yeah", "yep", "yup", "ok", "okay", "sure", "please", "do", "send", "it", "that", "go", "ahead", "and", "thanks", "thank", "you"]);
+const SAYS_YES = /\b(yes|yeah|yep|yup|ok|okay|sure|please do|send it|do it|do that|go ahead)\b/;
+const OPENS_WITH_YES = /^(yes|yeah|yep|yup|ok|okay|sure|please do|send it|go ahead)\b/;
+/** Used only to tell a plain "no" from an unclear reply, for the record. It can never make something a yes. */
+const REFUSES = /\b(no|nope|not|don't|dont|wait|stop)\b/;
 
 function classifyAssent(transcript: string): AssentDecision {
-  const said = tokens(transcript).join(" ");
-  const yes = YES.test(said);
-  const no = NO.test(said);
-  // Anything short of a clean yes is not a yes. A mixed reply is unclear, and unclear never sends.
-  if (yes && !no) return "yes";
-  if (no && !yes) return "no";
-  return "unclear";
+  const words = tokens(transcript);
+  const said = words.join(" ");
+  if (words.length > 0 && words.every((w) => YES_WORDS.has(w)) && SAYS_YES.test(said)) return "yes";
+  // Neither of these sends anything. A reply that opens with a yes and then adds to it is unclear, not a no.
+  return REFUSES.test(said) && !OPENS_WITH_YES.test(said) ? "no" : "unclear";
 }
 
 export const request_assent: ToolImpl<"request_assent"> = async (input, ctx) => {

@@ -96,6 +96,25 @@ describe("assent that is not a clean yes", () => {
     }
   });
 
+  it("publishes on nothing but a clean yes: no list of refusal words could ever be complete", async () => {
+    // Every one of these opens with a yes-word, contains no "no", and is not a yes. The last asks for a different audience.
+    for (const reply of ["Okay, never mind.", "Yes, cancel that.", "Sure, but change it first.", "Okay, let me think about it.", "Yeah, actually delete it.", "Sure, send it to Rohan instead."]) {
+      expect(await decisionFor(reply), reply).toBe("unclear");
+    }
+  });
+
+  it("still hears the ordinary ways of saying yes", async () => {
+    for (const reply of ["Yes.", "Yes please.", "Yeah, send it.", "Okay, go ahead.", "Sure, please do. Thank you."]) {
+      const run = await runFixture({ transcript: assentReplyCall(reply) });
+      expect((run.runtime.log.find((c) => c.tool === "request_assent")!.output as { decision: string }).decision, reply).toBe("yes");
+      expect(run.recording.final_state, reply).toBe("delivered");
+    }
+  });
+
+  it("does not take politeness alone for a yes", async () => {
+    for (const reply of ["Thank you.", "Please.", "It."]) expect(await decisionFor(reply), reply).toBe("unclear");
+  });
+
   it("hears a refusal that does not open the reply", async () => {
     expect(await decisionFor("Please don't.")).toBe("no");
     expect(await decisionFor("Hmm, no.")).toBe("no");

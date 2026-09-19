@@ -157,6 +157,10 @@ export class LadybugGraphStore implements GraphStore {
     if (!fromType || !toType) {
       throw new Error(`LadybugGraphStore: edge "${edge.id}" references a node that is not in the graph`);
     }
+    // Node tables have a primary key, so LadybugDB refuses a duplicate node itself. Rel tables have none:
+    // without this check a second edge with the same id is written silently, and the two stores disagree.
+    const existing = await this.run("MATCH (a)-[r]->(b) WHERE a.id = $from AND r.id = $id RETURN r.id AS id", { from: edge.from, id: edge.id });
+    if (existing.length > 0) throw new Error(`LadybugGraphStore: edge "${edge.id}" is already in the graph; edges are never overwritten`);
     await this.run(
       `MATCH (a:${fromType} {id:$from}), (b:${toType} {id:$to}) ` +
         `CREATE (a)-[:${edge.type} {id:$id, props:$props, prov:$prov, source_class:$source_class}]->(b)`,

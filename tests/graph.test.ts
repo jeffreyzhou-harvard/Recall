@@ -137,6 +137,8 @@ describe("LadybugDB store", () => {
     await expect(memory.putNode({ ...node, label: "rewritten" })).rejects.toThrow(/already in the graph/);
     await expect(memory.putEdge({ ...edge, props: { rewritten: "yes" } })).rejects.toThrow(/already in the graph/);
     await expect(lbug.putNode({ ...node, label: "rewritten" })).rejects.toThrow();
+    await expect(lbug.putEdge({ ...edge, props: { rewritten: "yes" } })).rejects.toThrow(/already in the graph/);
+    expect((await lbug.snapshot()).edges.filter((e) => e.id === edge.id)).toHaveLength(1);
     expect((await memory.getNode(PHOTO))!.label).toBe(node.label);
     expect((await lbug.getNode(PHOTO))!.label).toBe(node.label);
   });
