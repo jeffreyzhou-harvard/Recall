@@ -1,19 +1,30 @@
 # Relay
 
-Most dementia products help families care for the person. Relay helps the person keep caring for the family.
+Most dementia products help families manage the person. Relay helps the person keep reaching her own memories, and keeps the people around her calling her directly to do it.
 
-A relative forwards one current question from the family thread. Relay calls Mom on an ordinary phone, helps her stay on the thread without supplying an opinion, captures her exact words, gets her spoken yes, and delivers her verbatim contribution back into the family's existing thread with a full provenance receipt.
+Relay has two parts, built on one private memory graph:
 
-**Access changed. Authorship didn't.**
+1. **Capture.** She and the people who know her contribute memories — photos, voice, short stories — while those memories are still accessible. The graph holds people, relationships, places, events, stories, and preferences, each with visible provenance: who said it, and when.
+2. **Retrieve.** Relay periodically calls her on an ordinary phone. It picks a personally meaningful memory and helps her reach it herself: free recall first, then progressively more context, only as needed. It also learns which cues actually help *her*, and prefers those next time.
 
-`AGENTS.md` is the complete brief, including the non-negotiables. Read it first. `Rabbit_Product_Flow_Design_Spec.md` draws the end-to-end flow the code follows ("Rabbit" there is Relay). HackMIT 2026.
+Family stay in the loop without replacing her. They can contribute memories, open a light weekly note and a per-topic record of what happened in calls, and are pointed back to calling her.
+
+Core loop: **CAPTURE → ORGANIZE → RETRIEVE → REINFORCE → LEARN → REPEAT.** Not: **CAPTURE → simulate the person.**
+
+**Cues, not answers — every memory stays in her own words.**
+
+If Maya wants to know what Susan remembers about her wedding, Relay does not answer from the graph. It says: *"Susan's talked about this before. Want to give her a call?"* and stops there. A product that answers family questions from a database of someone's memories is a reason to stop calling her. Relay exists to be the opposite.
+
+Relay is not a digital replica, a "chat with her" interface, or a bot that relays decisions. It never impersonates her, never fabricates a first-person memory she didn't provide, and never becomes the thing family members talk to instead of her.
+
+`AGENTS.md` is the complete brief, including the non-negotiables. `SPECS.md` is the locked design doc. When they disagree, `AGENTS.md` wins. HackMIT 2026, Healthcare track.
 
 ## Run it
 
 ```bash
 npm install
 npm run check        # typecheck + tests + provenance verify
-npm run dev          # http://localhost:3000/present runs the judged path in the browser
+npm run dev          # http://localhost:3000/present is the judged path
 ```
 
 Node 22+. No keys, no database, and no network are needed for any of the above.
@@ -25,84 +36,75 @@ Node 22+. No keys, no database, and no network are needed for any of the above.
 | `npm run verify:strict` | The pre-demo gate. Same, but **fails while any placeholder media or placeholder word timing remains.** |
 | `npm run assets:hash` | Re-hash `/assets` into the manifest. Refuses to touch a changed `final` asset without `--allow-replace`. |
 | `npm run assets:placeholder` | Generate stand-in media. Never overwrites an existing file. |
-| `npm run graph:seed` | Build an on-disk LadybugDB at `.data/relay.lbug` (family seed + the ask via real intake) for Cypher poking. |
+| `npm run graph:seed` | Build an on-disk graph at `.data/` (family seed via real intake) for Cypher poking. |
 
 ## How it fits together
 
-Two loops share one graph, and `lib/service` is the whole outside surface:
+Relay places a scheduled recall call to her, climbs a five-rung support ladder, captures her exact words, and stores them only after she hears the line played back and says yes. A second question asks whether to share that line with family. Family never trigger a same-moment call, and Relay never answers them from the graph.
 
-```ts
-// participation: a family ask -> her own words -> her yes -> the family
-await relay.forwardAsk(payload);              // a relative forwarded one ask (text + at most one photo)
-const { recording } = await relay.runSession(threadId, sessionId);
-
-// discovery: photos -> questions -> answers -> a richer graph the asks above can lean on
-await relay.ingestLibrary(observations, grantedBy);
-const questions = await relay.nextQuestions(3);
-await relay.answerQuestion(question, answer);
+```
+idle → scheduled → policy_passed → connected → topic_selected → asking
+     → lost → reanchored → recalled → confirming → confirmed → stored
 ```
 
-`forwardAsk` is request intake. `runSession` walks the gates, places the call, captures her exact words, gets her yes, delivers, and sends the receipts - or stops safely. Everything it produced comes back as one `SessionRecording`: plain JSON that can be replayed to any moment, which is what the web views render.
+The call nests as `connected { greet → select_topic → ladder* → capture → confirm }`. Confirm asks two questions in order: store ("Want me to remember that?"), then share ("Would you like me to share it with your family?"). Commit happens last. A stop at the share question stores nothing.
 
-| Flow spec node | Where it lives |
+Family flows sit outside that reducer: a query is redirected, a contribution is stored as that contributor's unconfirmed claim, a weekly note is posted at most once per member per 7 days, and the per-topic record is a view, not a post.
+
+| Piece | Where it lives |
 | --- | --- |
-| Request intake (ask, audience, artifacts) | `lib/intake` - strict contract, no field for chat history; topics matched from the asker's own words |
-| Identity and audience / policy / evidence / assent gates | `lib/tools` - a `GateKeeper` service that fails closed; the model picks calls but cannot reach past it |
-| Scaffold ladder, capture, playback, publish | `lib/tools/impl`, walked by `lib/orchestrator` |
-| Family thread: voice card, "clarify", "not this time", support receipt | `lib/bridge` - refuses anything that is not a reply to a forward it received |
-| Live session view, receipt and provenance | `lib/session` - recording, `stateAt(t)`, and three view selectors |
-| Discovery loop (photo observations, knowledge gaps, the support ladder, guarded answers) | `lib/discovery` - inference never silently becomes fact: every node and edge carries how it is known, and only a person's sourced word can raise it |
-| Compact private context graph | `lib/graph` - 16 node types, 17 edge types, a closed relation vocabulary, provenance and epistemic status on every node and edge; in-memory store for the browser, LadybugDB for persistence, held to identical answers by a parity test |
-| State sequence | `lib/state` - one pure reducer, one transition table; the trace carries its events, so it *is* the recording |
-| Trims, hashes, receipts | `lib/provenance` - an edit-decision list that can only express silence and disfluency trims; hash-chained PROV-style log |
+| Reducer and transition table | `lib/state` — one source of truth; every pane keys off the same transitions |
+| 19 tools and hard gates | `lib/tools` — topic pick, place call, graph query, evidence, ladder, capture, store- and share-confirmation, family redirect, weekly note, topic record, clinician export, safety check |
+| Memory graph + retrieval layer | `lib/graph` — 18 node types, provenance on every claim and edge, a thinner per-cue effectiveness layer that never decides whether to climb, only which cue to try |
+| Trims, hashes, receipts | `lib/provenance` — an edit-decision list that can only express silence and disfluency trims; hash-chained PROV-style log |
+| Family app | `/family` — contribution form, "Ask about Susan" (redirect only), Weekly Note, per-topic record |
+| Judged sandbox | `/present` — autoplay 90-second path; arrow keys step manually |
 
-### Mock data
+The model may select tool calls. It cannot bypass gates. Storing a claim without confirmation, speaking an uncited fact, leaking graph content through `handle_family_query`, or climbing the ladder out of order are hard fails.
 
-Kept deliberately small. `/fixtures` holds only what the judged path needs - the family graph, the policy, one forwarded-ask payload, and the call transcript - and `/assets` holds three stand-in media files. The ask's graph nodes are never hand-written: intake builds them from the payload, exactly as it would for a real forward. Everything that exists only to exercise a failure branch lives in `tests/fixtures.ts`, mostly derived from the judged data. Nothing under `/lib` may import a fixture; a test enforces it.
+**Support ladder (least support first):** free recall → context → association → recognition → reorientation. Climb one rung at a time. Rung 1 is an invitation ("I'd love to hear about the summers at Cape May. What comes to mind?"), never "Who is…?" or "Do you remember…?". Family-sourced, unconfirmed claims stop at rung 3 and are spoken only attributed, followed by an open question.
 
-## Telegram bot
+## Family surface
 
-The family's thread is a Telegram group. Live only: the judged `/present` path never touches it.
+Family are part of the loop, passively and lightly. Nothing here is shown to her.
 
-1. Create a bot with [@BotFather](https://t.me/BotFather). **Leave group privacy mode on** - Telegram then sends Relay only `/ask` commands and the one message they reply to, never the rest of the chat.
-2. Put the token in `.env.local` as `TELEGRAM_BOT_TOKEN`, then `npm run telegram -- whoami` and `npm run telegram -- setup`.
-3. Add the bot to the family group. Run `npm run telegram -- discover`, send `/help` in the group, and copy the chat and user ids it prints into `RELAY_TELEGRAM_BINDINGS` (format in `.env.example`).
-4. `npm run telegram -- poll`. No public URL needed. (For a deployed app use `npm run telegram -- webhook https://your-host` with `TELEGRAM_WEBHOOK_SECRET` set.) With `RELAY_CALL=video`, run the web app and use `npm run telegram -- poll --forward http://localhost:3000` instead: the call has to be placed by the process that serves the call pages.
+- **Tell Relay about a memory.** A one-way form. Stored as the contributor's claim with `patient_confirmed: false`. A question typed here is rejected with a hint to call her.
+- **Ask about Susan.** Redirect only. The entire response is the fixed line pointing them to call her. No graph content, ever.
+- **Weekly Note.** At most one per approved member per 7 days, shown when they open the dashboard. Topic-only, observable; her words only after share-confirmation; at most one gap or difference prompt.
+- **Per-topic record.** Counts and dates from the last 8 calls that included a topic. No total, no score, no color-coded verdict. Fixed header: this is a record of what happened in Relay calls, not a measure of her memory overall.
+- **Export for a doctor.** Member-initiated. The same counts, dates, and header, plus "This record is not a clinical assessment or diagnosis." Relay never sends the file to anyone.
 
-To ask: post your question (with a photo if you like), then reply to it with `/ask kheer and halwa` - the words after `/ask` say what the photo shows.
+Relay never calls, texts, emails, or pushes family, with one exception: a fixed-text safety alert to designated caregivers if her final turn matches a lexical phrase on the safety list. The alert states a category and time. It never quotes her. Relay is not an emergency service.
 
-`RELAY_CALL=none` (default) is intake only: the ask is validated and recorded, and no call is placed. `RELAY_CALL=video` places a live video call and runs a real session over it (next section). `RELAY_CALL=prerecorded` runs the session against the prerecorded golden call and posts her voice card back under the question - real Telegram on both ends of a recorded call. It only completes for the Diwali ask that call was recorded for, and only inside the policy's call window (10:00-19:00 New York); outside it the family correctly gets "Not this time."
+## The 90-second golden path
 
-## Video call (WebRTC)
+Cast is fixed: Susan, Maya (daughter), Priya (sister), Anika (granddaughter), Cape May, Lincoln Elementary, Princeton. Do not invent another.
 
-A live call between Relay and her device, in the browser, that drives a real Relay session. Live only.
+1. Onboarding: Maya's photo, Susan names her, the graph node forms with provenance.
+2. The phone rings as a saved contact, "Relay (from Maya)." Relay discloses it is an AI assistant Maya set up, then invites her to talk about summers at Cape May. It waits. She is unsure.
+3. The ladder climbs: context, then association ("You and Maya used to go there together"). She reaches it. Relay does not rewrite her line. Store-confirmation, then share-confirmation. The graph grows from this call.
+4. Later, Maya types "What did Mom say about her wedding?" Relay's entire response: **"Susan's talked about this before. Want to give her a call?"**
+5. The dashboard shows the weekly note, the line Susan chose to share, and the per-topic record. Never a score.
+6. Provenance receipt: her waveform, literal transcript, 2 silence trims, 0 generated first-person words. Final line: **Cues, not answers — every memory stays in her own words.**
 
-```bash
-RELAY_CALL=video npm run dev         # open http://localhost:3000/call/host and leave it open: it is Relay's end of every call
-npm run build && npm run e2e:call    # one real call between two headless Chromes (needs Chrome)
-npm run build && npm run e2e:live    # a whole session for real: Deepgram + Muse Spark, a few cents a run (macOS + Chrome)
-```
-
-With `DEEPGRAM_API_KEY` (and optionally `MUSE_API_KEY`) in `.env.local`, a granted ask - from Telegram, or `POST /api/live/asks` from the web app - places a call. `/call/host` joins it as Relay and shows her one-time link. When she taps Join, Relay speaks each line on her device in the device's own synthetic voice, labeled "Relay"; **Deepgram** turns her speech into words with timings; **Muse Spark** chooses among the scaffolds Relay's ladder found eligible (and falls back to the ladder if it is slow, wrong, or down); her own recording is played back to her; and only her spoken yes delivers it. Her audio is wiped from the server when the call ends. `AGENTS.md` section 20 has the design.
-
-`/call/host` is Relay's side (an operator scaffold); it prints her one-time link, `/call/<room>#<token>`. Signaling is a small SSE + POST channel on Next route handlers - no WebSocket server, no dependency - and carries negotiation only: audio and video go peer to peer. Her audio is captured in memory under rule 8: only spans she approved are ever returned, the rest is zeroed, and video is never recorded.
-
-Three things will bite outside `localhost`: her device needs **HTTPS** for camera and microphone; venue wifi usually needs a **TURN** server (`RELAY_ICE_SERVERS`) or the call sits on "Connecting..."; and rooms live in memory, so it needs a **long-running Node server**, not serverless hosting.
+`/present` runs this offline, on prerecorded branches and fixture outputs. Telephony, ASR, and the network must never touch it.
 
 ## What is not built yet
 
-- **The interface.** `/` and `/present` are plain scaffolds. Design goes through the Impeccable skill: run `/impeccable init` first (see `AGENTS.md` section 16).
-- **Real media.** Everything in `/assets` is a generated stand-in (a tick once a second; an SVG that says "Placeholder"). Word timings in the transcripts are placeholders too. See below.
-- **Photo analysis.** The discovery loop is built from the analyzer's output onward. The analyzer itself (face grouping, EXIF, scene themes) is an interface, `PhotoAnalyzer`, with no implementation: it is a model concern with its own consent questions. A model that reads richer facts out of an answer plugs in as an `AnswerInterpreter`; today a small lexical one handles "my daughter Maya" and place names.
-- **Live parts.** Telegram, the video call, Deepgram, and Muse Spark (scaffold choice and graph ingestion) are all real. One seam still has only its deterministic implementation: `AskInterpreter` (reading the forwarded ask). The judged path must never depend on the live parts.
-- **The counterfactual replay.** Nothing exists for it yet, by design: the no-tools bot's lines are not written in `AGENTS.md` and should be locked by the team, not invented by an agent. It is a labeled, prerecorded clip, so it needs a recording and a transcript but no engine work.
+The brief pivoted on 2026-09-19 from a family-ask relay to scheduled recall calls. The tree still contains the earlier participation-loop code (forwarded ask, Telegram, a live video path). That mechanic is out of scope. Rebuild against `AGENTS.md`.
+
+- **The recall loop.** Topic pick, five-rung ladder, store- and share-confirmation, retrieval layer, and the family-redirect guarantee are specified, not yet the running product.
+- **The family app.** `/family` is not built. Contribution form, Weekly Note, per-topic record, change lines, and export still need fixtures (`call-script.json`, `family-copy.json`, `record-thresholds.json`, `safety-phrases.json`) and whitelist projections.
+- **The interface.** `/` and `/present` are still scaffolds of the earlier demo. Direction is "The Living Graph" (`AGENTS.md` §10).
+- **Real media.** Everything in `/assets` is a generated stand-in. Word timings are placeholders. See below.
+- **Live telephony.** The judged path is fixture-backed. A live Deepgram / Muse side demo may exist later, behind a flag, never on `/present`.
 
 ## Replacing the placeholder media
 
 1. Record, then drop the real file into `/assets` (keep the id; the extension may change).
 2. In `assets/manifest.json`, update that entry's `path` and set `"status": "final"`. Set `duration_ms` by hand if it is not a PCM WAV.
 3. `npm run assets:hash`
-4. Re-derive word timings from the real recording and replace `fixtures/transcripts/call-golden.json`, setting `"timing_status": "measured"`. The three pauses in Mom's answer must still exceed 700 ms for the receipt to read "3 pauses trimmed".
+4. Re-derive word timings from the real recording and replace the call transcript fixture, setting `"timing_status": "measured"`. The pauses in her answer must still exceed 700 ms for the receipt to read "2 pauses trimmed".
 5. `npm run verify:strict`
 
-`/assets` is append-only after hashing. Relay's spoken lines in the recording must match `render_prompt` output word for word: if they drift, the run stops with a `ScriptMismatchError` rather than letting the audio say one thing while the trace shows another.
+`/assets` is append-only after hashing. Relay's spoken lines in the recording must match `render_prompt` (or a fixed script ID) word for word: if they drift, the run stops rather than letting the audio say one thing while the trace shows another.
