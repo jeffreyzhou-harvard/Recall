@@ -108,7 +108,7 @@ Keep the graph compact and private. Do not import a large ontology or FHIR. This
 
 ## 8. Stack and repo layout
 
-**Stack:** Next.js (App Router) + TypeScript + Tailwind + Framer Motion + Zustand (or a tiny reducer) + Lucide icons. LadybugDB for the graph. Deepgram streaming STT and Meta Muse calls behind the tool interfaces above. All media is local. No backend is required for the judged path.
+**Stack:** Next.js (App Router) + TypeScript + Tailwind + Framer Motion + Zustand (or a tiny reducer) + Lucide icons. LadybugDB for the graph. Deepgram streaming STT and Meta Muse calls behind the tool interfaces above. All media is local. No backend is required for the judged path. The family's thread is Telegram, through the Bot API over plain `fetch` (no SDK) - live only, never on the judged path; see section 17.
 
 **Build tooling (dev only, never shipped to the judged path beyond zod):** zod (the single source for tool types, runtime validation, and the JSON Schemas handed to a model's tool interface), Vitest (the section 12 checks), tsx (runs `/scripts`). npm is the package manager; commit `package-lock.json`.
 
@@ -123,6 +123,9 @@ Keep the graph compact and private. Do not import a large ontology or FHIR. This
                      photo, nothing else), lexical interpretation, graph writes
 /lib/bridge          the neutral seam to the family's existing thread; refuses any
                      message that is not a reply to a forward it received
+/lib/bridge/telegram LIVE ONLY. Bot API client, update -> forwarded ask, bindings,
+                     and the Telegram transport behind the shared guard
+/server              LIVE ONLY. Composition of the live process (webhook + polling)
 /lib/service         RelayService: forwardAsk() and runSession() - the one entry point
 /lib/session         session recordings, replay to any moment, and the view selectors
                      for the three web surfaces (intake, live session, receipt)
@@ -245,3 +248,15 @@ All interface work in this repo goes through the Impeccable design skill (https:
 - The non-negotiables in section 2 outrank any design suggestion. In particular: no transcript crawl, typing dots, countdowns, confidence readouts, or moving traces in anything Mom sees; the authorship ribbon never touches Relay's words.
 - A hook runs the skill's detector after edits to UI files and once more when an agent stops. It reports; it does not block. Per-machine hook config (`.claude/settings.local.json`) is git-ignored, so each teammate runs `npx impeccable install --providers=claude,codex,cursor --scope=project` once. If that fails with "invalid zip data" (an upstream installer bug seen with engine 0.1.5), download `https://impeccable.style/api/download/bundle/universal` and re-run with `IMPECCABLE_BUNDLE_PATH=<that zip>`, then `chmod +x` the three `skills/impeccable/scripts/impeccable` launchers.
 - Panes render the view selectors in `lib/session/view.ts` (`intakeView`, `liveSessionView`, `receiptView`) over a `SessionRecording`, at a moment in time. They decide nothing themselves, and the selectors have no field for confidence, scores, or clinical labels. Anything showing "what Relay said" reads `recording.spoken`, never `recording.prompts`: the fixed-script lines are rendered before every call and are usually never said.
+
+## 17. Telegram (the family's thread, live only)
+
+The product has two surfaces: a Telegram bot, which is the family's existing thread, and the Relay web app. Telegram is a real integration, not a mock, and it stays out of the judged path: `/present` runs on `MemoryThreadBridge`, and tests enforce that only `lib/bridge/telegram/api.ts` may make a network call and that nothing judged-path safe imports `lib/bridge/telegram` or `/server`. In the web UI the left rail is still a neutral chat shell; do not imitate Telegram's look (section 10).
+
+- **Forwarding an ask** is replying to your own question with `/ask` (optionally saying what the photo shows: `/ask kheer and halwa`). You can only forward your own message.
+- **Keep the bot's group privacy mode ON.** Telegram then delivers only commands addressed to the bot and the single message such a command replies to. The rest of the chat never reaches Relay, so rule 8 holds before our code runs. Relay subscribes to `message` updates only.
+- **Bindings** (which chat is which thread, which Telegram account is which person) are personal data: they come from `RELAY_TELEGRAM_BINDINGS`, never from a committed file. A binding grants nothing; the identity gate and the policy still decide every run. An unbound chat gets no reply of any kind. An unbound sender in a bound chat gets the fixed "clarify" notice.
+- **Everything Relay says on Telegram goes through `TelegramThreadBridge`,** which inherits the guard from `GuardedThreadBridge`: only replies to a received forward, only into its own thread, notices in their fixed wording. The one exception is fixed usage help, sent only as a reply to a `/help` or malformed `/ask` in a bound chat. The support receipt goes to the named relative's private chat, never the group.
+- **The voice card's audio** is the kept spans cut byte-for-byte from the source recording (`lib/provenance/wav.ts`): no re-encoding. It is sent as a WAV document; transcoding to OGG/Opus would make it a voice bubble but is a re-encode, so decide that deliberately.
+- **Modes** (`RELAY_CALL`): `none` is intake only, because there is no telephony yet and Relay does not pretend otherwise. `prerecorded` runs the session against the prerecorded golden call for the side demo; say so when showing it. If Telegram cannot be reached at delivery, the run ends `not_sent` and the failure is recorded in `recording.delivery_failures`.
+- Operate it with `npm run telegram -- whoami | setup | discover | poll | webhook <https-url> | webhook:off`. The webhook requires `TELEGRAM_WEBHOOK_SECRET` and rejects any request without it.

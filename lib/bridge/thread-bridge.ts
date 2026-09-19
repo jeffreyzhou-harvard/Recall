@@ -74,14 +74,21 @@ export interface ThreadBridge {
   posted(): PostedMessage[];
 }
 
-/** In-process bridge. The judged path uses this; the family-thread pane reads `posted()`. */
-export class MemoryThreadBridge implements ThreadBridge {
+/**
+ * The guard every bridge shares. A transport only has to say how to deliver a message; whether a
+ * message may be sent at all is decided here, once, and cannot be skipped by a subclass: `post`
+ * checks first, delivers second, and records only what was actually delivered.
+ */
+export abstract class GuardedThreadBridge implements ThreadBridge {
   private readonly forwards = new Map<string, string>();
   private readonly messages: PostedMessage[] = [];
 
   registerForward(forwardId: string, threadId: string): void {
     this.forwards.set(forwardId, threadId);
   }
+
+  /** Deliver a message that has already passed the guard. Throw BridgeError if it could not be delivered. */
+  protected abstract deliver(message: ThreadMessage, originThreadId: string): Promise<void>;
 
   async post(message: ThreadMessage, postedAt: string): Promise<void> {
     const origin = this.forwards.get(message.in_reply_to);
@@ -94,6 +101,7 @@ export class MemoryThreadBridge implements ThreadBridge {
     if (message.kind === "family_notice" && message.text !== NOTICE_TEXT[message.notice]) {
       throw new BridgeError("refusing to send: a family notice carries only its fixed wording");
     }
+    await this.deliver(message, origin);
     this.messages.push(structuredClone({ ...message, posted_at: postedAt }));
   }
 
@@ -104,4 +112,9 @@ export class MemoryThreadBridge implements ThreadBridge {
   voiceCards(): VoiceCard[] {
     return this.posted().flatMap((m) => (m.kind === "voice_contribution" ? [m.card] : []));
   }
+}
+
+/** In-process bridge with nowhere to deliver to. The judged path uses this; the family-thread pane reads `posted()`. */
+export class MemoryThreadBridge extends GuardedThreadBridge {
+  protected async deliver(): Promise<void> {}
 }

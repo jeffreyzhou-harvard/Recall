@@ -12,7 +12,7 @@ A relative forwards one current question from the family thread. Relay calls Mom
 
 ```bash
 npm install
-npm run check        # typecheck + 157 tests + provenance verify
+npm run check        # typecheck + 175 tests + provenance verify
 npm run dev          # http://localhost:3000/present runs the judged path in the browser
 ```
 
@@ -53,11 +53,24 @@ const { recording } = await relay.runSession(threadId, sessionId);
 
 Kept deliberately small. `/fixtures` holds only what the judged path needs - the family graph, the policy, one forwarded-ask payload, and the call transcript - and `/assets` holds three stand-in media files. The ask's graph nodes are never hand-written: intake builds them from the payload, exactly as it would for a real forward. Everything that exists only to exercise a failure branch lives in `tests/fixtures.ts`, mostly derived from the judged data. Nothing under `/lib` may import a fixture; a test enforces it.
 
+## Telegram bot
+
+The family's thread is a Telegram group. Live only: the judged `/present` path never touches it.
+
+1. Create a bot with [@BotFather](https://t.me/BotFather). **Leave group privacy mode on** - Telegram then sends Relay only `/ask` commands and the one message they reply to, never the rest of the chat.
+2. Put the token in `.env.local` as `TELEGRAM_BOT_TOKEN`, then `npm run telegram -- whoami` and `npm run telegram -- setup`.
+3. Add the bot to the family group. Run `npm run telegram -- discover`, send `/help` in the group, and copy the chat and user ids it prints into `RELAY_TELEGRAM_BINDINGS` (format in `.env.example`).
+4. `npm run telegram -- poll`. No public URL needed. (For a deployed app use `npm run telegram -- webhook https://your-host` with `TELEGRAM_WEBHOOK_SECRET` set.)
+
+To ask: post your question (with a photo if you like), then reply to it with `/ask kheer and halwa` - the words after `/ask` say what the photo shows.
+
+`RELAY_CALL=none` (default) is intake only: the ask is validated and recorded, and no call is placed, because there is no telephony yet. `RELAY_CALL=prerecorded` runs the session against the prerecorded golden call and posts her voice card back under the question - real Telegram on both ends of a recorded call. It only completes for the Diwali ask that call was recorded for, and only inside the policy's call window (10:00-19:00 New York); outside it the family correctly gets "Not this time."
+
 ## What is not built yet
 
 - **The interface.** `/` and `/present` are plain scaffolds. Design goes through the Impeccable skill: run `/impeccable init` first (see `AGENTS.md` section 16).
 - **Real media.** Everything in `/assets` is a generated stand-in (a tick once a second; an SVG that says "Placeholder"). Word timings in the transcripts are placeholders too. See below.
-- **Live parts.** Four seams are interfaces with only their deterministic implementation so far: `ThreadBridge` (a real transport to the family's thread), `CallDriver` (telephony), `TranscriptionProvider` (Deepgram / Muse Voice Transcribe), and `AskInterpreter` plus the `select_scaffold` decision (Muse Spark). The judged path must never depend on the live ones.
+- **Live parts.** `ThreadBridge` now has a real Telegram transport. Three seams still have only their deterministic implementation: `CallDriver` (telephony - the big one), `TranscriptionProvider` (Deepgram / Muse Voice Transcribe), and `AskInterpreter` plus the `select_scaffold` decision (Muse Spark). The judged path must never depend on the live ones.
 - **The counterfactual replay.** Nothing exists for it yet, by design: the no-tools bot's lines are not written in `AGENTS.md` and should be locked by the team, not invented by an agent. It is a labeled, prerecorded clip, so it needs a recording and a transcript but no engine work.
 
 ## Replacing the placeholder media

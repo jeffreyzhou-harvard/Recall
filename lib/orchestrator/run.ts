@@ -12,7 +12,7 @@
  * becomes the corresponding deterministic transition and the run ends safely.
  */
 import type { StoreApi } from "zustand/vanilla";
-import { NOTICE_TEXT } from "@/lib/bridge/thread-bridge";
+import { BridgeError, NOTICE_TEXT, type ThreadMessage } from "@/lib/bridge/thread-bridge";
 import type { RelayEvent } from "@/lib/state/machine";
 import { TERMINAL } from "@/lib/state/machine";
 import type { MachineState } from "@/lib/state/reducer";
@@ -215,6 +215,11 @@ export async function runAsk(env: RunEnv): Promise<RunResult> {
         await speak(fixed.close_kindly);
         dispatch({ type: "CALL_CLOSED" }, false);
       }
+    } else if (e instanceof BridgeError) {
+      // The thread could not be reached, so her contribution was not delivered. Handled exactly like a
+      // tool that did not respond: after capture that means nothing sends, and the run ends safely.
+      ctx.session.delivery_failures.push(e.message);
+      dispatch({ type: "TOOL_TIMEOUT", tool: "publish_contribution" });
     } else throw e;
   }
 
@@ -241,20 +246,26 @@ async function finish(env: RunEnv, driver: CallDriver | null): Promise<RunResult
   }
 
   // What the family sees. Everything goes through the bridge, as a reply to the forward this run answers.
+  // A transport that is down must not lose the run: the failure is recorded, and the session still ends.
+  const post = async (message: ThreadMessage): Promise<void> => {
+    try {
+      await ctx.bridge.post(message, ctx.clock.iso());
+    } catch (e) {
+      if (!(e instanceof BridgeError)) throw e;
+      ctx.session.delivery_failures.push(`${message.kind}: ${e.message}`);
+    }
+  };
   const machine = store.getState().machine;
   const ask = ctx.session.ask;
   const notice = machine.context.family_notice;
   if (ask && notice) {
-    await ctx.bridge.post(
-      { kind: "family_notice", in_reply_to: ask.forward_id, to: { thread_id: ask.thread_id }, notice, text: NOTICE_TEXT[notice], authored_by: "relay" },
-      ctx.clock.iso(),
-    );
+    await post({ kind: "family_notice", in_reply_to: ask.forward_id, to: { thread_id: ask.thread_id }, notice, text: NOTICE_TEXT[notice], authored_by: "relay" });
   }
   // The non-clinical support receipt follows a delivery, and goes only to the relatives the joint setup named.
   if (ask && receipt && machine.state === "delivered") {
     const support = { session_id: receipt.session_id, lines: receipt.lines, scaffolds_logged: receipt.scaffolds_logged };
     for (const person_id of ctx.policy.support_receipt.recipients) {
-      await ctx.bridge.post({ kind: "support_receipt", in_reply_to: ask.forward_id, to: { person_id }, receipt: support }, ctx.clock.iso());
+      await post({ kind: "support_receipt", in_reply_to: ask.forward_id, to: { person_id }, receipt: support });
     }
   }
   return { machine, receipt };
