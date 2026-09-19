@@ -5,6 +5,7 @@ import { buildFixtureRig, runJudgedPath } from "@/fixtures/harness";
 import { buildTopicRecord, type OutcomeRow } from "@/lib/family/record";
 import { FamilyView } from "@/lib/family/projection";
 import type { GraphData } from "@/lib/graph/types";
+import { SetupStore, dashboardAccess } from "@/lib/tools/policy";
 import { ACCOUNTS_DIFFER, CAPTURE_AND_CONFIRM, HER_LINE, OPENING, SAID, policyWith, run } from "./helpers";
 
 const REDIRECT = "Susan's talked about this before. Want to give her a call?";
@@ -75,9 +76,9 @@ describe("the Ask about Susan box: a redirect, and nothing else (rule 10)", () =
   });
 
   it("cannot place a call: the service has no way for a family member to cause one", async () => {
-    const { RelayService } = await import("@/lib/service/relay-service");
-    expect(RelayService.prototype.runScheduledCall.length).toBe(1); // a session id. No topic, no requester.
-    expect(Object.getOwnPropertyNames(RelayService.prototype).filter((m) => /call/i.test(m))).toEqual(["runScheduledCall"]);
+    const { RecallService } = await import("@/lib/service/recall-service");
+    expect(RecallService.prototype.runScheduledCall.length).toBe(1); // a session id. No topic, no requester.
+    expect(Object.getOwnPropertyNames(RecallService.prototype).filter((m) => /(^call|Call)(?=[A-Z]|$)/.test(m))).toEqual(["runScheduledCall"]); // "Call" as a word of the name - not the letters inside "Recall"
   });
 });
 
@@ -101,9 +102,9 @@ describe("the whitelist projection (tools 14-17)", () => {
   });
 
   it("never includes text from a contribution she did not say yes to sharing", async () => {
-    const kept = await run([...OPENING, ["her", "Cape May...?"], ["relay", SAID.rung2], ["her", "I'm not sure."], ["relay", SAID.rung3], ["her", "Maya, my daughter!"], ["relay", SAID.elaborate], ...CAPTURE_AND_CONFIRM("Yes.", "No.")]);
+    const kept = await run([...OPENING, ["her", "Cape May...?"], ["recall", SAID.rung2], ["her", "I'm not sure."], ["recall", SAID.rung3], ["her", "Maya, my daughter!"], ["recall", SAID.elaborate], ...CAPTURE_AND_CONFIRM("Yes.", "No.")]);
     expect((await kept.graph.nodesOfType("Contribution"))[0]!.props).toMatchObject({ literal_transcript: HER_LINE, shared: false });
-    expect(await new FamilyView(kept.graph, "person:susan").sharedLines("2000-01-01T00:00:00.000Z", "person:maya")).toEqual([]);
+    expect(await new FamilyView(kept.graph, "person:susan").sharedLines("person:maya")).toEqual([]);
     expect(JSON.stringify(await kept.service.weeklyNote("person:maya"))).not.toContain("every summer");
   });
 });
@@ -171,7 +172,7 @@ describe("the family view is opt-in, revocable, and for approved members only (r
     expect(out.file!.text).toContain("This record is not a clinical assessment or diagnosis.");
     expect(out.file!.text).toContain("Lincoln Elementary - recalled unaided in 1 of the last 4 calls, compared with 4 of the 4 before.");
     expect(await new FamilyView(rig.graph, "person:susan").exportsLog()).toEqual([{ requester_name: "Maya", at: rig.clock.iso() }]);
-    expect(rig.alerts.count()).toBe(0); // Relay never sends it to anyone
+    expect(rig.alerts.count()).toBe(0); // Recall never sends it to anyone
   });
 
   it("the setup prompts a periodic re-confirmation", async () => {
@@ -184,13 +185,13 @@ describe("the family view is opt-in, revocable, and for approved members only (r
   });
 });
 
-describe("Tell Relay about a memory", () => {
+describe("Tell Recall about a memory", () => {
   const tell = (what: string, by = "person:maya") => ({ contributor_id: by, claim: { who: "Mom and me", what_happened: what, when_where: "Cape May, the eighties", photo_asset_id: null, about_topic_id: "event:cape-may-summers" }, provenance: { medium: "text" as const, received_at: "2026-11-05T15:30:00.000Z" } });
 
   it("stores it exactly as typed, as the contributor's claim, patient_confirmed false - and returns nothing from the graph", async () => {
     const rig = await buildFixtureRig();
-    const out = await rig.service.tellRelayAMemory(tell("When I was ten we got caught in a storm on the boardwalk and Mom bought us both taffy."));
-    expect(out).toEqual({ status: "stored_as_family_claim", contribution_ref: "family-contribution:3", patient_confirmed: false, line: { script_id: "FAM-CONTRIB-THANKS", text: "Thank you. Relay will gently ask Susan about it, in her own time." } });
+    const out = await rig.service.tellRecallAMemory(tell("When I was ten we got caught in a storm on the boardwalk and Mom bought us both taffy."));
+    expect(out).toEqual({ status: "stored_as_family_claim", contribution_ref: "family-contribution:3", patient_confirmed: false, line: { script_id: "FAM-CONTRIB-THANKS", text: "Thank you. Recall will gently ask Susan about it, in her own time." } });
     const claim = (await rig.graph.nodesOfType("EpisodicClaim")).find((c) => c.id === "claim:family-contribution:3")!;
     expect(claim.props.text).toBe("When I was ten we got caught in a storm on the boardwalk and Mom bought us both taffy.");
     expect(claim.prov).toMatchObject({ author: "person:maya", status: "family_confirmed", patient_confirmed: false, source_class: "family_contribution", extraction_method: "family_form" });
@@ -200,24 +201,35 @@ describe("Tell Relay about a memory", () => {
   it.each(["What did Mom say about the boardwalk?", "Does she remember the storm", "Tell me what she said about Cape May.", "We went every year. Did she ever talk about it?"].map((q, i) => [q, i] as const))("rejects a question with the hint, and stores nothing: %s", async (q, i) => {
     const rig = await buildFixtureRig();
     const before = (await rig.graph.snapshot()).nodes.length;
-    const out = await rig.service.tellRelayAMemory(tell(q));
+    const out = await rig.service.tellRecallAMemory(tell(q));
     if (i < 3) {
-      expect(out).toEqual({ status: "rejected_question", line: { script_id: "FAM-CONTRIB-HINT", text: "This box is for telling Relay something you remember. To find out what Susan remembers, give her a call." } });
+      expect(out).toEqual({ status: "rejected_question", line: { script_id: "FAM-CONTRIB-HINT", text: "This box is for telling Recall something you remember. To find out what Susan remembers, give her a call." } });
       expect((await rig.graph.snapshot()).nodes.length).toBe(before);
     } else expect(out.status).toBe("stored_as_family_claim"); // it begins as a memory; the form is for telling, and this tells something
   });
 
   it("'When I was ten...' is a memory, not a question", async () => {
     const rig = await buildFixtureRig();
-    expect((await rig.service.tellRelayAMemory(tell("When I was ten we drove down every August."))).status).toBe("stored_as_family_claim");
+    expect((await rig.service.tellRecallAMemory(tell("When I was ten we drove down every August."))).status).toBe("stored_as_family_claim");
   });
 
   it("refuses anyone the joint setup has not approved - including someone whose approval was just revoked", async () => {
     const rig = await buildFixtureRig({ policy: policyWith((p) => p.approved_people.push("person:priya")) });
-    expect((await rig.service.tellRelayAMemory(tell("We shared a room as girls.", "person:priya"))).status).toBe("stored_as_family_claim");
+    expect((await rig.service.tellRecallAMemory(tell("We shared a room as girls.", "person:priya"))).status).toBe("stored_as_family_claim");
     rig.setup.revokeContributor("person:priya", rig.clock.iso());
-    expect(await rig.service.tellRelayAMemory(tell("And a bicycle.", "person:priya"))).toEqual({ status: "refused", reason: "contributor_not_approved" });
-    expect(await rig.service.tellRelayAMemory(tell("Hello.", "person:stranger"))).toEqual({ status: "refused", reason: "contributor_not_approved" });
+    expect(await rig.service.tellRecallAMemory(tell("And a bicycle.", "person:priya"))).toEqual({ status: "refused", reason: "contributor_not_approved" });
+    expect(await rig.service.tellRecallAMemory(tell("Hello.", "person:stranger"))).toEqual({ status: "refused", reason: "contributor_not_approved" });
+  });
+
+  it("revoking a contributor who also has the family view ends both, and keeps the revoked grant on the record", async () => {
+    const granted = { member_id: "person:priya", detail_level: "weekly_note" as const, granted_at: "2026-10-12T15:00:00.000Z", revoked_at: null };
+    const rig = await buildFixtureRig({ policy: policyWith((p) => (p.approved_people.push("person:priya"), p.dashboard.grants.push(granted))) });
+    expect(dashboardAccess(rig.setup.current(), "person:priya")).toBe("weekly_note");
+    rig.setup.revokeContributor("person:priya", rig.clock.iso());
+    expect(dashboardAccess(rig.setup.current(), "person:priya")).toBeNull();
+    expect(rig.setup.current().dashboard.grants.find((g) => g.member_id === "person:priya")).toEqual({ ...granted, revoked_at: rig.clock.iso() });
+    // A LIVE grant for someone who is not approved is still refused.
+    expect(() => new SetupStore(policyWith((p) => p.dashboard.grants.push({ ...granted, member_id: "person:stranger" })))).toThrow(/approved people only/);
   });
 });
 
@@ -253,7 +265,7 @@ describe("the per-topic record and its change lines", () => {
     expect(record(two).change_lines).toHaveLength(3);
     expect(record(two).summary_line).toBeNull();
     const three = record([...two, ...rows("D", FOUR_THEN_ONE)]);
-    expect(three.summary_line).toEqual({ script_id: "FAM-CHG-01", text: "In recent Relay calls, more prompting was needed across several topics than in earlier calls. This is a record of Relay calls, not a clinical assessment. If you have concerns, you can export the record to share with a doctor." });
+    expect(three.summary_line).toEqual({ script_id: "FAM-CHG-01", text: "In recent Recall calls, more prompting was needed across several topics than in earlier calls. This is a record of Recall calls, not a clinical assessment. If you have concerns, you can export the record to share with a doctor." });
   });
 
   it("the same events always produce the same output, whatever order they arrive in", () => {

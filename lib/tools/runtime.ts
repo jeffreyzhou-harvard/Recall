@@ -72,7 +72,17 @@ export interface RuntimeOptions {
   fixtureLatency?: { clock: FixtureClock; ms: Partial<Record<ToolName, number>>; default_ms: number };
   /** Live side demo only: real timeout per call. */
   timeout_ms?: number;
+  /** Keep only the most recent calls. For a runtime that lives as long as the server does (the family side). */
+  max_log?: number;
 }
+
+/**
+ * What of a call's input goes in the log. The log is for showing what Recall did, and rule 8 outranks it: a
+ * family member's question is never kept - not in the graph, and not here - and nor is who asked it.
+ */
+const LOGGED_INPUT: Partial<Record<ToolName, (input: unknown) => unknown>> = {
+  handle_family_query: (input) => ({ question: "(not logged)", question_chars: typeof (input as { question?: unknown })?.question === "string" ? (input as { question: string }).question.length : 0, requester_id: "(not logged)" }),
+};
 
 /** Collect every evidence id an output mentions, for the log's `source_ids` column. */
 function collectSourceIds(value: unknown, out = new Set<string>()): Set<string> {
@@ -90,6 +100,8 @@ function collectSourceIds(value: unknown, out = new Set<string>()): Set<string> 
 
 export class ToolRuntime {
   readonly log: ToolCallRecord[] = [];
+  /** How many records have been dropped off the front of `log`, so that `seq` keeps counting. */
+  private dropped = 0;
   private readonly callCounts = new Map<ToolName, number>();
 
   constructor(
@@ -110,12 +122,12 @@ export class ToolRuntime {
     const startedAt = this.contexts.clock.iso();
     const startedMs = this.contexts.clock.now();
     const record: ToolCallRecord = {
-      seq: this.log.length + 1,
+      seq: this.dropped + this.log.length + 1,
       tool,
       step: ENFORCED_SEQUENCE.indexOf(tool as CallToolName) + 1,
       started_at: startedAt,
       latency_ms: 0,
-      input: rawInput,
+      input: LOGGED_INPUT[tool]?.(rawInput) ?? rawInput,
       output: null,
       error: null,
       source_ids: [],
@@ -123,6 +135,8 @@ export class ToolRuntime {
       state_transition: null,
     };
     this.log.push(record);
+    const max = this.options.max_log;
+    if (max && this.log.length > max) this.dropped += this.log.splice(0, this.log.length - max).length;
 
     try {
       if (this.options.faults?.some((f) => f.tool === tool && f.on_call === count && f.kind === "timeout")) {
@@ -155,12 +169,25 @@ export class ToolRuntime {
 
   /** Link the most recent call of a tool to the transition it caused, so the console can show cause and effect. */
   noteTransition(seq: number, from: string, to: string): void {
-    const record = this.log[seq - 1];
+    const record = this.log[seq - 1 - this.dropped];
     if (record) record.state_transition = { from, to };
   }
 
   lastSeq(): number {
-    return this.log.length;
+    return this.dropped + this.log.length;
+  }
+
+  /**
+   * Rule 8: when a call ends with nothing confirmed, only metadata remains - and the log is no exception. What
+   * she said is taken out of every record; that a turn was heard, how it was classified, and when, all stay.
+   */
+  forgetHerWords(): void {
+    for (const record of this.log) {
+      const out = record.output as Record<string, unknown> | null;
+      if (!out) continue;
+      if (record.tool === "assess_conversation_state" && out.evidence && typeof out.evidence === "object") (out.evidence as Record<string, unknown>).transcript = "";
+      if (record.tool === "capture_contribution") Object.assign(out, { literal_transcript: "", words: [] });
+    }
   }
 
   private describePolicy(tool: ToolName, output: unknown): string | null {

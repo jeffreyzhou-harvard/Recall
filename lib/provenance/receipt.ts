@@ -7,7 +7,7 @@
  *   first-person words, store-confirmation and share-confirmation timestamps,
  *   content hash, and the retrieval-layer update.
  */
-import { RELAY_AGENT_ID, type MediaSpan } from "@/lib/graph/types";
+import { RECALL_AGENT_ID, type MediaSpan } from "@/lib/graph/types";
 import type { SessionRecord, ToolCallRecord } from "@/lib/tools";
 import { ProvLog, type SealedProvLog } from "./prov-log";
 
@@ -27,7 +27,7 @@ export interface ProvenanceReceipt {
   stored_at: string;
   shared: boolean;
   rungs_used: number;
-  /** "Maya logged as an effective cue for Cape May summers." One per cue offered. What Relay logged; never a statement about her. */
+  /** "Maya logged as an effective cue for Cape May summers." One per cue offered. What Recall logged; never a statement about her. */
   retrieval_updates: Array<{ topic_label: string; cue_id: string; rung: number; effective: boolean }>;
   prov_head: string;
   final_line: typeof THESIS_LINE;
@@ -37,14 +37,14 @@ export interface ProvenanceReceipt {
 export function buildProvLog(session: SessionRecord, toolLog: readonly ToolCallRecord[], personId: string): ProvLog {
   const log = new ProvLog();
   const start = toolLog[0]?.started_at ?? "";
-  log.agent(RELAY_AGENT_ID, "software", start, { label: "Relay" });
+  log.agent(RECALL_AGENT_ID, "software", start, { label: "Recall" });
   if (!session.topic) return log;
   log.agent(personId, "person", start);
 
   for (const call of toolLog) {
     const id = `activity:${call.seq}:${call.tool}`;
-    log.activity(id, `relay:${call.tool}`, call.started_at, { latency_ms: call.latency_ms, policy_decision: call.policy_decision, error: call.error?.name ?? null });
-    log.relate("wasAssociatedWith", id, RELAY_AGENT_ID, call.started_at);
+    log.activity(id, `recall:${call.tool}`, call.started_at, { latency_ms: call.latency_ms, policy_decision: call.policy_decision, error: call.error?.name ?? null });
+    log.relate("wasAssociatedWith", id, RECALL_AGENT_ID, call.started_at);
     for (const source of call.source_ids) log.relate("used", id, source, call.started_at);
   }
   const activityFor = (tool: string): string | null => {
@@ -56,7 +56,7 @@ export function buildProvLog(session: SessionRecord, toolLog: readonly ToolCallR
   const stored = session.stored;
   if (!c || !stored) return log;
   // Her words are attributed to her, and to nobody and nothing else (rule 1).
-  log.entity(c.contribution_id, "relay:Contribution", stored.stored_at, { content_hash: c.content_hash, generated_first_person_words: 0 });
+  log.entity(c.contribution_id, "recall:Contribution", stored.stored_at, { content_hash: c.content_hash, generated_first_person_words: 0 });
   log.relate("wasAttributedTo", c.contribution_id, c.speaker_id, stored.stored_at);
   log.relate("wasDerivedFrom", c.contribution_id, `asset:${c.source.asset_id}`, stored.stored_at);
   const capture = activityFor("capture_contribution");
@@ -64,17 +64,17 @@ export function buildProvLog(session: SessionRecord, toolLog: readonly ToolCallR
 
   const store = session.store_confirmation;
   if (store) {
-    log.entity(store.confirmation_id, "relay:StoreConfirmation", store.recorded_at, { decision: store.decision, confirmation_hash: store.confirmation_hash });
+    log.entity(store.confirmation_id, "recall:StoreConfirmation", store.recorded_at, { decision: store.decision, confirmation_hash: store.confirmation_hash });
     log.relate("wasAttributedTo", store.confirmation_id, c.speaker_id, store.recorded_at);
     log.relate("wasInformedBy", store.confirmation_id, c.contribution_id, store.recorded_at);
   }
   const share = session.share_confirmation;
   if (share) {
-    log.entity(share.share_confirmation_id, "relay:ShareConfirmation", share.recorded_at, { decision: share.decision, confirmation_hash: share.confirmation_hash });
+    log.entity(share.share_confirmation_id, "recall:ShareConfirmation", share.recorded_at, { decision: share.decision, confirmation_hash: share.confirmation_hash });
     log.relate("wasAttributedTo", share.share_confirmation_id, c.speaker_id, share.recorded_at);
     log.relate("wasInformedBy", share.share_confirmation_id, c.contribution_id, share.recorded_at);
   }
-  log.entity(stored.claim_id, "relay:EpisodicClaim", stored.stored_at, { shared: stored.shared });
+  log.entity(stored.claim_id, "recall:EpisodicClaim", stored.stored_at, { shared: stored.shared });
   log.relate("wasDerivedFrom", stored.claim_id, c.contribution_id, stored.stored_at);
   log.relate("wasAttributedTo", stored.claim_id, c.speaker_id, stored.stored_at);
   const commit = activityFor("confirm_and_store");

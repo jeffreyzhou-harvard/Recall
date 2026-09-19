@@ -1,11 +1,11 @@
-# Relay
+# Recall
 
-Most dementia products help families manage the person. Relay helps the person keep reaching her own memories, and keeps the people around her calling her directly to do it.
+Most dementia products help families manage the person. Recall helps the person keep reaching her own memories, and keeps the people around her calling her directly to do it.
 
-Relay has two parts, built on one private memory graph:
+Recall has two parts, built on one private memory graph:
 
 1. **Capture.** She and the people who know her contribute memories — photos, voice, short stories — while those memories are still accessible. The graph holds people, relationships, places, events, stories, and preferences, each with visible provenance: who said it, and when.
-2. **Retrieve.** Relay periodically calls her on an ordinary phone. It picks a personally meaningful memory and helps her reach it herself: free recall first, then progressively more context, only as needed. It also learns which cues actually help *her*, and prefers those next time.
+2. **Retrieve.** Recall periodically calls her on an ordinary phone. It picks a personally meaningful memory and helps her reach it herself: free recall first, then progressively more context, only as needed. It also learns which cues actually help *her*, and prefers those next time.
 
 Family stay in the loop without replacing her. They can contribute memories, open a light weekly note and a per-topic record of what happened in calls, and are pointed back to calling her.
 
@@ -13,9 +13,9 @@ Core loop: **CAPTURE → ORGANIZE → RETRIEVE → REINFORCE → LEARN → REPEA
 
 **Cues, not answers — every memory stays in her own words.**
 
-If Maya wants to know what Susan remembers about her wedding, Relay does not answer from the graph. It says: *"Susan's talked about this before. Want to give her a call?"* and stops there. A product that answers family questions from a database of someone's memories is a reason to stop calling her. Relay exists to be the opposite.
+If Maya wants to know what Susan remembers about her wedding, Recall does not answer from the graph. It says: *"Susan's talked about this before. Want to give her a call?"* and stops there. A product that answers family questions from a database of someone's memories is a reason to stop calling her. Recall exists to be the opposite.
 
-Relay is not a digital replica, a "chat with her" interface, or a bot that relays decisions. It never impersonates her, never fabricates a first-person memory she didn't provide, and never becomes the thing family members talk to instead of her.
+Recall is not a digital replica, a "chat with her" interface, or a bot that relays decisions. It never impersonates her, never fabricates a first-person memory she didn't provide, and never becomes the thing family members talk to instead of her.
 
 `AGENTS.md` is the complete brief, including the non-negotiables. `SPECS.md` is the locked design doc. When they disagree, `AGENTS.md` wins. HackMIT 2026, Healthcare track.
 
@@ -27,21 +27,21 @@ npm run check        # typecheck + tests + language lint + provenance verify
 npm run dev          # http://localhost:3000/present is the judged path
 ```
 
-Node 22+. No keys, no database, and no network are needed for any of the above.
+Node 22.13+. No keys, no database, and no network are needed for any of the above. (Onboarding real households uses one SQLite file through Node's built-in `node:sqlite`: still no service to run and no new dependency. See "Onboarding" below.)
 
 | Command | What it does |
 | --- | --- |
 | `npm run check` | `typecheck` + `test` + `lint:language` + `verify`. Must pass before a task is called done. |
-| `npm run lint:language` | The banned-phrase and conduct lint (`AGENTS.md` §12, test 8) over every fixed line and every line Relay rendered on the golden path. |
+| `npm run lint:language` | The banned-phrase and conduct lint (`AGENTS.md` §12, test 8) over every fixed line and every line Recall rendered on the golden path. |
 | `npm run verify` | Asset hashes, seed validation, citation resolution, the judged path end to end, authorship invariants. |
 | `npm run verify:strict` | The pre-demo gate. Same, but **fails while any placeholder media or placeholder word timing remains.** |
 | `npm run assets:hash` | Re-hash `/assets` into the manifest. Refuses to touch a changed `final` asset without `--allow-replace`. |
 | `npm run assets:placeholder` | Generate stand-in media. Never overwrites an existing file. |
-| `npm run graph:seed` | Build an on-disk LadybugDB graph at `.data/relay.lbug` from the family seed, for Cypher poking. |
+| `npm run graph:seed` | Build an on-disk LadybugDB graph at `.data/recall.lbug` from the family seed, for Cypher poking. |
 
 ## How it fits together
 
-Relay places a scheduled recall call to her, climbs a five-rung support ladder, captures her exact words, and stores them only after she hears the line played back and says yes. A second question asks whether to share that line with family. Family never trigger a same-moment call, and Relay never answers them from the graph.
+Recall places a scheduled recall call to her, climbs a five-rung support ladder, captures her exact words, and stores them only after she hears the line played back and says yes. A second question asks whether to share that line with family. Family never trigger a same-moment call, and Recall never answers them from the graph.
 
 ```
 idle → scheduled → policy_passed → connected → topic_selected → asking
@@ -58,6 +58,7 @@ Family flows sit outside that reducer: a query is redirected, a contribution is 
 | 19 tools and hard gates | `lib/tools` — topic pick, place call, graph query, evidence, ladder, capture, store- and share-confirmation, family redirect, weekly note, topic record, clinician export, safety check |
 | Memory graph + retrieval layer | `lib/graph` — 18 node types, provenance on every claim and edge, a thinner per-cue effectiveness layer that never decides whether to climb, only which cue to try |
 | Trims, hashes, receipts | `lib/provenance` — an edit-decision list that can only express silence and disfluency trims; hash-chained PROV-style log |
+| Onboarding database | `lib/onboarding` — households, the people in them, stated ties, invitations, and every version of the joint setup, append-only. SQLite (`node:sqlite`) with an in-memory twin; the same rules run over both |
 | Family app | `/family` — contribution form, "Ask about Susan" (redirect only), Weekly Note, per-topic record |
 | Judged sandbox | `/present` — autoplay 90-second path; arrow keys step manually |
 
@@ -69,22 +70,34 @@ The model may select tool calls. It cannot bypass gates. Storing a claim without
 
 Family are part of the loop, passively and lightly. Nothing here is shown to her.
 
-- **Tell Relay about a memory.** A one-way form. Stored as the contributor's claim with `patient_confirmed: false`. A question typed here is rejected with a hint to call her.
+- **Tell Recall about a memory.** A one-way form. Stored as the contributor's claim with `patient_confirmed: false`. A question typed here is rejected with a hint to call her.
 - **Ask about Susan.** Redirect only. The entire response is the fixed line pointing them to call her. No graph content, ever.
 - **Weekly Note.** At most one per approved member per 7 days, shown when they open the dashboard. Topic-only, observable; her words only after share-confirmation; at most one gap or difference prompt.
-- **Per-topic record.** Counts and dates from the last 8 calls that included a topic. No total, no score, no color-coded verdict. Fixed header: this is a record of what happened in Relay calls, not a measure of her memory overall.
-- **Export for a doctor.** Member-initiated. The same counts, dates, and header, plus "This record is not a clinical assessment or diagnosis." Relay never sends the file to anyone.
+- **Per-topic record.** Counts and dates from the last 8 calls that included a topic. No total, no score, no color-coded verdict. Fixed header: this is a record of what happened in Recall calls, not a measure of her memory overall.
+- **Export for a doctor.** Member-initiated. The same counts, dates, and header, plus "This record is not a clinical assessment or diagnosis." Recall never sends the file to anyone.
 
-Relay never calls, texts, emails, or pushes family, with one exception: a fixed-text safety alert to designated caregivers if her final turn matches a lexical phrase on the safety list. The alert states a category and time. It never quotes her. Relay is not an emergency service.
+Recall never calls, texts, emails, or pushes family, with one exception: a fixed-text safety alert to designated caregivers if her final turn matches a lexical phrase on the safety list. The alert states a category and time. It never quotes her. Recall is not an emergency service.
+
+## Onboarding
+
+Before Recall's first call, a household is set up: her, the caregiver setting Recall up with her, and whoever they invite. `lib/onboarding` holds it, and the live server can run for a household from it (`RECALL_HOUSEHOLD=household:1`) instead of the committed fixture family.
+
+- **One file, no service.** `SqliteOnboardingStore` uses Node's built-in `node:sqlite`, at `.data/onboarding.db` (git-ignored; `RECALL_ONBOARDING_DB` moves it). `MemoryOnboardingStore` is its twin, and `tests/onboarding.test.ts` runs every rule over both.
+- **Two ways to change the setup, and the difference is the point.** `recordJointSetup` needs her AND a caregiver, and is the only way to add or widen anything. `tightenSetup` is what she, or a caregiver, may do alone at any time: revoke, narrow, pause (rule 12). It compares the new document with the current one and refuses, by name, anything that gives more - above all any change to the safety block (rule 15). Every version is kept, with who agreed and who recorded it; the table is append-only in the schema itself.
+- **Nobody signs themselves up.** Family join by an invitation from her or a caregiver. The token is shown once, to the inviter, to pass on themselves - Recall never contacts family (rule 5) - and only its hash is kept.
+- **Data minimization is in the schema (rule 8).** One phone number - hers - and nothing else about anyone: no diagnosis, stage, birth date, address, or email column exists, a family member's row cannot hold a number, and clinical or state language is refused in any name or note.
+- **Ask, don't assert.** A tie between two people is recorded only because a named member stated it, in the word they used, and `graphSeed()` turns the household into the identity layer of her graph - people, stated ties, the setup - with no memories in it. Those come only from her own confirmed words, or a family contribution in its author's name.
+
+Routes are under `/api/onboarding/*` (operator only until there is a sign-in; accepting an invitation needs only the token).
 
 ## The 90-second golden path
 
 Cast is fixed: Susan, Maya (daughter), Priya (sister), Anika (granddaughter), Cape May, Lincoln Elementary, Princeton. Do not invent another.
 
 1. Onboarding: Maya's photo, Susan names her, the graph node forms with provenance.
-2. The phone rings as a saved contact, "Relay (from Maya)." Relay discloses it is an AI assistant Maya set up, then invites her to talk about summers at Cape May. It waits. She is unsure.
-3. The ladder climbs: context, then association ("You and Maya used to go there together"). She reaches it. Relay does not rewrite her line. Store-confirmation, then share-confirmation. The graph grows from this call.
-4. Later, Maya types "What did Mom say about her wedding?" Relay's entire response: **"Susan's talked about this before. Want to give her a call?"**
+2. The phone rings as a saved contact, "Recall (from Maya)." Recall discloses it is an AI assistant Maya set up, then invites her to talk about summers at Cape May. It waits. She is unsure.
+3. The ladder climbs: context, then association ("You and Maya used to go there together"). She reaches it. Recall does not rewrite her line. Store-confirmation, then share-confirmation. The graph grows from this call.
+4. Later, Maya types "What did Mom say about her wedding?" Recall's entire response: **"Susan's talked about this before. Want to give her a call?"**
 5. The dashboard shows the weekly note, the line Susan chose to share, and the per-topic record. Never a score.
 6. Provenance receipt: her waveform, literal transcript, 2 silence trims, 0 generated first-person words. Final line: **Cues, not answers — every memory stays in her own words.**
 
@@ -98,9 +111,10 @@ Cast is fixed: Susan, Maya (daughter), Priya (sister), Anika (granddaughter), Ca
 
 - **The interface.** `/family` and `/components` do not exist, and `/` and `/present` are unstyled scaffolds. Direction is "The Living Graph" (`AGENTS.md` §10). The family side is reachable only through `/api/family/*`, which has no sign-in yet.
 - **A live call.** The earlier video call was removed. The call feature - her speech transcribed on the web app - is being built separately; it plugs in as a `CallDriver` plus a `TranscriptionProvider` (`lib/orchestrator/call-driver.ts` says what a driver owes the engine). Until then a call runs only on the prerecorded fixture, and a turn of the schedule is a manual, operator-only request.
-- **Onboarding capture.** The "Who is this?" beat has no flow; her graph comes from the seed.
+- **Onboarding capture.** The database, its rules, and its routes exist (see "Onboarding"); the screens do not, and neither does the "Who is this?" beat. A household onboarded today has people and a setup but no topics yet: topics enter through family contributions, which the API does not yet attach to a topic.
+- **Sign-in.** The family routes take `member` on trust, behind `RECALL_FAMILY_SECRET`; the schedule and onboarding are behind the separate `RECALL_OPERATOR_SECRET`, so that whatever opens the family side can never cause a call (rule 5).
 - **Real media.** Everything in `/assets` is a generated stand-in. Word timings are placeholders. See below.
-- **`legacy/`** holds the earlier family-ask relay (forwarded asks, thread bridge, Telegram). It is out of scope (`AGENTS.md` §14), excluded from the build, and can be deleted once the team agrees.
+- **`legacy/`** holds the earlier family-ask recall (forwarded asks, thread bridge). It is out of scope (`AGENTS.md` §14), excluded from the build, and can be deleted once the team agrees.
 
 ## Replacing the placeholder media
 
@@ -110,4 +124,4 @@ Cast is fixed: Susan, Maya (daughter), Priya (sister), Anika (granddaughter), Ca
 4. Re-derive word timings from the real recording and replace the call transcript fixture, setting `"timing_status": "measured"`. The pauses in her answer must still exceed 700 ms for the receipt to read "2 pauses trimmed".
 5. `npm run verify:strict`
 
-`/assets` is append-only after hashing. Relay's spoken lines in the recording must match `render_prompt` (or a fixed script ID) word for word: if they drift, the run stops rather than letting the audio say one thing while the trace shows another.
+`/assets` is append-only after hashing. Recall's spoken lines in the recording must match `render_prompt` (or a fixed script ID) word for word: if they drift, the run stops rather than letting the audio say one thing while the trace shows another.

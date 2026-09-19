@@ -11,7 +11,7 @@
  *
  * The relation is deliberately plain and ungendered. The word the person
  * actually used ("daughter", "my big sister") is kept beside it as `said_as`
- * and is what gets shown and spoken: her word, not Relay's paraphrase.
+ * and is what gets shown and spoken: her word, not Recall's paraphrase.
  */
 import type { EdgeType, GraphEdge, NodeType } from "./types";
 
@@ -71,7 +71,7 @@ export const isRelation = (value: unknown): value is Relation => typeof value ==
 
 /** Throws unless the relation is in the vocabulary and may connect these two kinds of node. */
 export function assertRelation(relation: unknown, fromType: NodeType, toType: NodeType): asserts relation is Relation {
-  if (!isRelation(relation)) throw new RelationError(`"${String(relation)}" is not a relation Relay knows; relations come from a closed list`);
+  if (!isRelation(relation)) throw new RelationError(`"${String(relation)}" is not a relation Recall knows; relations come from a closed list`);
   const rule: RelationRule = RELATIONS[relation];
   if (!rule.from.includes(fromType) || !rule.to.includes(toType)) {
     throw new RelationError(`"${relation}" cannot connect ${fromType} -> ${toType}`);

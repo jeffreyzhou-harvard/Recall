@@ -5,13 +5,13 @@
  * same interface.
  *
  * Transcription only ever goes speech -> text. There is no text -> speech for
- * the participant anywhere in Relay: her audio is played back, never
+ * the participant anywhere in Recall: her audio is played back, never
  * synthesized (rules 1 and 2).
  */
 import type { MediaSpan } from "@/lib/graph/types";
 
-/** `participant` is the person Relay calls. `playback` is her own recorded audio being played back to her. */
-export type Speaker = "participant" | "relay" | "playback";
+/** `participant` is the person Recall calls. `playback` is her own recorded audio being played back to her. */
+export type Speaker = "participant" | "recall" | "playback";
 
 export interface Word {
   w: string;
@@ -79,6 +79,7 @@ export const turnText = (turn: Pick<Turn, "words">): string => turn.words.map((w
 export const tokens = (text: string): string[] =>
   text
     .toLowerCase()
+    .replace(/[‘’]/g, "'") // a curly apostrophe is an apostrophe: "I’d" is one word, as `normalize` already has it
     .replace(/[^\p{L}\p{N}'\s]/gu, " ")
     .split(/\s+/)
     .filter(Boolean);

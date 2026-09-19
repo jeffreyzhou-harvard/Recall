@@ -1,10 +1,10 @@
 /**
- * Relay's service layer: the one place the call side and the family side meet.
+ * Recall's service layer: the one place the call side and the family side meet.
  *
  *   runScheduledCall   the scheduler's tick: pick the topic that is due, check
  *                      the joint setup, call her, climb the ladder, capture,
  *                      confirm, store. Always ends safely.
- *   family flows       tell Relay a memory, the redirect-only ask box, the
+ *   family flows       tell Recall a memory, the redirect-only ask box, the
  *                      Weekly Note, the per-topic record, the export.
  *   caregiver controls pause, revoke, clear a record layer.
  *
@@ -32,10 +32,10 @@ import type { AlertChannel } from "@/lib/safety/alert";
 import type { SafetyPhrases } from "@/lib/safety/phrases";
 import type { CallScript } from "@/lib/script/call-script";
 import { buildRecording, type SessionRecording } from "@/lib/session/recording";
-import { createRelayStore } from "@/lib/state/store";
+import { createRecallStore } from "@/lib/state/store";
 import { GateKeeper, TOOL_IMPLS, ToolRuntime, newSession, type FamilyToolContext, type Fault, type ScaffoldAdvisor, type SetupStore, type ToolContext, type ToolInput, type ToolName, type ToolOutput } from "@/lib/tools";
 
-export interface RelayDeps {
+export interface RecallDeps {
   graph: GraphStore;
   /** The live joint setup. Read fresh at every call and every dashboard load, so a revocation is in force before the next one. */
   setup: SetupStore;
@@ -68,12 +68,12 @@ export interface SessionRun {
 
 type FamilyTool = "receive_family_contribution" | "handle_family_query" | "build_weekly_note" | "get_topic_record" | "export_record_for_clinician";
 
-export class RelayService {
+export class RecallService {
   private readonly answerInterpreter: AnswerInterpreter;
   /** The family side's tool log, for the judge console. Kept apart from any call's log. */
   readonly familyRuntime: ToolRuntime;
 
-  constructor(private readonly deps: RelayDeps) {
+  constructor(private readonly deps: RecallDeps) {
     this.answerInterpreter = deps.answerInterpreter ?? new LexicalAnswerInterpreter();
     const family: FamilyToolContext = {
       view: new FamilyView(deps.graph, deps.setup.current().person_id),
@@ -85,7 +85,7 @@ export class RelayService {
       thresholds: deps.thresholds,
     };
     // A runtime with a family context and no call context: a family flow cannot run a call tool even by mistake.
-    this.familyRuntime = new ToolRuntime({ clock: deps.clock, family }, TOOL_IMPLS);
+    this.familyRuntime = new ToolRuntime({ clock: deps.clock, family }, TOOL_IMPLS, { max_log: 500 });
   }
 
   // --- the recall call -----------------------------------------------------------------------------------------
@@ -96,7 +96,7 @@ export class RelayService {
    */
   async runScheduledCall(sessionId: string): Promise<SessionRun | null> {
     const { deps } = this;
-    const store = createRelayStore();
+    const store = createRecallStore();
     const personId = deps.setup.current().person_id;
     const ctx: ToolContext = {
       graph: deps.graph,
@@ -124,12 +124,20 @@ export class RelayService {
 
   // --- the family side: read when an approved member opens it, never pushed ----------------------------------------
 
+  /**
+   * One family request at a time. Each one reads the graph and then writes to it - the next note's id, the access
+   * log - so two dashboards opened at the same moment would mint the same id, and one of them would fail. A
+   * request that fails does not hold up the next.
+   */
+  private familyQueue: Promise<unknown> = Promise.resolve();
   private family<T extends FamilyTool>(tool: T, input: ToolInput<T>): Promise<ToolOutput<T>> {
-    return this.familyRuntime.call(tool, input);
+    const next = this.familyQueue.then(() => this.familyRuntime.call(tool, input));
+    this.familyQueue = next.catch(() => undefined);
+    return next;
   }
 
-  /** "Tell Relay about a memory you share with Susan." One-way: it returns a thank-you or a hint, never anything from the graph. */
-  tellRelayAMemory(input: ToolInput<"receive_family_contribution">): Promise<ToolOutput<"receive_family_contribution">> {
+  /** "Tell Recall about a memory you share with Susan." One-way: it returns a thank-you or a hint, never anything from the graph. */
+  tellRecallAMemory(input: ToolInput<"receive_family_contribution">): Promise<ToolOutput<"receive_family_contribution">> {
     return this.family("receive_family_contribution", input);
   }
 
@@ -162,8 +170,8 @@ export class RelayService {
     return clearTopicRecord(this.deps.graph);
   }
 
-  // --- ask, don't assert: questions about what Relay does not know yet (section 7) ------------------------------------
-  // Pull-based on purpose. Relay never schedules one of these: someone opens a sitting and asks what Relay
+  // --- ask, don't assert: questions about what Recall does not know yet (section 7) ------------------------------------
+  // Pull-based on purpose. Recall never schedules one of these: someone opens a sitting and asks what Recall
   // would like to know. No sitting, no questions.
 
   /** Observations about photos the family shared. Refused unless the joint setup allows it, kind by kind. */
@@ -171,7 +179,7 @@ export class RelayService {
     return ingestLibrary(observations, { graph: this.deps.graph, assets: this.deps.assets, policy: this.deps.setup.current(), granted_by: grantedBy });
   }
 
-  /** What Relay does not know yet, most useful first, each already worded and checked to cite only what it may. */
+  /** What Recall does not know yet, most useful first, each already worded and checked to cite only what it may. */
   async nextQuestions(limit = 3, askedThisSitting: ReadonlySet<string> = new Set()): Promise<Question[]> {
     const { graph } = this.deps;
     const policy = this.deps.setup.current();
@@ -190,6 +198,8 @@ export class RelayService {
   async answerQuestion(question: Question, answer: Answer): Promise<ApplyResult> {
     const { graph } = this.deps;
     const policy = this.deps.setup.current();
+    // Off means off: with discovery not turned on in the joint setup no answer is read - not even handed to a model - and nothing is kept.
+    if (!policy.discovery.enabled) throw new Error("discovery is not turned on in the joint setup");
     const speaker = { id: answer.by, is_participant: answer.by === policy.person_id };
     const proposals = await this.answerInterpreter.interpret(question, answer, speaker, policy.person_id);
     return applyAnswer(question, answer, proposals, { graph, policy });

@@ -95,7 +95,7 @@ const SPECS: Spec[] = [
     id: "call-golden",
     path: "assets/audio/call-golden.wav",
     kind: "audio",
-    description: "The prerecorded phone call for the judged path, from Relay's greeting through Susan's two spoken yeses and the warm close.",
+    description: "The prerecorded phone call for the judged path, from Recall's greeting through Susan's two spoken yeses and the warm close.",
     duration_ms: 60_000,
     make: () => placeholderWav(60_000),
   },

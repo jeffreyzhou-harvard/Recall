@@ -152,4 +152,9 @@ export class GateKeeper {
     this.alerted.add(key);
     return true;
   }
+
+  /** The alert did not go out after all, so it has not been sent: a second try may claim it again. */
+  releaseAlert(category: string, caregiverId: string): void {
+    this.alerted.delete(JSON.stringify([category, caregiverId]));
+  }
 }

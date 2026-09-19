@@ -1,17 +1,17 @@
 /**
  * The bridge to the family's existing thread.
  *
- * Relay does not own a chat surface. A relative forwards one ask out of the
- * thread the family already uses; Relay replies into that same thread. This
+ * Recall does not own a chat surface. A relative forwards one ask out of the
+ * thread the family already uses; Recall replies into that same thread. This
  * file is the whole of that seam, and it is deliberately neutral: there is no
  * branded or mocked messaging integration behind it on the judged path
  * (product flow spec, "Telegram bot" row). A real transport implements
- * `ThreadBridge`; nothing else in Relay knows which one it is.
+ * `ThreadBridge`; nothing else in Recall knows which one it is.
  *
  * Rule 5, no autonomous outreach, is enforced here rather than trusted to
  * callers: every outbound message must be a reply to a forward this bridge
  * actually received, and must go back to that forward's own thread or to a
- * person the policy named. Relay has no way to start a conversation.
+ * person the policy named. Recall has no way to start a conversation.
  */
 import type { MediaSpan } from "@/lib/graph/types";
 
@@ -29,19 +29,19 @@ export interface VoiceCard {
 }
 
 /**
- * The two things Relay itself may say to the family. Both are fixed, both are
- * labeled as Relay, and neither says anything about her: the words are the
+ * The two things Recall itself may say to the family. Both are fixed, both are
+ * labeled as Recall, and neither says anything about her: the words are the
  * same whatever the reason the ask did not complete.
  */
 export const NOTICE_TEXT = {
   /** Identity, audience, or evidence was missing: stop safely and ask the family to clarify. */
-  clarify: "Relay needs a bit more detail before it can pass this along. Could you clarify and send it again?",
+  clarify: "Recall needs a bit more detail before it can pass this along. Could you clarify and send it again?",
   /** Anything else that ended without a delivery. */
   not_this_time: "Not this time. You're welcome to ask again.",
 } as const;
 export type FamilyNotice = keyof typeof NOTICE_TEXT;
 
-/** A short, non-clinical account of the support Relay gave. Goes to approved relatives only, never to the thread. */
+/** A short, non-clinical account of the support Recall gave. Goes to approved relatives only, never to the thread. */
 export interface SupportReceipt {
   session_id: string;
   lines: Array<{ dimension: "social" | "emotional" | "intellectual"; text: string; citations: string[] }>;
@@ -55,7 +55,7 @@ interface Reply {
 
 export type ThreadMessage =
   | (Reply & { kind: "voice_contribution"; to: { thread_id: string }; card: VoiceCard })
-  | (Reply & { kind: "family_notice"; to: { thread_id: string }; notice: FamilyNotice; text: string; authored_by: "relay" })
+  | (Reply & { kind: "family_notice"; to: { thread_id: string }; notice: FamilyNotice; text: string; authored_by: "recall" })
   | (Reply & { kind: "support_receipt"; to: { person_id: string }; receipt: SupportReceipt });
 
 export type PostedMessage = ThreadMessage & { posted_at: string };

@@ -4,7 +4,7 @@
  */
 import { buildFixtureRig, type FixtureOptions, type FixtureRig } from "@/fixtures/harness";
 import { ProvLog } from "@/lib/provenance/prov-log";
-import { createRelayStore } from "@/lib/state/store";
+import { createRecallStore } from "@/lib/state/store";
 import { GateKeeper, TOOL_IMPLS, ToolRuntime, newSession, policySchema, type ToolContext, type ToolOutput } from "@/lib/tools";
 import { FixtureTranscription } from "@/lib/providers/transcription";
 import { GOLDEN_TRANSCRIPT, POLICY } from "@/fixtures";
@@ -24,7 +24,7 @@ export async function bench(options: FixtureOptions = {}): Promise<Bench> {
 
 /** A bare tool runtime over a rig that is already set up, for tests that prepare the graph themselves. */
 export function benchOn(rig: FixtureRig, options: FixtureOptions = {}): Bench {
-  const store = createRelayStore();
+  const store = createRecallStore();
   const ctx: ToolContext = {
     graph: rig.graph,
     policy: policySchema.parse(options.policy ?? POLICY),

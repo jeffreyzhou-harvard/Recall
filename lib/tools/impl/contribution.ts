@@ -4,12 +4,12 @@
  * Then record what happened on the topic. Each step fails closed.
  */
 import { edgeId } from "@/lib/graph/seed";
-import { patientConfirmed, RELAY_AGENT_ID, type EdgeType, type GraphNode, type MediaSpan, type Provenance, type SourceClass } from "@/lib/graph/types";
+import { NOT_ANSWERED, patientConfirmed, RECALL_AGENT_ID, type EdgeType, type GraphNode, type MediaSpan, type Provenance, type SourceClass } from "@/lib/graph/types";
 import { AuthorshipError, generatedFirstPersonWords, herWordsPct, participantWordsIn } from "@/lib/provenance/authorship";
 import { buildEdl, trimCount } from "@/lib/provenance/edl";
 import { contentHash } from "@/lib/provenance/hash";
 import { tokens, turnText, type AudioWindow } from "@/lib/providers/transcription";
-import { firstPhraseIn } from "@/lib/script/call-script";
+import { stopPhraseIn } from "@/lib/script/call-script";
 import type { StoreDecision } from "@/lib/state/machine";
 import type { ToolOutput } from "../contracts";
 import type { ToolContext } from "../context";
@@ -44,7 +44,7 @@ export const capture_contribution: ToolImpl<"capture_contribution"> = async (inp
   const turns = await ctx.transcription.allTurns(asset.id);
   let words;
   try {
-    // Deterministic check: any interval holding Relay's speech, or played-back audio, is rejected outright.
+    // Deterministic check: any interval holding Recall's speech, or played-back audio, is rejected outright.
     words = participantWordsIn(turns, intervals);
   } catch (e) {
     if (e instanceof AuthorshipError) throw new GateError("authorship", e.message);
@@ -89,11 +89,16 @@ export const capture_contribution: ToolImpl<"capture_contribution"> = async (inp
  * it is part of saying yes, and at least one of them actually says it. Anything else she might add, of any
  * kind, makes it not a clean yes (rule 3).
  *
- * The cost is deliberate: "yes, the one about the beach" is unclear, and nothing is kept. Relay can ask
+ * The cost is deliberate: "yes, the one about the beach" is unclear, and nothing is kept. Recall can ask
  * again on another call; a memory stored or shared without her clear yes cannot be un-stored in her eyes.
  * English only, like the rest of the lexical rules here.
  */
-const YES_WORDS = new Set(["yes", "yeah", "yep", "yup", "ok", "okay", "sure", "please", "do", "it", "that", "go", "ahead", "and", "thanks", "thank", "you", "remember", "share", "i", "would", "i'd", "like", "to"]);
+const YES_PARTS = ["yes", "yeah", "yep", "yup", "ok", "okay", "sure", "please", "and", "thanks", "thank you", "go ahead", "do it", "do that", "do", "i do", "i would", "remember it", "remember that", "share it", "share that", "i'd like that", "i would like that", "i'd like you to", "i would like you to"];
+/**
+ * Whole phrases, not loose words. "go" is part of a yes only inside "go ahead", and "to" only inside "I'd like you
+ * to": with each allowed on its own, "Okay, I'd like to go" - a woman trying to leave the call - read as a clean yes.
+ */
+const ONLY_YES = new RegExp(`^(?:${[...YES_PARTS].sort((a, b) => b.length - a.length).join("|")})(?: (?:${[...YES_PARTS].sort((a, b) => b.length - a.length).join("|")}))*$`);
 const SAYS_YES = /\b(yes|yeah|yep|yup|ok|okay|sure|please do|do it|do that|go ahead)\b/;
 const OPENS_WITH_YES = /^(yes|yeah|yep|yup|ok|okay|sure|please do|go ahead)\b/;
 /** Used only to tell a plain "no" from an unclear reply, for the record. It can never make something a yes. */
@@ -102,7 +107,7 @@ const REFUSES = /\b(no|nope|not|don't|dont|wait|stop|never)\b/;
 export function classifyYes(transcript: string): StoreDecision {
   const words = tokens(transcript);
   const said = words.join(" ");
-  if (words.length > 0 && words.every((w) => YES_WORDS.has(w)) && SAYS_YES.test(said)) return "yes";
+  if (ONLY_YES.test(said) && SAYS_YES.test(said)) return "yes";
   // Neither of these stores or shares anything. A reply that opens with a yes and then adds to it is unclear, not a no.
   return REFUSES.test(said) && !OPENS_WITH_YES.test(said) ? "no" : "unclear";
 }
@@ -126,7 +131,7 @@ function provFor(ctx: ToolContext, c: Contribution, author: string, span: MediaS
     span,
     observed_at: at,
     author,
-    extraction_method: author === RELAY_AGENT_ID ? "system_event" : "literal_transcript",
+    extraction_method: author === RECALL_AGENT_ID ? "system_event" : "literal_transcript",
     confidence: 1,
     audience_scope: [ctx.setup.current().person_id],
     expires_at: null,
@@ -147,7 +152,7 @@ export const confirm_and_store: ToolImpl<"confirm_and_store"> = async (input, ct
     const asset = ctx.assets.resolveSpan(input.audio_window.asset_id, input.audio_window);
     const turn = await finalTurnIn(ctx, input.audio_window);
     // A stop is not an answer to the question. It is recorded as "no" so that nothing can be kept, and the orchestrator ends the call.
-    const stopRequested = turn !== null && firstPhraseIn(turnText(turn), ctx.script.stop_phrases) !== null;
+    const stopRequested = turn !== null && stopPhraseIn(turnText(turn), ctx.script.stop_phrases) !== null;
     const decision: StoreDecision = turn ? (stopRequested ? "no" : classifyYes(turnText(turn))) : "unclear";
     const recordedAt = ctx.clock.iso();
     const body = { decision, contribution_hash: input.contribution_hash, audio: { asset_id: asset.id, span: turn ? { start_ms: turn.start_ms, end_ms: turn.end_ms } : null, media_hash: asset.sha256 }, recorded_at: recordedAt };
@@ -223,7 +228,7 @@ export const confirm_share: ToolImpl<"confirm_share"> = async (input, ctx) => {
   ctx.gate.requirePendingContribution(input.contribution_hash);
   // No window means she did not answer in time. That is "not shared", and it never blocks storing (section 5).
   const turn = input.audio_window ? await finalTurnIn(ctx, input.audio_window) : null;
-  const stopRequested = turn !== null && firstPhraseIn(turnText(turn), ctx.script.stop_phrases) !== null;
+  const stopRequested = turn !== null && stopPhraseIn(turnText(turn), ctx.script.stop_phrases) !== null;
   const decision = !input.audio_window ? ("timeout" as const) : turn ? (stopRequested ? ("no" as const) : classifyYes(turnText(turn))) : ("unclear" as const);
   const recordedAt = ctx.clock.iso();
   const body = { decision, contribution_hash: input.contribution_hash, recorded_at: recordedAt };
@@ -251,7 +256,7 @@ export const record_retrieval_outcome: ToolImpl<"record_retrieval_outcome"> = as
     media_hash: null,
     span: null,
     observed_at: at,
-    author: RELAY_AGENT_ID,
+    author: RECALL_AGENT_ID,
     extraction_method: "system_event",
     confidence: 1,
     audience_scope: [ctx.setup.current().person_id],
@@ -262,8 +267,8 @@ export const record_retrieval_outcome: ToolImpl<"record_retrieval_outcome"> = as
     patient_confirmed: false,
     confirmations: [],
   };
-  await ctx.graph.putNode({ id: logId, type: "Artifact", label: "Relay's record of this call", props: { kind: "call", text: null, alt: null }, prov });
-  await ctx.graph.putNode({ id: sessionNodeId, type: "Session", label: "Recall call", props: { topic_id: topic.topic_id, started_at: ctx.session.started_at ?? at, ended_at: at, outcome: machine.state }, prov });
+  await ctx.graph.putNode({ id: logId, type: "Artifact", label: "Recall's record of this call", props: { kind: "call", text: null, alt: null }, prov });
+  await ctx.graph.putNode({ id: sessionNodeId, type: "Session", label: "Recall call", props: { topic_id: topic.topic_id, started_at: ctx.session.started_at ?? at, ended_at: at, outcome: machine.context.session_id === null ? NOT_ANSWERED : machine.state }, prov });
   const link = async (type: EdgeType, from: string, to: string): Promise<void> => ctx.graph.putEdge({ id: edgeId(type, from, to), type, from, to, props: {}, prov });
   if (ctx.session.stored && c) await link("DERIVED_FROM", c.contribution_id, sessionNodeId);
 

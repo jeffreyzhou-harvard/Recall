@@ -1,14 +1,14 @@
 {
   "policy_id": "policy:susan-setup",
   "version": 2,
-  "description": "What Susan and Maya agreed together, once, before Relay's first call. Every call and every family view is checked against this, and it is read fresh each time, so a change or a revocation takes effect before the next call or the next dashboard load.",
+  "description": "What Susan and Maya agreed together, once, before Recall's first call. Every call and every family view is checked against this, and it is read fresh each time, so a change or a revocation takes effect before the next call or the next dashboard load.",
   "person_id": "person:susan",
   "established_by": [
     "person:susan",
     "person:maya"
   ],
   "established_at": "2026-10-12T15:00:00.000Z",
-  "relay_set_up_by": "person:maya",
+  "recall_set_up_by": "person:maya",
   "approved_people": [
     "person:maya"
   ],
@@ -73,9 +73,9 @@
   },
   "attestations": {
     "number_saved_in_her_phone": true,
-    "saved_contact_name": "Relay (from Maya)",
+    "saved_contact_name": "Recall (from Maya)",
     "saved_contact_photo": true,
-    "relay_introduced_to_her": true,
+    "recall_introduced_to_her": true,
     "introduced_by": "person:maya"
   },
   "dashboard": {

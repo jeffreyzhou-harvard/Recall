@@ -43,7 +43,7 @@ describe("retrieval gate", () => {
     ).rejects.toEqual(gate("policy"));
   });
 
-  it("does nothing at all when no ask was forwarded: Relay never initiates", async () => {
+  it("does nothing at all when no ask was forwarded: Recall never initiates", async () => {
     const b = await bench();
     await expect(b.runtime.call("inspect_request", { thread_id: "artifact:some-other-thread" })).rejects.toEqual(gate("permission"));
   });
@@ -104,7 +104,7 @@ describe("evidence gate", () => {
 });
 
 describe("authorship gate", () => {
-  it("rejects any interval that contains Relay's own speech", async () => {
+  it("rejects any interval that contains Recall's own speech", async () => {
     const p = await throughCapture();
     await expect(
       p.runtime.call("capture_exact_contribution", { ask_id: p.ask.ask_id, audio_intervals: [{ asset_id: CALL, start_ms: goldenTurn("r2").start_ms, end_ms: goldenTurn("p2").end_ms }] }),

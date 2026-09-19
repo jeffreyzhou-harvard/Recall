@@ -2,7 +2,7 @@
  * Build an on-disk LadybugDB graph: the family seed, plus the judged ask taken
  * in through real intake.
  *
- *   npm run graph:seed        ->  .data/relay.lbug
+ *   npm run graph:seed        ->  .data/recall.lbug
  *
  * The judged path never reads this database: it runs on the in-memory store.
  * This is persistence for the optional live side demo and for poking at the
@@ -17,7 +17,7 @@ import { NODE_LAYER } from "@/lib/graph/types";
 import { ROOT } from "./lib/asset-tools";
 
 const dir = join(ROOT, ".data");
-const path = join(dir, "relay.lbug");
+const path = join(dir, "recall.lbug");
 mkdirSync(dir, { recursive: true });
 rmSync(path, { recursive: true, force: true });
 rmSync(`${path}.wal`, { force: true });

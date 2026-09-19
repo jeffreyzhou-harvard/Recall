@@ -1,34 +1,34 @@
 /** The reducer on its own: no tools, no fixtures. It must hold the line even if everything around it is wrong. */
 import { describe, expect, it } from "vitest";
-import { CALL_PHASE, MAIN_LINE, SAFE_ENDINGS, TERMINAL, TRANSITIONS, type RelayEvent, type RelayState } from "@/lib/state/machine";
+import { CALL_PHASE, MAIN_LINE, SAFE_ENDINGS, TERMINAL, TRANSITIONS, type RecallEvent, type RecallState } from "@/lib/state/machine";
 import { initialState, reduce, replay, visitedStates, type MachineState } from "@/lib/state/reducer";
-import { createRelayStore } from "@/lib/state/store";
+import { createRecallStore } from "@/lib/state/store";
 
 const AT = "2026-11-05T17:30:00.000Z";
 const HASH = "a".repeat(64);
 const THREAD = "artifact:thread-family";
 
-const play = (events: RelayEvent[], from: MachineState = initialState()): MachineState =>
+const play = (events: RecallEvent[], from: MachineState = initialState()): MachineState =>
   events.reduce((m, e) => reduce(m, e, { at: AT }), from);
 
-const TO_FOLLOWING: RelayEvent[] = [
+const TO_FOLLOWING: RecallEvent[] = [
   { type: "ASK_FORWARDED", ask_id: "ask:1", thread_id: THREAD, asker_id: "person:anika", addressee_id: "person:mom" },
   { type: "POLICY_GRANTED", policy_token_id: "token:1", audience: THREAD },
   { type: "CALL_CONNECTED", session_id: "session:1" },
   { type: "BRIEF_DELIVERED", prompt_id: "prompt:1", citations: ["person:anika"] },
 ];
-const TO_PLAYBACK: RelayEvent[] = [
+const TO_PLAYBACK: RecallEvent[] = [
   ...TO_FOLLOWING,
   { type: "TURN_ASSESSED", turn_id: "p2", turn_state: "answer_present" },
   { type: "CONTRIBUTION_CAPTURED", contribution_hash: HASH, trims: 3, generated_first_person_words: 0 },
   { type: "PLAYBACK_STARTED", contribution_hash: HASH },
 ];
-const YES: RelayEvent = { type: "ASSENT_RECORDED", assent_id: "assent:1", decision: "yes", contribution_hash: HASH, audience: THREAD };
-const PUBLISH: RelayEvent = { type: "PUBLISHED", delivery_id: "delivery:1", contribution_hash: HASH, destination: THREAD };
+const YES: RecallEvent = { type: "ASSENT_RECORDED", assent_id: "assent:1", decision: "yes", contribution_hash: HASH, audience: THREAD };
+const PUBLISH: RecallEvent = { type: "PUBLISHED", delivery_id: "delivery:1", contribution_hash: HASH, destination: THREAD };
 
 describe("transition table", () => {
   it("covers every state, and no terminal state has a way out", () => {
-    const all: RelayState[] = [...MAIN_LINE, ...SAFE_ENDINGS, "fallback"];
+    const all: RecallState[] = [...MAIN_LINE, ...SAFE_ENDINGS, "fallback"];
     expect(Object.keys(TRANSITIONS).sort()).toEqual([...all].sort());
     for (const state of TERMINAL) expect(Object.keys(TRANSITIONS[state])).toEqual([]);
   });
@@ -62,19 +62,19 @@ describe("reducer", () => {
   });
 
   it("refuses assent for a different hash or a different audience", () => {
-    expect(play([...TO_PLAYBACK, { ...YES, contribution_hash: "b".repeat(64) } as RelayEvent]).state).toBe("playback");
-    expect(play([...TO_PLAYBACK, { ...YES, audience: "person:anika" } as RelayEvent]).state).toBe("playback");
+    expect(play([...TO_PLAYBACK, { ...YES, contribution_hash: "b".repeat(64) } as RecallEvent]).state).toBe("playback");
+    expect(play([...TO_PLAYBACK, { ...YES, audience: "person:anika" } as RecallEvent]).state).toBe("playback");
   });
 
   it("refuses to publish a different hash or to a different destination, even after a yes", () => {
-    expect(play([...TO_PLAYBACK, YES, { ...PUBLISH, contribution_hash: "b".repeat(64) } as RelayEvent]).state).toBe("assented");
-    expect(play([...TO_PLAYBACK, YES, { ...PUBLISH, destination: "person:anika" } as RelayEvent]).state).toBe("assented");
+    expect(play([...TO_PLAYBACK, YES, { ...PUBLISH, contribution_hash: "b".repeat(64) } as RecallEvent]).state).toBe("assented");
+    expect(play([...TO_PLAYBACK, YES, { ...PUBLISH, destination: "person:anika" } as RecallEvent]).state).toBe("assented");
     expect(play([...TO_PLAYBACK, YES, PUBLISH]).state).toBe("delivered");
   });
 
   it("treats no and unclear the same way: nothing sends", () => {
     for (const decision of ["no", "unclear"] as const) {
-      const m = play([...TO_PLAYBACK, { ...YES, decision } as RelayEvent, PUBLISH]);
+      const m = play([...TO_PLAYBACK, { ...YES, decision } as RecallEvent, PUBLISH]);
       expect(m.state).toBe("not_sent");
       expect(m.context.assent_id).toBeNull();
     }
@@ -104,8 +104,8 @@ describe("reducer", () => {
   });
 
   it("wraps up on the second lost-thread signal, whichever kind it is", () => {
-    const lost = (s: "asked_repeat" | "no_answer"): RelayEvent => ({ type: "TURN_ASSESSED", turn_id: "t", turn_state: s });
-    const scaffold: RelayEvent = { type: "SCAFFOLD_DELIVERED", scaffold_id: "restate_options", prompt_id: "prompt:2", citations: [] };
+    const lost = (s: "asked_repeat" | "no_answer"): RecallEvent => ({ type: "TURN_ASSESSED", turn_id: "t", turn_state: s });
+    const scaffold: RecallEvent = { type: "SCAFFOLD_DELIVERED", scaffold_id: "restate_options", prompt_id: "prompt:2", citations: [] };
     expect(play([...TO_FOLLOWING, lost("asked_repeat")]).state).toBe("lost");
     const m = play([...TO_FOLLOWING, lost("asked_repeat"), scaffold, lost("no_answer")]);
     expect(m.state).toBe("wrapped_up");
@@ -113,32 +113,32 @@ describe("reducer", () => {
   });
 
   it("sends a missing gate to the right safe ending for where the flow is", () => {
-    const gate: RelayEvent = { type: "GATE_MISSING", gate: "evidence", detail: "x" };
+    const gate: RecallEvent = { type: "GATE_MISSING", gate: "evidence", detail: "x" };
     expect(play([TO_FOLLOWING[0]!, gate]).state).toBe("blocked");
     expect(play([...TO_FOLLOWING, gate]).state).toBe("narrowed");
     expect(play([...TO_PLAYBACK, gate]).state).toBe("not_sent");
   });
 
   it("decides what the family is told: clarify when something they can supply is missing, otherwise not this time", () => {
-    const gate: RelayEvent = { type: "GATE_MISSING", gate: "identity", detail: "x" };
-    const notice = (events: RelayEvent[]) => play(events).context.family_notice;
+    const gate: RecallEvent = { type: "GATE_MISSING", gate: "identity", detail: "x" };
+    const notice = (events: RecallEvent[]) => play(events).context.family_notice;
     expect(notice([gate])).toBe("clarify"); // intake could not even record the ask
     expect(notice([TO_FOLLOWING[0]!, gate])).toBe("clarify"); // spec X: stop safely, ask family to clarify
-    expect(notice([...TO_FOLLOWING, gate])).toBe("clarify"); // Relay told her it would ask Anika to clarify
+    expect(notice([...TO_FOLLOWING, gate])).toBe("clarify"); // Recall told her it would ask Anika to clarify
     expect(notice([TO_FOLLOWING[0]!, { type: "POLICY_DENIED", reason: "topic_blocked" }])).toBe("not_this_time"); // spec Y
-    expect(notice([...TO_PLAYBACK, { ...YES, decision: "unclear" } as RelayEvent])).toBe("not_this_time"); // spec W
+    expect(notice([...TO_PLAYBACK, { ...YES, decision: "unclear" } as RecallEvent])).toBe("not_this_time"); // spec W
     expect(notice([...TO_PLAYBACK, YES, PUBLISH])).toBeNull();
   });
 
   it("gives every safe ending a notice, so the family is never left without a reply", () => {
-    const lost: RelayEvent = { type: "TURN_ASSESSED", turn_id: "t", turn_state: "no_answer" };
-    const scaffold: RelayEvent = { type: "SCAFFOLD_DELIVERED", scaffold_id: "repeat", prompt_id: "p", citations: [] };
-    const timeout: RelayEvent = { type: "TOOL_TIMEOUT", tool: "select_scaffold" };
-    const endings: RelayEvent[][] = [
+    const lost: RecallEvent = { type: "TURN_ASSESSED", turn_id: "t", turn_state: "no_answer" };
+    const scaffold: RecallEvent = { type: "SCAFFOLD_DELIVERED", scaffold_id: "repeat", prompt_id: "p", citations: [] };
+    const timeout: RecallEvent = { type: "TOOL_TIMEOUT", tool: "select_scaffold" };
+    const endings: RecallEvent[][] = [
       [TO_FOLLOWING[0]!, { type: "POLICY_DENIED", reason: "x" }],
       [...TO_FOLLOWING, { type: "GATE_MISSING", gate: "evidence", detail: "x" }],
       [...TO_FOLLOWING, lost, scaffold, lost],
-      [...TO_PLAYBACK, { ...YES, decision: "no" } as RelayEvent],
+      [...TO_PLAYBACK, { ...YES, decision: "no" } as RecallEvent],
       [...TO_FOLLOWING, timeout, { type: "FIXED_RESTATEMENT_DELIVERED", prompt_id: "p" }, { type: "CALL_CLOSED" }],
     ];
     expect(endings.map((e) => play(e).state).sort()).toEqual([...SAFE_ENDINGS].sort());
@@ -156,7 +156,7 @@ describe("reducer", () => {
   });
 
   it("sends a tool timeout to the right place: not placed, fixed script, or not sent", () => {
-    const timeout: RelayEvent = { type: "TOOL_TIMEOUT", tool: "select_scaffold" };
+    const timeout: RecallEvent = { type: "TOOL_TIMEOUT", tool: "select_scaffold" };
     expect(play([TO_FOLLOWING[0]!, timeout]).state).toBe("blocked");
     expect(play([...TO_PLAYBACK, timeout]).state).toBe("not_sent");
     const inCall = play([...TO_FOLLOWING, timeout]);
@@ -184,8 +184,8 @@ describe("reducer", () => {
 
 describe("store", () => {
   it("is the reducer plus subscription, nothing more", () => {
-    const store = createRelayStore();
-    const seen: RelayState[] = [];
+    const store = createRecallStore();
+    const seen: RecallState[] = [];
     store.subscribe((s) => seen.push(s.machine.state));
     for (const e of TO_FOLLOWING) store.getState().dispatch(e, { at: AT });
     expect(seen).toEqual(["ask_received", "policy_passed", "connected", "following"]);

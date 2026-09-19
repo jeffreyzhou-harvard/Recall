@@ -1,5 +1,5 @@
 /**
- * Session recordings and the view selectors behind the Relay web experience
+ * Session recordings and the view selectors behind the Recall web experience
  * (product flow spec: D request intake, E live session view, F receipt and
  * provenance). One reducer drives every pane: the views are the trace,
  * re-reduced to a moment in time.
@@ -73,7 +73,7 @@ describe("live session view", () => {
     expect(liveSessionView(run.recording, at(5000)).headline).toEqual({ person: "Mom", asker: "Anika", about: "Diwali dessert" });
   });
 
-  it("shows one cue at a time, following what Relay just said", () => {
+  it("shows one cue at a time, following what Recall just said", () => {
     const cueAt = (ms: number) => liveSessionView(run.recording, at(ms)).cue?.kind ?? null;
     expect(cueAt(goldenTurn("r1").end_ms)).toBe("photo");
     expect(cueAt(goldenTurn("r2").end_ms)).toBe("choices");

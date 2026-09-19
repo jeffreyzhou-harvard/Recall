@@ -29,6 +29,9 @@ import {
   type Provenance,
 } from "./types";
 
+/** How much a status vouches for. A seed may move a source down this scale, never up. */
+const STANDING: Record<(typeof EPISTEMIC_STATUSES)[number], number> = { disputed: 0, observed: 0, inferred: 0, family_confirmed: 1, reference: 1, participant_confirmed: 2 };
+
 const spanSchema = z.object({ start_ms: z.number().int().nonnegative(), end_ms: z.number().int().positive() });
 
 const sourceSchema = z.object({
@@ -153,7 +156,7 @@ export class SeedValidationError extends Error {
  * deliberately blunt - a false positive costs a rewording, a false negative
  * puts a clinical label in a family's graph.
  */
-const CLINICAL_TERMS =
+export const CLINICAL_TERMS =
   /\b(diagnos\w*|dementia|alzheimer\w*|cognit\w*|competen\w*|mood|disease stage|decline|impairment|symptom\w*|score[sd]?)\b/i;
 
 function clinicalHits(value: unknown, path: string, out: string[]): void {
@@ -242,9 +245,11 @@ export function buildGraph(raw: unknown, assets: AssetIndex): GraphData {
   clinicalHits(seed.edges, "edges", problems);
 
   const nodeTypes = new Map<string, NodeType>();
+  const participants = new Set<string>();
   for (const n of seed.nodes) {
     if (nodeTypes.has(n.id)) problems.push(`duplicate node id "${n.id}"`);
     nodeTypes.set(n.id, n.type);
+    if (n.type === "Person" && (n.props as { role?: unknown } | undefined)?.role === "participant") participants.add(n.id);
   }
 
   const provFor = (
@@ -273,6 +278,11 @@ export function buildGraph(raw: unknown, assets: AssetIndex): GraphData {
     for (const id of source.audience_scope) {
       if (!nodeTypes.has(id)) problems.push(`${where}: audience_scope names unknown node "${id}"`);
     }
+    // A seed may only LOWER how well something is known. Raising it would let a file declare a family member's
+    // account to be her own confirmed memory (rule 13) - and her confirmation comes from her, on a call, and nowhere else.
+    const byDefault = initialStatus(source.source_class);
+    if (source.status && source.status !== byDefault && STANDING[source.status] >= STANDING[byDefault]) problems.push(`${where}: source "${sourceKey}" claims status "${source.status}", above what a ${source.source_class} source starts as ("${byDefault}")`);
+    if (patientConfirmed(source.status ?? byDefault) && !participants.has(source.author)) problems.push(`${where}: source "${sourceKey}" would count as her own confirmed word, but its author "${source.author}" is not the participant`);
     return {
       source_id: sourceKey,
       source_class: source.source_class,

@@ -1,5 +1,5 @@
 /**
- * Builds a complete Relay from fixtures: in-memory graph, the joint setup, the
+ * Builds a complete Recall from fixtures: in-memory graph, the joint setup, the
  * fixed scripts, a fixture clock, and a prerecorded call. The judged path and
  * every engine test run through this, so they exercise the same service the
  * live side demo does - only the call driver and the clock differ.
@@ -14,7 +14,7 @@ import { FixtureTranscription, type CallTranscript } from "@/lib/providers/trans
 import { MemoryAlertChannel } from "@/lib/safety/alert";
 import type { SafetyPhrases } from "@/lib/safety/phrases";
 import type { CallScript } from "@/lib/script/call-script";
-import { RelayService, type SessionRun } from "@/lib/service/relay-service";
+import { RecallService, type SessionRun } from "@/lib/service/recall-service";
 import { SetupStore, type Fault, type ScaffoldAdvisor } from "@/lib/tools";
 import { CALL_SCRIPT, FAMILY_COPY, FAMILY_SEED, GOLDEN_TRANSCRIPT, JUDGED_TIMING, MANIFEST, POLICY, RECORD_THRESHOLDS, SAFETY_PHRASES } from "./index";
 
@@ -38,7 +38,7 @@ export interface FixtureOptions {
 }
 
 export interface FixtureRig {
-  service: RelayService;
+  service: RecallService;
   graph: GraphStore;
   setup: SetupStore;
   alerts: MemoryAlertChannel;
@@ -58,7 +58,7 @@ export async function buildFixtureRig(options: FixtureOptions = {}): Promise<Fix
   const transcript = options.transcript === undefined ? GOLDEN_TRANSCRIPT : options.transcript;
   const { default: default_ms, ...ms } = JUDGED_TIMING.tool_latency_ms;
 
-  const service = new RelayService({
+  const service = new RecallService({
     graph,
     setup,
     assets,

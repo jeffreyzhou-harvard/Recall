@@ -4,7 +4,7 @@
  * This is a lexical match on her literal words. It infers nothing about her,
  * it will miss things, and it will sometimes fire on a harmless phrase ("I fell
  * in love with Maya"): a neutral note to her caregiver is the accepted cost of
- * not missing a real one. Relay is not an emergency service.
+ * not missing a real one. Recall is not an emergency service.
  */
 import { z } from "zod";
 import { containsPhrase } from "@/lib/script/call-script";

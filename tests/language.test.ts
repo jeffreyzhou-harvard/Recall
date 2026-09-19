@@ -11,21 +11,21 @@ const banned = CALL_SCRIPT.banned;
 const call = (text: string): LintLine[] => [{ id: "x", text, surface: "call" }];
 
 describe("the banned-phrase lint", () => {
-  it("passes over every fixed line Relay can say and every fixed line the family side can show", () => {
+  it("passes over every fixed line Recall can say and every fixed line the family side can show", () => {
     const lines = collectFixedLines();
     expect(lines.length).toBeGreaterThan(50);
     expect(lintLines(lines, banned)).toEqual([]);
   });
 
-  it("passes over every line Relay actually rendered and every family surface it produced, across the branches", async () => {
+  it("passes over every line Recall actually rendered and every family surface it produced, across the branches", async () => {
     const golden = await runJudgedPath();
-    const climbed = await run([...OPENING, ["her", "Cape May...?"], ["relay", SAID.rung2], ["her", "I'm not sure."], ["relay", SAID.rung3], ["her", "Hmm."], ["relay", SAID.rung4], ["her", "My daughter."], ["relay", SAID.elaborate], ...CAPTURE_AND_CONFIRM()]);
+    const climbed = await run([...OPENING, ["her", "Cape May...?"], ["recall", SAID.rung2], ["her", "I'm not sure."], ["recall", SAID.rung3], ["her", "Hmm."], ["recall", SAID.rung4], ["her", "My daughter."], ["recall", SAID.elaborate], ...CAPTURE_AND_CONFIRM()]);
     const lines: LintLine[] = [];
     for (const r of [golden, climbed]) {
       for (const p of r.recording.prompts) lines.push({ id: p.script_id, text: p.text, surface: "call" });
       for (const l of r.recording.caregiver_receipt!.lines) lines.push({ id: l.script_id, text: l.text, surface: "family" });
       const note = await r.service.weeklyNote("person:maya");
-      for (const l of note.note!.lines.filter((l) => l.kind !== "share")) lines.push({ id: l.script_id, text: l.text, surface: "family" }); // a shared line is her words, not Relay's
+      for (const l of note.note!.lines.filter((l) => l.kind !== "share")) lines.push({ id: l.script_id, text: l.text, surface: "family" }); // a shared line is her words, not Recall's
       const record = await r.service.topicRecord("person:maya");
       for (const l of [record.header!, ...record.topics.flatMap((t) => t.lines), ...record.change_lines]) lines.push({ id: l.script_id, text: l.text, surface: "family" });
       lines.push({ id: "FAM-EXPORT", text: (await r.service.exportRecord("person:maya")).file!.text.replace(FAMILY_COPY.lines.export_note.text, ""), surface: "family" });
@@ -36,7 +36,7 @@ describe("the banned-phrase lint", () => {
   it.each([
     ["rule 11", ["That's wrong.", "Try again.", "You forgot.", "Good job!", "That's right!", "No, actually it was Maya.", "Incorrect."]],
     ["rule 4", ["She seemed confused today.", "Her mood was low.", "Cognitive testing.", "She was thinking of you."]],
-    ["rule 9", ["A decline since last month.", "Signs of improvement.", "Good progress this week.", "It is getting worse.", "She did better today.", "Relay will monitor her.", "An early stage."]],
+    ["rule 9", ["A decline since last month.", "Signs of improvement.", "Good progress this week.", "It is getting worse.", "She did better today.", "Recall will monitor her.", "An early stage."]],
     ["rule 16", ["What is your account number?", "Can you send money?", "Tell me your password.", "Which bank do you use?"]],
   ])("finds %s language", (_rule, texts) => {
     for (const text of texts) expect(lintLines(call(text), banned), text).not.toEqual([]);
@@ -75,7 +75,7 @@ describe("conduct", () => {
     expect(endsInOpenQuestion("Maya mentioned a trip to Cape May.")).toBe(false);
   });
 
-  it("no line in Relay's script states a memory outright: every topic is autobiographical, so there is no reorientation line at all", () => {
+  it("no line in Recall's script states a memory outright: every topic is autobiographical, so there is no reorientation line at all", () => {
     for (const l of allScriptLines(CALL_SCRIPT)) expect(/you told me/i.test(l.text) || /^LADDER-5/.test(l.id), l.id).toBe(false);
     for (const [name, c] of Object.entries(CALL_SCRIPT.ladder.categories)) expect([name, c.memory_kind, c.reorientation]).toEqual([name, "autobiographical", undefined]);
   });
@@ -93,18 +93,18 @@ describe("conduct", () => {
     const say = (text: string): LintLine[] => [{ id: "x", text, surface: "call" }];
     expect(lintConduct(say("Where did you go? And who went with you?"), CALL_SCRIPT.conduct).map((f) => f.phrase)).toEqual(["2 questions in one turn"]);
     expect(lintConduct(say("It was the place that your family, who had been going there since before Maya was born, used to visit every single summer."), CALL_SCRIPT.conduct)[0]!.phrase).toMatch(/a sentence of \d+ words/);
-    expect(lintConduct([{ id: "x", text: "Where did you go? And who went with you?", surface: "family" }], CALL_SCRIPT.conduct)).toEqual([]); // the rule is about how Relay talks to HER
+    expect(lintConduct([{ id: "x", text: "Where did you go? And who went with you?", surface: "family" }], CALL_SCRIPT.conduct)).toEqual([]); // the rule is about how Recall talks to HER
   });
 
-  it("script ids are unique, and every slot is one Relay knows how to fill from the graph or the joint setup", () => {
+  it("script ids are unique, and every slot is one Recall knows how to fill from the graph or the joint setup", () => {
     const lines = [...allScriptLines(CALL_SCRIPT), ...Object.values(FAMILY_COPY.lines), SAFETY_PHRASES.alert];
     expect(new Set(lines.map((l) => l.id)).size).toBe(lines.length);
     const known = new Set(["name", "set_up_by", "caregiver", "emergency_number", "topic", "cue", "person", "author", "place", "relation", "option_a", "option_b"]);
     for (const l of allScriptLines(CALL_SCRIPT)) for (const slot of slotsOf(l.text)) expect(known.has(slot), `${l.id} {${slot}}`).toBe(true);
   });
 
-  it("the first line of every call says Relay is an AI assistant set up by a named family member; the identity line says it is not a person", () => {
-    expect(CALL_SCRIPT.lines.greeting.text).toMatch(/I'm Relay, an AI assistant \{set_up_by\} set up/);
+  it("the first line of every call says Recall is an AI assistant set up by a named family member; the identity line says it is not a person", () => {
+    expect(CALL_SCRIPT.lines.greeting.text).toMatch(/I'm Recall, an AI assistant \{set_up_by\} set up/);
     expect(CALL_SCRIPT.lines.identity.text).toMatch(/a computer assistant, not a person/);
     expect(CALL_SCRIPT.lines.safety.text).toMatch(/\{caregiver\}.*\{emergency_number\}/);
   });

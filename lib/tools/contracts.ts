@@ -74,7 +74,7 @@ export const contracts = {
     }),
   },
   place_recall_call: {
-    description: "The gate in front of every call: her, only her, only inside the agreed windows and frequency, only about an allowed topic, and only once a family member has attested that the number is saved in her phone and that Relay was introduced to her. A denial means the call is never placed.",
+    description: "The gate in front of every call: her, only her, only inside the agreed windows and frequency, only about an allowed topic, and only once a family member has attested that the number is saved in her phone and that Recall was introduced to her. A denial means the call is never placed.",
     input: z.strictObject({ person_id: id, topic_id: id, window: z.strictObject({ now: iso }) }),
     output: z.discriminatedUnion("decision", [
       z.strictObject({
@@ -121,7 +121,7 @@ export const contracts = {
         transcript: z.string(),
         span: span,
         matched_rule: z.string(),
-        /** Verified graph ids her words touched that Relay had not yet said in this call. */
+        /** Verified graph ids her words touched that Recall had not yet said in this call. */
         matched_ids: z.array(id),
         conduct_signal: z.enum(CONDUCT_SIGNALS).nullable(),
         /** What kind of prompt she was answering. Logged beside every reply: a forced choice and an open reply are not equally trustworthy (EVIDENCE.md, section C). */
@@ -146,19 +146,19 @@ export const contracts = {
     }),
   },
   render_prompt: {
-    description: "Verbalize one reviewed line from the call script. Slots are filled only from the cited, verified graph values named in slot_ids, or from the joint setup. An attribution that does not match the claim's speaker fails closed. Spoken in Relay's own labeled voice; never produces speech as her.",
+    description: "Verbalize one reviewed line from the call script. Slots are filled only from the cited, verified graph values named in slot_ids, or from the joint setup. An attribution that does not match the claim's speaker fails closed. Spoken in Recall's own labeled voice; never produces speech as her.",
     input: z.strictObject({ topic_id: id, scaffold_id: id, slot_ids: z.record(z.string(), id), citations: z.array(id) }),
     output: z.strictObject({
       prompt_id: id,
       script_id: id,
-      voice: z.literal("relay"),
+      voice: z.literal("recall"),
       text: z.string().min(1),
       rung: rung.nullable(),
       segments: z.array(z.strictObject({ text: z.string(), kind: z.enum(["connective", "fact"]), citation_ids: z.array(id) })),
     }),
   },
   capture_contribution: {
-    description: "Build the contribution from her exact words: literal transcript plus an edit-decision list limited to silence and disfluency trims. Rejects any interval containing Relay's speech or blocked content. Source audio is never modified.",
+    description: "Build the contribution from her exact words: literal transcript plus an edit-decision list limited to silence and disfluency trims. Rejects any interval containing Recall's speech or blocked content. Source audio is never modified.",
     input: z.strictObject({ topic_id: id, audio_intervals: z.array(audioWindow).min(1) }),
     output: z.strictObject({
       contribution_id: id,
@@ -219,7 +219,7 @@ export const contracts = {
     }),
   },
   receive_family_contribution: {
-    description: "The asynchronous capture path. A family member tells Relay a memory; it is stored exactly as typed, as THEIR claim, patient_confirmed false. Text that opens as a question is refused with the fixed hint. Returns nothing from the graph.",
+    description: "The asynchronous capture path. A family member tells Recall a memory; it is stored exactly as typed, as THEIR claim, patient_confirmed false. Text that opens as a question is refused with the fixed hint. Returns nothing from the graph.",
     input: z.strictObject({
       contributor_id: id,
       claim: z.strictObject({ who: z.string().max(200), what_happened: z.string().min(1).max(2000), when_where: z.string().max(200).nullable(), photo_asset_id: z.string().nullable(), about_topic_id: z.string().nullable() }),
@@ -290,7 +290,7 @@ export const contracts = {
     }),
   },
   export_record_for_clinician: {
-    description: "An approved member asks for a file of the same per-topic counts, dates, change lines, and fixed header, plus the fixed non-clinical note. Logged. Relay never sends it to anyone: it is handed back to the member who asked.",
+    description: "An approved member asks for a file of the same per-topic counts, dates, change lines, and fixed header, plus the fixed non-clinical note. Logged. Recall never sends it to anyone: it is handed back to the member who asked.",
     input: z.strictObject({ requester_id: id }),
     output: z.strictObject({
       status: z.enum(["exported", "refused"]),
@@ -311,7 +311,7 @@ export const contracts = {
     }),
   },
   check_safety_phrases: {
-    description: "Deterministic lexical match of her final turn against the fixed safety list. Runs first on every final turn of hers, before anything else. Never a model judgment; never applied to Relay's own speech. Returns a category or none - not her words.",
+    description: "Deterministic lexical match of her final turn against the fixed safety list. Runs first on every final turn of hers, before anything else. Never a model judgment; never applied to Recall's own speech. Returns a category or none - not her words.",
     input: z.strictObject({ audio_window: audioWindow }),
     output: z.strictObject({ turn_id: z.string().nullable(), category: z.string().nullable() }),
   },

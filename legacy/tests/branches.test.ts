@@ -7,13 +7,13 @@
 import { describe, expect, it } from "vitest";
 import { runFixture, type FixtureOptions } from "@/fixtures/harness";
 import { NOTICE_TEXT } from "@/lib/bridge/thread-bridge";
-import type { RelayState } from "@/lib/state/machine";
+import type { RecallState } from "@/lib/state/machine";
 import { replay, visitedStates } from "@/lib/state/reducer";
 import { BLOCKED_TOPIC_FORWARD, CONFLICTING_CLAIMS, CONFLICT_MANIFEST, THREAD, assentReplyCall, diwaliForward, doubleLostCall, toolTimeoutCall, unclearAssentCall } from "./fixtures";
 
-const TO_REANCHORED: RelayState[] = ["idle", "ask_received", "policy_passed", "connected", "following", "lost", "reanchored"];
+const TO_REANCHORED: RecallState[] = ["idle", "ask_received", "policy_passed", "connected", "following", "lost", "reanchored"];
 
-const BRANCHES: Array<{ name: string; options: FixtureOptions; path: RelayState[]; notice: "clarify" | "not_this_time" | null }> = [
+const BRANCHES: Array<{ name: string; options: FixtureOptions; path: RecallState[]; notice: "clarify" | "not_this_time" | null }> = [
   { name: "judged path", options: {}, path: [...TO_REANCHORED, "contributed", "playback", "assented", "delivered"], notice: null },
   { name: "policy denies the topic (spec Y: no call placed)", options: { forward: BLOCKED_TOPIC_FORWARD, transcript: null }, path: ["idle", "ask_received", "blocked"], notice: "not_this_time" },
   { name: "audience not verified (spec X: stop safely, ask family to clarify)", options: { forward: diwaliForward({ requested_audience: "person:anika" }), transcript: null }, path: ["idle", "ask_received", "blocked"], notice: "clarify" },

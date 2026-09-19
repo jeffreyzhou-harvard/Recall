@@ -78,7 +78,7 @@ describe("evidence-bounded speech (rule 6)", () => {
     const mayas = "claim:maya-remembers-cape-may";
     // Maya's account said as a plain fact ("You and Maya..."): refused.
     expect(await gateOf(b.runtime.call("render_prompt", { topic_id: b.topicId, scaffold_id: "LADDER-3-PERSON-FAMILY-SUMMERS", slot_ids: { cue: "person:maya" }, citations: [b.topicId, mayas, "person:maya"] }))).toBe("evidence");
-    // Maya's account under "You told me": refused. (Relay's own script has no such line; this is the test-only one.)
+    // Maya's account under "You told me": refused. (Recall's own script has no such line; this is the test-only one.)
     const withLastRung = await bench({ script: SCRIPT_WITH_REORIENTATION });
     expect(await gateOf(withLastRung.runtime.call("render_prompt", { topic_id: b.topicId, scaffold_id: "LADDER-5-TEST-ONLY", slot_ids: { relation: "RELATED_TO:person:susan->person:maya", person: "person:maya", place: "place:cape-may" }, citations: [b.topicId, mayas, "person:maya", "place:cape-may", "RELATED_TO:person:susan->person:maya"] }))).toBe("evidence");
     // Her own account attributed to Maya: refused.
@@ -160,7 +160,7 @@ describe("the call gate", () => {
 });
 
 describe("capture", () => {
-  it("rejects any stretch of the call that holds Relay's speech", async () => {
+  it("rejects any stretch of the call that holds Recall's speech", async () => {
     const run = await runJudgedPath();
     const b = await bench();
     Object.assign(b.ctx.session, { assessments: run.ctx.session.assessments });

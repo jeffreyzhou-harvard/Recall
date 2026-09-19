@@ -9,7 +9,7 @@
  * LIVE ONLY, SERVER ONLY. The key must never reach a browser, and nothing on
  * the judged path imports this.
  *
- * Relay never lets a model's output act directly. `structured` asks for JSON
+ * Recall never lets a model's output act directly. `structured` asks for JSON
  * matching a zod schema and then VALIDATES what comes back against that same
  * schema: a reply that does not parse is an error, not a best effort. What the
  * validated output is allowed to do is decided by the caller's own guards -
@@ -39,6 +39,9 @@ export class MuseApiError extends Error {
     this.name = "MuseApiError";
   }
 }
+
+const describeStatus = (status: number): string =>
+  status === 401 || status === 403 ? "the API key was refused" : status === 408 || status === 504 ? "the service timed out" : status === 429 ? "too many requests" : status >= 500 ? "the service failed" : "the request was refused";
 
 /** Refuses anything that does not look like a Model API key, so a missing or mangled key fails at start-up, not mid-call. */
 export function requireMuseKey(key: string | undefined): string {
@@ -85,8 +88,14 @@ export class MuseSpark {
     }).catch((e: unknown) => {
       throw new MuseApiError(null, e instanceof Error && e.name === "TimeoutError" ? `no reply within ${timeout_ms} ms` : `the request did not complete (${e instanceof Error ? e.message : "unknown"})`);
     });
-    if (!res.ok) throw new MuseApiError(res.status, (await res.text().catch(() => "")).slice(0, 300) || "request failed");
-    const parsed = completionSchema.safeParse(await res.json());
+    // The status and a fixed description - never the response body. A provider's error can echo the request, the request can
+    // hold her words, and callers log this message (rule 8).
+    if (!res.ok) throw new MuseApiError(res.status, describeStatus(res.status));
+    // Reading the body can fail too: a 200 that is not JSON, or the time limit running out partway through it.
+    const reply = await res.json().catch((e: unknown) => {
+      throw new MuseApiError(res.status, e instanceof Error && e.name === "TimeoutError" ? `no reply within ${timeout_ms} ms` : "the response was not JSON");
+    });
+    const parsed = completionSchema.safeParse(reply);
     if (!parsed.success) throw new MuseApiError(res.status, "the response was not a chat completion");
     const { message, finish_reason } = parsed.data.choices[0]!;
     const content = message.content;

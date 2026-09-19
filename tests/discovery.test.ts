@@ -10,7 +10,7 @@
  * module stays OFF unless the joint setup turns it on (`discovery.enabled`), and the judged setup does not.
  */
 import { describe, expect, it } from "vitest";
-import { MANIFEST, POLICY } from "@/fixtures";
+import { CALL_SCRIPT, MANIFEST, POLICY } from "@/fixtures";
 import { buildFixtureRig, type FixtureRig } from "@/fixtures/harness";
 import { UngroundedFactError, applyAnswer, type Answer, type ProposedFact } from "@/lib/discovery/answers";
 import { anchors, findGaps } from "@/lib/discovery/gaps";
@@ -20,6 +20,7 @@ import { LadybugGraphStore } from "@/lib/graph/ladybug-store";
 import { RelationError, assertRelation } from "@/lib/graph/relations";
 import type { SeedFile } from "@/lib/graph/seed";
 import type { AssetManifest } from "@/lib/provenance/assets";
+import { endsInOpenQuestion, lintConduct, lintLines } from "@/lib/script/lint";
 import { policySchema } from "@/lib/tools";
 
 const MOM = "person:mom";
@@ -60,7 +61,7 @@ const SETUP = {
   policy_id: "policy:mom-setup",
   person_id: MOM,
   established_by: [MOM, ANIKA],
-  relay_set_up_by: ANIKA,
+  recall_set_up_by: ANIKA,
   approved_people: [ANIKA],
   approved_audiences: [MOM],
   topics: { allow: [], block: [], person_topics_enabled: false },
@@ -177,6 +178,111 @@ describe("knowledge gaps and the questions they become", () => {
     expect((await rig.graph.getEdge("IDENTIFIED_AS:cluster:face:f1->person:maya"))!.prov.status).toBe("disputed");
     expect((await rig.service.nextQuestions(1))[0]!.gap.kind).toBe("unidentified"); // a gap again, until a person settles it
   });
+
+  it("a third name for a face already in dispute is set aside too, never read as the answer", async () => {
+    const rig = await rigWithLibrary();
+    const [who] = await rig.service.nextQuestions(1);
+    await rig.service.answerQuestion(who!, says(ANIKA, "That's Maya.", "a1"));
+    await rig.service.answerQuestion(who!, says(MOM, "That's Priya.", "a2"));
+    const third = await rig.service.answerQuestion(who!, says(ANIKA, "That's Rose.", "a3"));
+    const rose = "IDENTIFIED_AS:cluster:face:f1->person:rose";
+    expect((await rig.graph.getEdge(rose))!.prov.status).toBe("disputed");
+    expect(third.disputed).toEqual([rose]);
+    expect(third.created).not.toContain(rose);
+    // The two already set aside are not disputed a second time: each still carries exactly what was said about it.
+    expect((await rig.graph.getEdge("IDENTIFIED_AS:cluster:face:f1->person:maya"))!.prov.confirmations).toHaveLength(1);
+    expect((await rig.graph.getEdge("IDENTIFIED_AS:cluster:face:f1->person:priya"))!.prov.confirmations).toHaveLength(0);
+    expect((await rig.service.nextQuestions(1))[0]!.gap).toMatchObject({ kind: "unidentified", cluster_id: "cluster:face:f1" });
+  });
+
+  it("restating a tie the setup already holds confirms that edge, rather than writing a second one beside it", async () => {
+    const seeded = "RELATED_TO:person:mom->person:anika";
+    const seed: SeedFile = { ...SEED, edges: [...SEED.edges, { type: "RELATED_TO", from: MOM, to: ANIKA, source: "artifact:setup-record", props: { relation: "grandchild", said_as: "granddaughter" } }] };
+    const rig = await buildFixtureRig({ policy: discoveryOn(), manifest, seed });
+    await rig.service.ingestLibrary(OBSERVED, ANIKA);
+    expect((await rig.graph.getEdge(seeded))!.prov.status).toBe("family_confirmed");
+    const [who] = await rig.service.nextQuestions(1);
+    const result = await rig.service.answerQuestion(who!, says(MOM, "That's my granddaughter Anika."));
+    expect(result.confirmed).toEqual([seeded]);
+    expect((await rig.graph.getEdge(seeded))!.prov).toMatchObject({ status: "participant_confirmed", patient_confirmed: true });
+    expect((await rig.graph.snapshot()).edges.filter((e) => e.type === "RELATED_TO" && e.from === MOM && e.to === ANIKA).map((e) => e.id)).toEqual([seeded]);
+  });
+});
+
+describe("the lexical reader proposes only what the words carry", () => {
+  const ask = async (policy: unknown = discoveryOn()) => {
+    const rig = await rigWithLibrary(policy);
+    const [who] = await rig.service.nextQuestions(1);
+    return { rig, who: who! };
+  };
+  const people = async (rig: FixtureRig): Promise<string[]> => (await rig.graph.nodesOfType("Person")).map((p) => p.id).sort();
+  const ties = async (rig: FixtureRig): Promise<string[]> => (await rig.graph.snapshot()).edges.filter((e) => e.type === "RELATED_TO").map((e) => e.id);
+
+  it("takes a name only from a capitalized word: 'my daughter on the beach' names nobody", async () => {
+    const { rig, who } = await ask();
+    const result = await rig.service.answerQuestion(who, says(MOM, "That's my daughter on the beach."));
+    expect(result.created).toEqual([]);
+    expect(await people(rig)).toEqual([ANIKA, MOM]);
+    expect(await ties(rig)).toEqual([]);
+  });
+
+  it("'her', said by her, is somebody else: 'Maya and her daughter Anika' ties nobody to Mom", async () => {
+    const { rig, who } = await ask();
+    const result = await rig.service.answerQuestion(who, says(MOM, "That's Maya and her daughter Anika."));
+    expect(result.created).toEqual([]); // two people, and nothing in the words says which one this face is
+    expect(await ties(rig)).toEqual([]);
+    // Said by family after another name, "her" most likely means that person. It is not taken as a tie to Mom either.
+    const family = await ask();
+    await family.rig.service.answerQuestion(family.who, says(ANIKA, "That's Maya and her daughter Rose."));
+    expect(await ties(family.rig)).toEqual([]);
+    // With no other name before it, "her", said by family, is Mom - as it always was.
+    const plain = await ask();
+    await plain.rig.service.answerQuestion(plain.who, says(ANIKA, "That's her daughter Maya."));
+    expect(await ties(plain.rig)).toEqual(["RELATED_TO:child:person:mom->person:maya"]);
+  });
+
+  it("the person named after \"that's\" is who the photo shows, not the person tied to the speaker", async () => {
+    const { rig, who } = await ask();
+    const result = await rig.service.answerQuestion(who, says(MOM, "That's Maya with my sister Priya."));
+    expect(result.created).toEqual(["person:maya", "IDENTIFIED_AS:cluster:face:f1->person:maya", "person:priya", "RELATED_TO:sibling:person:mom->person:priya"]);
+    expect(await rig.graph.getEdge("IDENTIFIED_AS:cluster:face:f1->person:priya")).toBeNull();
+  });
+
+  it("proposes nothing from a denial, a doubt, or an echo of Recall's own question - so it can never promote the family's answer", async () => {
+    for (const text of ["No, that's not Priya, that's Maya.", "That isn't Priya.", "Maya or Priya?", "Looks like Priya.", "I think that's Priya.", "Maybe Priya."]) {
+      const { rig, who } = await ask();
+      await rig.service.answerQuestion(who, says(ANIKA, "That's Priya.", "a1"));
+      const result = await rig.service.answerQuestion(who, says(MOM, text, "a2"));
+      expect([result.created, result.confirmed, result.disputed], text).toEqual([[], [], []]);
+      expect((await rig.graph.getEdge("IDENTIFIED_AS:cluster:face:f1->person:priya"))!.prov, text).toMatchObject({ status: "family_confirmed", patient_confirmed: false, confirmations: [] });
+    }
+  });
+
+  it("does not take a sentence opener, or a possessive, for a name", async () => {
+    for (const [text, expected] of [
+      ["Hmm, Maya.", [ANIKA, "person:maya", MOM]],
+      ["Definitely Maya.", [ANIKA, "person:maya", MOM]],
+      ["Looks like Maya.", [ANIKA, MOM]],
+      ["That's Maya's friend.", [ANIKA, MOM]],
+    ] as const) {
+      const { rig, who } = await ask();
+      await rig.service.answerQuestion(who, says(MOM, text));
+      expect(await people(rig), text).toEqual(expected);
+    }
+  });
+
+  it("her naming the face on an invite_her_word question is recorded as her own word", async () => {
+    const rig = await rigWithLibrary(discoveryOn({ invite_her_confirmation: true }));
+    const [q1] = await rig.service.nextQuestions(1);
+    await rig.service.answerQuestion(q1!, says(ANIKA, "That's her daughter Maya.", "a1"));
+    const invite = (await rig.service.nextQuestions(10)).find((q) => q.gap.kind === "invite_her_word")!;
+    expect(invite.gap.cluster_id).toBe("cluster:face:f1");
+    const result = await rig.service.answerQuestion(invite, says(MOM, "That's Maya.", "a2"));
+    const id = "IDENTIFIED_AS:cluster:face:f1->person:maya";
+    expect(result.confirmed).toEqual([id]);
+    expect((await rig.graph.getEdge(id))!.prov).toMatchObject({ status: "participant_confirmed", patient_confirmed: true });
+    expect((await findGaps(rig.graph, { participant_id: MOM, invite_her_confirmation: true })).filter((g) => g.kind === "invite_her_word")).toEqual([]); // asked until she has said it once, and never again
+  });
 });
 
 describe("inference never silently becomes fact", () => {
@@ -197,6 +303,67 @@ describe("inference never silently becomes fact", () => {
     expect(await persisted(rig), "nothing at all is written when any proposal is ungrounded").toBe(before);
     const putWordsInHerMouth: ProposedFact[] = [{ kind: "relate", from: { id: MOM }, relation: "child", to: { type: "Person", name: "Maya" }, said_as: "beloved daughter", basis: "stated" }];
     await expect(applyAnswer(who, says(MOM, "That's my daughter Maya."), putWordsInHerMouth, deps)).rejects.toBeInstanceOf(UngroundedFactError);
+  });
+
+  it("keeps her words out of the error when a proposal is refused (rule 8)", async () => {
+    const { who, deps } = await setup();
+    const invented: ProposedFact[] = [{ kind: "identify", as: { type: "Person", name: "Rose" } }];
+    const refused: unknown = await applyAnswer(who, says(MOM, "That's my daughter Maya, down at the shore."), invented, deps).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(refused).toBeInstanceOf(UngroundedFactError);
+    const { message } = refused as Error;
+    expect(message).toContain('"Rose" does not appear in what was said');
+    for (const hers of ["Maya", "daughter", "shore"]) expect(message).not.toContain(hers);
+  });
+
+  it("refuses a relation that contradicts the word she used for it", async () => {
+    const { rig, who, deps } = await setup();
+    const before = await persisted(rig);
+    const twisted: ProposedFact[] = [{ kind: "relate", from: { id: MOM }, relation: "sibling", to: { type: "Person", name: "Maya" }, said_as: "daughter", basis: "stated" }];
+    await expect(applyAnswer(who, says(MOM, "That's my daughter Maya."), twisted, deps)).rejects.toBeInstanceOf(UngroundedFactError);
+    expect(await persisted(rig)).toBe(before);
+  });
+
+  it("takes 'stated' from the words, never on the proposer's say-so", async () => {
+    const { rig, who, deps } = await setup();
+    // No word of hers carries the tie.
+    await applyAnswer(who, says(MOM, "That's Maya.", "a1"), [{ kind: "relate", from: { id: MOM }, relation: "child", to: { type: "Person", name: "Maya" }, said_as: null, basis: "stated" }], deps);
+    expect((await rig.graph.getEdge("RELATED_TO:child:person:mom->person:maya"))!.prov).toMatchObject({ status: "inferred", patient_confirmed: false, extraction_method: "rule_deduction" });
+    // She never mentioned Anika, so a tie from Anika is not something she said, whatever word is offered with it.
+    await applyAnswer(who, says(MOM, "That's my daughter Maya.", "a2"), [{ kind: "relate", from: { id: ANIKA }, relation: "child", to: { type: "Person", name: "Maya" }, said_as: "daughter", basis: "stated" }], deps);
+    expect((await rig.graph.getEdge("RELATED_TO:child:person:anika->person:maya"))!.prov).toMatchObject({ status: "inferred", patient_confirmed: false });
+    // Her word, her tie, and everyone in it named or present: that one is hers.
+    await applyAnswer(who, says(MOM, "My sister Priya.", "a3"), [{ kind: "relate", from: { id: MOM }, relation: "sibling", to: { type: "Person", name: "Priya" }, said_as: "sister", basis: "stated" }], deps);
+    expect((await rig.graph.getEdge("RELATED_TO:sibling:person:mom->person:priya"))!.prov.status).toBe("participant_confirmed");
+  });
+
+  it("checks the shape of every planned edge, and that the speaker is in the graph, before writing anything", async () => {
+    const { rig, who, deps } = await setup();
+    const before = await persisted(rig);
+    // A story can be about a person, a place, an event or an activity - not a preference, and not a policy record.
+    await expect(applyAnswer(who, says(MOM, "She loved kheer."), [{ kind: "story", about: [{ type: "PreferenceExpertise", name: "kheer" }] }], deps)).rejects.toBeInstanceOf(UngroundedFactError);
+    await expect(applyAnswer(who, says(MOM, "She loved kheer."), [{ kind: "story", about: [{ id: "policy:mom-setup" }] }], deps)).rejects.toBeInstanceOf(UngroundedFactError);
+    // Approved on paper, but not a person in the graph: there is nobody for the story to be spoken by.
+    const ghost = { ...deps, policy: { ...deps.policy, approved_people: [...deps.policy.approved_people, "person:ghost"] } };
+    await expect(applyAnswer(who, says("person:ghost", "Maya loved the shore."), [{ kind: "story", about: [{ type: "Person", name: "Maya" }] }], ghost)).rejects.toBeInstanceOf(UngroundedFactError);
+    // A question about a cluster that is not there.
+    const nowhere = { ...who, gap: { ...who.gap, cluster_id: "cluster:face:none" } };
+    await expect(applyAnswer(nowhere, says(MOM, "That's Maya."), [{ kind: "identify", as: { type: "Person", name: "Maya" } }], deps)).rejects.toBeInstanceOf(UngroundedFactError);
+    expect(await persisted(rig), "nothing is half-written").toBe(before);
+  });
+
+  it("refuses to reuse an answer id for different words, so one answer's facts never cite another's", async () => {
+    const { rig, who, deps } = await setup();
+    const maya: ProposedFact[] = [{ kind: "identify", as: { type: "Person", name: "Maya" } }];
+    await applyAnswer(who, says(MOM, "That's Maya.", "a1"), maya, deps);
+    const before = await persisted(rig);
+    await expect(applyAnswer(who, says(MOM, "That's Priya.", "a1"), [{ kind: "identify", as: { type: "Person", name: "Priya" } }], deps)).rejects.toThrow(/answer id/);
+    await expect(applyAnswer(who, says(ANIKA, "That's Maya.", "a1"), maya, deps)).rejects.toThrow(/answer id/);
+    expect(await persisted(rig)).toBe(before);
+    // The same words from the same person under the same id is a retry, not a collision.
+    await expect(applyAnswer(who, says(MOM, "That's Maya.", "a1"), maya, deps)).resolves.toMatchObject({ confirmed: ["IDENTIFIED_AS:cluster:face:f1->person:maya"] });
   });
 
   it("writes what was worked out as `inferred`, and keeps it out of questions, retrieval, and identity", async () => {
@@ -233,6 +400,17 @@ describe("inference never silently becomes fact", () => {
     forged.rungs[0]!.segments.push({ text: " This is your daughter.", kind: "fact", citation_ids: ["cluster:face:f1"] });
     await expect(assertSpeakable(forged, rig.graph)).rejects.toThrow(/only observed/);
   });
+
+  it("refuses to state, unattributed, what only the family has said (rule 13)", async () => {
+    const { rig, who } = await setup();
+    await rig.service.answerQuestion(who, says(ANIKA, "That's Maya."));
+    const forged = structuredClone(who);
+    forged.rungs[0]!.segments.push({ text: " This is Maya.", kind: "fact", citation_ids: ["IDENTIFIED_AS:cluster:face:f1->person:maya"] });
+    await expect(assertSpeakable(forged, rig.graph)).rejects.toThrow(/only family_confirmed/);
+    // Once she has said so herself, the same line is hers to hear.
+    await rig.service.answerQuestion(who, says(MOM, "Maya.", "a2"));
+    await expect(assertSpeakable(forged, rig.graph)).resolves.toBeUndefined();
+  });
 });
 
 describe("never a test", () => {
@@ -244,45 +422,74 @@ describe("never a test", () => {
     expect(later.filter((g) => g.cluster_id === "cluster:face:f1").map((g) => g.kind)).toEqual(["tell_me_about"]); // an invitation, not a check
   });
 
-  it("inviting her own word is off by default, and when on it climbs a ladder of support that ends by simply telling her", async () => {
-    const tellHer = async (invite: boolean) => {
+  it("inviting her own word is off by default; when on, the family's answer is only ever an attributed cue before an open question (rule 13)", async () => {
+    const invited = async (invite: boolean, tie = "daughter") => {
       const rig = await rigWithLibrary(discoveryOn({ invite_her_confirmation: invite }));
       const [q1, q2] = await rig.service.nextQuestions(2);
-      await rig.service.answerQuestion(q1!, says(ANIKA, "That's her daughter Maya.", "a1"));
+      await rig.service.answerQuestion(q1!, says(ANIKA, `That's her ${tie} Maya.`, "a1"));
       await rig.service.answerQuestion(q2!, says(ANIKA, "That's her sister Priya.", "a2"));
       const gap = (await findGaps(rig.graph, { participant_id: MOM, invite_her_confirmation: invite })).find((g) => g.kind === "invite_her_word" && g.cluster_id === "cluster:face:f1");
       return { rig, gap };
     };
-    expect((await tellHer(false)).gap).toBeUndefined();
+    expect((await invited(false)).gap).toBeUndefined();
 
-    const { rig, gap } = await tellHer(true);
-    const q = await questionFor(gap!, rig.graph, MOM);
-    await assertSpeakable(q, rig.graph);
-    expect(q.rungs.map((r) => `${r.level}: ${r.text}`)).toEqual([
-      "open: This person appears in several of your photos. Who is this?",
-      "cue: This is someone in your family.",
-      "recognition: Is this Maya or Priya?",
-      "tell: This is Maya, your daughter.",
-    ]);
-    expect(nextRung(q, "open")!.level).toBe("cue");
-    expect(nextRung(q, "tell")).toBeNull(); // the end of the ladder is not a failure; Relay moves on
+    // Whatever the family said the tie is, their answer is never a forced-choice option and is never stated outright.
+    for (const tie of ["daughter", "friend"]) {
+      const { rig, gap } = await invited(true, tie);
+      const q = await questionFor(gap!, rig.graph, MOM);
+      await assertSpeakable(q, rig.graph);
+      expect(q.rungs.map((r) => `${r.level}: ${r.text}`), tie).toEqual([
+        "open: This person appears in several of your photos. Who is this?",
+        "cue: Anika mentioned this might be Maya. What comes to mind?",
+      ]);
+      expect(q.rungs.flatMap((r) => r.segments).filter((s) => s.kind === "fact"), "nothing of the family's is voiced as a fact").toEqual([]);
+      expect(nextRung(q, "open")!.level).toBe("cue");
+      expect(nextRung(q, "cue")).toBeNull(); // the end of the ladder is not a failure; Recall moves on
+    }
+  });
+
+  it("every question that leans on the family's word says whose word it is; her own word is simply said", async () => {
+    const rig = await rigWithLibrary(discoveryOn({ invite_her_confirmation: true }));
+    const [face] = await rig.service.nextQuestions(1);
+    await rig.service.answerQuestion(face!, says(ANIKA, "That's Maya.", "a1"));
+    const textsByKind = async (): Promise<Record<string, string[]>> => {
+      const out: Record<string, string[]> = {};
+      for (const q of await rig.service.nextQuestions(10)) out[`${q.gap.kind} ${q.gap.cluster_id}`] = q.rungs.map((r) => r.text); // nextQuestions runs assertSpeakable on each
+      return out;
+    };
+    const familyOnly = await textsByKind();
+    expect(familyOnly["how_related cluster:face:f1"]).toEqual(["Anika mentioned this might be Maya. How do you know Maya?"]);
+    expect(familyOnly["unidentified cluster:place:p1"]).toEqual(["This place appears in some of your photos. Where is this?"]); // not "Maya is in some of these too": she has not said so
+    const spoken = Object.values(familyOnly).flat().map((text, i) => ({ id: `discovery:${i}`, text, surface: "call" as const }));
+    expect([...lintLines(spoken, CALL_SCRIPT.banned), ...lintConduct(spoken, CALL_SCRIPT.conduct)]).toEqual([]);
+    for (const line of spoken.filter((l) => l.text.includes("mentioned"))) expect(endsInOpenQuestion(line.text), line.text).toBe(true);
+
+    const invite = (await rig.service.nextQuestions(10)).find((q) => q.gap.kind === "invite_her_word")!;
+    await rig.service.answerQuestion(invite, says(MOM, "That's Maya.", "a2"));
+    const hers = await textsByKind();
+    expect(hers["how_related cluster:face:f1"]).toEqual(["This is Maya. How do you know Maya?"]);
+    expect(hers["unidentified cluster:place:p1"]).toEqual(["This place appears in some of your photos. Maya is in some of these too. Where is this?"]);
+
+    // A recurring, tied person nobody has told a story about: an invitation, attributed while only the family has named her.
+    const told = await rigWithLibrary();
+    const [first] = await told.service.nextQuestions(1);
+    await told.service.answerQuestion(first!, says(ANIKA, "That's her daughter Maya.", "a1"));
+    const about = (await told.service.nextQuestions(10)).find((q) => q.gap.kind === "tell_me_about")!;
+    expect(about.rungs.map((r) => r.text)).toEqual(["Anika mentioned this might be Maya. What would you like to tell me about this photo?"]);
+    expect(endsInOpenQuestion(about.rungs[0]!.text)).toBe(true);
   });
 
   it("a ladder missing a rung skips past it, and never circles back to asking her again", async () => {
-    const rig = await rigWithLibrary(discoveryOn({ invite_her_confirmation: true }));
-    const [q1, q2] = await rig.service.nextQuestions(2);
-    await rig.service.answerQuestion(q1!, says(ANIKA, "That's her friend Maya.", "a1")); // a friend is not "someone in your family": no cue rung
-    await rig.service.answerQuestion(q2!, says(ANIKA, "That's her sister Priya.", "a2"));
-    const gap = (await findGaps(rig.graph, { participant_id: MOM, invite_her_confirmation: true })).find((g) => g.kind === "invite_her_word" && g.cluster_id === "cluster:face:f1");
-    const q = await questionFor(gap!, rig.graph, MOM);
-    expect(q.rungs.map((r) => r.level)).toEqual(["open", "recognition", "tell"]);
-    expect(nextRung(q, "open")!.level).toBe("recognition");
-    expect(nextRung(q, "cue")!.level).toBe("recognition");
-    expect(nextRung(q, "recognition")!.level).toBe("tell");
-    for (const only of [q.rungs.slice(0, 1), q.rungs.slice(0, 2)]) {
-      expect(nextRung({ ...q, rungs: only }, "cue")?.level ?? null).toBe(only.length === 2 ? "recognition" : null);
-      expect(nextRung({ ...q, rungs: only }, "recognition")).toBeNull();
-    }
+    const rig = await rigWithLibrary();
+    const [real] = await rig.service.nextQuestions(1);
+    const at = (level: "open" | "cue" | "recognition") => ({ level, text: "", segments: [] });
+    const noCue = { ...real!, rungs: [at("open"), at("recognition")] };
+    expect(nextRung(noCue, "open")!.level).toBe("recognition");
+    expect(nextRung(noCue, "cue")!.level).toBe("recognition");
+    expect(nextRung(noCue, "recognition")).toBeNull();
+    const openOnly = { ...real!, rungs: [at("open")] };
+    expect(nextRung(openOnly, "cue")).toBeNull();
+    expect(nextRung(openOnly, "recognition")).toBeNull();
   });
 
   it("stores nothing about how a question went: no rung, no timing, no attempts - nothing a memory score could be built from", async () => {
@@ -307,13 +514,17 @@ describe("LadybugDB parity", () => {
         await rig.service.ingestLibrary(OBSERVED, ANIKA);
         const [who] = await rig.service.nextQuestions(1);
         await rig.service.answerQuestion(who!, says(ANIKA, "That's her daughter Maya.", "a1"));
-        await rig.service.answerQuestion(who!, says(MOM, "My daughter Maya.", "a2"));
+        // The question she is actually asked next about this face - not the stale "unidentified" one - so her confirmation runs the real path.
+        const invite = (await rig.service.nextQuestions(10)).find((q) => q.gap.kind === "invite_her_word" && q.gap.cluster_id === who!.gap.cluster_id)!;
+        await rig.service.answerQuestion(invite, says(MOM, "My daughter Maya.", "a2"));
         return rig.graph.snapshot();
       };
-      const onLbug = await run(await buildFixtureRig({ policy: discoveryOn(), manifest, seed: SEED, graph: store }));
-      const inMemory = await run(await buildFixtureRig({ policy: discoveryOn(), manifest, seed: SEED }));
+      const policy = discoveryOn({ invite_her_confirmation: true });
+      const onLbug = await run(await buildFixtureRig({ policy, manifest, seed: SEED, graph: store }));
+      const inMemory = await run(await buildFixtureRig({ policy, manifest, seed: SEED }));
       expect(onLbug).toEqual(inMemory);
-      expect(onLbug.edges.find((e) => e.type === "IDENTIFIED_AS")!.prov.confirmations).toHaveLength(1);
+      expect(onLbug.edges.find((e) => e.type === "IDENTIFIED_AS")!.prov).toMatchObject({ status: "participant_confirmed", confirmations: [{ by: MOM, stance: "confirms" }] });
+      expect(onLbug.edges.find((e) => e.id === "RELATED_TO:child:person:mom->person:maya")!.prov.status).toBe("participant_confirmed");
     } finally {
       await store.close();
     }

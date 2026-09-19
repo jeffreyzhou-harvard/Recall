@@ -1,5 +1,5 @@
 /**
- * Relay's fixed lines (AGENTS.md section 6.2). Every line Relay can say that
+ * Recall's fixed lines (AGENTS.md section 6.2). Every line Recall can say that
  * carries no factual claim lives in /fixtures/call-script.json under a stable
  * script id; this module validates that file and fills its slots.
  *
@@ -31,7 +31,7 @@ const categoryLines = z
     elaborate: line.optional(),
   })
   .refine((c) => c.memory_kind === "procedural" || c.reorientation === undefined, {
-    message: "an autobiographical category has no reorientation line: Relay never states such a memory outright",
+    message: "an autobiographical category has no reorientation line: Recall never states such a memory outright",
     path: ["reorientation"],
   });
 export type CategoryLines = z.infer<typeof categoryLines>;
@@ -74,10 +74,10 @@ export const callScriptSchema = z.strictObject({
   }),
   stop_phrases: z.array(z.string().min(1)).min(1),
   identity_phrases: z.array(z.string().min(1)).min(1),
-  /** How Relay talks (EVIDENCE.md, section C): one question at a time, and short sentences rather than slow ones. */
+  /** How Recall talks (EVIDENCE.md, section C): one question at a time, and short sentences rather than slow ones. */
   conduct: z.strictObject({ max_questions_per_line: z.number().int().positive(), max_words_per_sentence: z.number().int().positive() }),
   unsure_phrases: z.array(z.string().min(1)).min(1),
-  /** Short replies that say she is with the topic without yet saying anything about it. Relay then asks the open follow-up. */
+  /** Short replies that say she is with the topic without yet saying anything about it. Recall then asks the open follow-up. */
   affirm_phrases: z.array(z.string().min(1)).min(1),
   banned: z.array(bannedEntry).min(1),
 });
@@ -116,7 +116,7 @@ export function allScriptLines(script: CallScript): ScriptLine[] {
   return out;
 }
 
-/** Lowercased, punctuation to spaces, apostrophes kept: the one normal form every lexical rule in Relay matches on. */
+/** Lowercased, punctuation to spaces, apostrophes kept: the one normal form every lexical rule in Recall matches on. */
 export const normalize = (text: string): string =>
   ` ${text
     .toLowerCase()
@@ -127,6 +127,35 @@ export const normalize = (text: string): string =>
 
 /** Does the text contain the phrase as whole words? "correction" does not contain "correct". */
 export const containsPhrase = (text: string, phrase: string): boolean => normalize(text).includes(normalize(phrase));
+
+/**
+ * Did she ask to stop? A stop phrase is an instruction when it IS what she said, not when it is a word inside
+ * her story: "We never wanted to stop at the boardwalk" and "We said goodbye to the house" are memories, and
+ * ending the call on them would throw her words away. So a phrase counts when:
+ *
+ *   - it is a whole sentence of its own ("I have to go", "leave me alone": three words or more), anywhere;
+ *   - or the turn is short - six words or fewer ("Please stop.", "No more, thank you.");
+ *   - or it opens the turn ("Stop, I don't want this"), or closes it after a pause ("...that's enough. Goodbye.").
+ *
+ * "Don't stop" is not a stop. When unsure this errs toward stopping: a call that ends early can be made
+ * again, and a stop that is not heard cannot be taken back (rule 12).
+ */
+export function stopPhraseIn(text: string, phrases: readonly string[]): string | null {
+  const said = normalize(text).trim();
+  const short = said.split(" ").filter(Boolean).length <= 6;
+  for (const p of phrases) {
+    const phrase = normalize(p).trim();
+    const whole = phrase.split(" ").length >= 3;
+    for (let at = ` ${said} `.indexOf(` ${phrase} `); at >= 0; at = ` ${said} `.indexOf(` ${phrase} `, at + 1)) {
+      const before = said.slice(0, at).trim();
+      if (/(^| )(don't|dont|do not|never|not|didn't|didnt|won't|wont|wouldn't|wouldnt)$/.test(before)) continue;
+      const opens = before.split(" ").filter(Boolean).length <= 1;
+      const closes = said.endsWith(phrase) && new RegExp(`[.,!?;:\\-]\\s*${phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/ /g, "\\W+")}\\W*$`, "i").test(text.replace(/[‘’]/g, "'"));
+      if (whole || short || opens || closes) return p;
+    }
+  }
+  return null;
+}
 
 /** The first phrase on a list that the text contains, as whole words, or null. */
 export const firstPhraseIn = (text: string, phrases: readonly string[]): string | null => phrases.find((p) => containsPhrase(text, p)) ?? null;

@@ -1,12 +1,12 @@
 /**
- * Tools 1-2: which topic is due, and whether Relay may call her about it now.
+ * Tools 1-2: which topic is due, and whether Recall may call her about it now.
  *
  * Topic choice is a deterministic ranking. No model free-picks a topic, and no
  * family member can cause a call: the only inputs are the graph, the joint
  * setup, and the clock (rule 5).
  */
 import { cueHints } from "@/lib/graph/retrieval-layer";
-import { LIFE_PERIODS, SPEAKABLE_AS_FACT, TOPIC_NODE_TYPES, type GraphNode, type TopicFacet } from "@/lib/graph/types";
+import { LIFE_PERIODS, NOT_ANSWERED, SPEAKABLE_AS_FACT, TOPIC_NODE_TYPES, type GraphNode, type TopicFacet } from "@/lib/graph/types";
 import type { ToolOutput } from "../contracts";
 import type { ToolContext } from "../context";
 import { GateError } from "../gates";
@@ -56,10 +56,15 @@ export const get_next_recall_topic: ToolImpl<"get_next_recall_topic"> = async (i
   const eligible: Array<{ node: GraphNode; facet: TopicFacet; last: string | null; told: number; cue: boolean }> = [];
   if (input.person_id !== policy.person_id) return { topic: null, ranked: [], excluded: [], decided_by: "deterministic_ranking" };
 
+  // When each topic last came up. From the topic outcomes, and from the calls themselves - which nobody can clear,
+  // so clearing the family's record never changes what Recall does next (section 6.3); and which exist for a call
+  // she stopped, so the topic she stopped on is not the first thing she hears tomorrow (rule 12).
   const lastRevisit = new Map<string, string>();
-  for (const o of await ctx.graph.nodesOfType("TopicOutcome")) {
-    if (o.props.timestamp <= input.schedule_context.now && o.props.timestamp > (lastRevisit.get(o.props.topic_id) ?? "")) lastRevisit.set(o.props.topic_id, o.props.timestamp);
-  }
+  const cameUp = (topicId: string, at: string): void => {
+    if (at <= input.schedule_context.now && at > (lastRevisit.get(topicId) ?? "")) lastRevisit.set(topicId, at);
+  };
+  for (const o of await ctx.graph.nodesOfType("TopicOutcome")) cameUp(o.props.topic_id, o.props.timestamp);
+  for (const s of await ctx.graph.nodesOfType("Session")) if (s.props.outcome !== NOT_ANSWERED) cameUp(s.props.topic_id, s.props.started_at);
 
   for (const type of TOPIC_NODE_TYPES) {
     for (const node of await ctx.graph.nodesOfType(type)) {
@@ -77,7 +82,7 @@ export const get_next_recall_topic: ToolImpl<"get_next_recall_topic"> = async (i
 
   // Freshness first - never revisited, then longest ago - so that every memory comes round again, call after call,
   // rather than being visited once. Among those equally due: the one told most often; then by when in her life it is
-  // from, where someone has said (ages 6-30, then recent, then the years between; unknown last); then a topic Relay
+  // from, where someone has said (ages 6-30, then recent, then the years between; unknown last); then a topic Recall
   // already knows a helpful cue for; then id. Nothing here is a model's judgment.
   const period = (f: TopicFacet): number => (f.life_period ? LIFE_PERIODS.indexOf(f.life_period) : LIFE_PERIODS.length);
   eligible.sort((a, b) => {

@@ -18,11 +18,11 @@
  * the schedule, the graph, and the joint setup, and from nothing else (rule 5).
  */
 import type { StoreApi } from "zustand/vanilla";
-import type { AudioWindow } from "@/lib/providers/transcription";
-import type { FixedLineKey } from "@/lib/script/call-script";
-import { IN_CALL, TERMINAL, type RelayEvent, type Rung } from "@/lib/state/machine";
+import { turnText, type AudioWindow } from "@/lib/providers/transcription";
+import { firstPhraseIn, stopPhraseIn, type FixedLineKey } from "@/lib/script/call-script";
+import { IN_CALL, TERMINAL, type RecallEvent, type Rung } from "@/lib/state/machine";
 import type { MachineState } from "@/lib/state/reducer";
-import type { RelayStore } from "@/lib/state/store";
+import type { RecallStore } from "@/lib/state/store";
 import { GateError, ToolTimeoutError, type ToolContext, type ToolOutput, type ToolRuntime } from "@/lib/tools";
 import { CallUnavailableError, type CallDriver } from "./call-driver";
 
@@ -30,7 +30,7 @@ export interface RunEnv {
   person_id: string;
   ctx: ToolContext;
   runtime: ToolRuntime;
-  store: StoreApi<RelayStore>;
+  store: StoreApi<RecallStore>;
   /** Called exactly once, and only after the policy has granted the call: no grant, no call. */
   callDriver: (() => CallDriver) | null;
 }
@@ -81,9 +81,11 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
   const ended = (): boolean => TERMINAL.has(machine().state);
   let driver: CallDriver | null = null;
   let connected = false;
+  /** Something whoever runs Recall must hear about, but only once the call has been closed and recorded properly. */
+  let surfaceAfterwards: unknown = null;
 
   /** Dispatch an event, stamped with the injected clock and linked to the tool call that caused it. */
-  const dispatch = (event: RelayEvent, fromTool = true): MachineState => {
+  const dispatch = (event: RecallEvent, fromTool = true): MachineState => {
     const before = machine().state;
     const seq = fromTool ? runtime.lastSeq() : null;
     const next = store.getState().dispatch(event, { at: ctx.clock.iso(), tool_call_seq: seq });
@@ -132,7 +134,7 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
       claim_ids: [...new Set([topicId, ...retrieval.candidates.map((c) => c.root_id), ...retrieval.relations.map((r) => r.edge_id)])],
       policy_token_id: tokenId,
     });
-    // Two accounts differ: Relay speaks neither of them, and carries on with what is left (section 5).
+    // Two accounts differ: Recall speaks neither of them, and carries on with what is left (section 5).
     if (support.conflicts.length > 0) dispatch({ type: "CLAIMS_CONFLICT", claim_ids: support.conflicts.flatMap((c) => [c.a, c.b]) });
     const verified = support.verified.map((v) => v.claim_id);
     if (!verified.includes(topicId)) throw new GateError("evidence", "the topic itself could not be verified");
@@ -153,14 +155,14 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
     } catch (e) {
       if (!isDropped(e)) throw e;
       dispatch({ type: "CALL_NOT_ANSWERED", detail: e instanceof Error ? e.message : "nobody answered" }, false);
-      return await finish(env, null, false);
+      return await finish(env, null, true); // her phone rang: that is a call, as far as "how often" goes
     }
     connected = true;
     ctx.session.call_asset_id = driver.call_asset_id;
     ctx.session.started_at = ctx.clock.iso();
     dispatch({ type: "CALL_CONNECTED", session_id: ctx.session.session_id }, false);
 
-    // The first line of every call says what Relay is (rule 16). Only then the topic, and only as an invitation.
+    // The first line of every call says what Recall is (rule 16). Only then the topic, and only as an invitation.
     await speak(fixed.greeting!);
     dispatch({ type: "GREETING_DELIVERED", prompt_id: fixed.greeting!.prompt_id, discloses_ai: true }, false);
     dispatch({ type: "TOPIC_SELECTED", topic_id: topicId, citations: [topicId] }, false);
@@ -169,7 +171,7 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
 
     /**
      * Wait for her next final turn. The safety check runs on it before anything else (rule 15), and the alert
-     * goes out BEFORE Relay says a word about it, so that a hang-up in the same turn cannot cancel it.
+     * goes out BEFORE Recall says a word about it, so that a hang-up in the same turn cannot cancel it.
      * Returns null when the call is over.
      */
     const hear = async (): Promise<AudioWindow | null> => {
@@ -178,12 +180,36 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
         return null;
       }
       const window = await driver!.listen();
-      const safety = await runtime.call("check_safety_phrases", { audio_window: window });
+      // A turn is never let through unchecked, and a match is never dropped: each safety tool gets a second try,
+      // and whatever the alert tool does, the flow is dropped and she hears the safety line (rule 15).
+      const safety = await twice(() => runtime.call("check_safety_phrases", { audio_window: window }));
       if (safety.category === null) return window;
-      await runtime.call("send_safety_alert", { category: safety.category, caregiver_ids: ctx.setup.current().safety.designated_caregivers.map((c) => c.person_id) });
+      let alertFailure: unknown = null;
+      await twice(() => runtime.call("send_safety_alert", { category: safety.category!, caregiver_ids: ctx.setup.current().safety.designated_caregivers.map((c) => c.person_id) }), true).catch((e: unknown) => void (alertFailure = e));
       dispatch({ type: "SAFETY_MATCHED", category: safety.category });
       await speakIfThere(fixed.safety);
+      // The alert did not go out, twice. That is not something to end quietly on: it surfaces - after she has been
+      // told to call for help, and after the call has been closed and recorded like any other.
+      if (alertFailure !== null && !ctx.session.safety_alert_sent) surfaceAfterwards = new SafetyAlertError(alertFailure);
       return null;
+    };
+    /**
+     * Her reply to one of the two confirmation questions. A stop, and "who is this?", are read here from her own
+     * words - so neither depends on the tool that records her answer responding (rules 12 and 16). After the
+     * identity line the question is asked once more, since it is still the question on the table.
+     */
+    const hearReply = async (question: Prompt): Promise<AudioWindow | "stop" | null> => {
+      for (let asked = 1; ; asked++) {
+        const window = await hear();
+        if (!window) return null;
+        const turn = (await ctx.transcription.turnsIn(window)).filter((t) => t.speaker === "participant" && t.is_final).at(-1);
+        const said = turn ? turnText(turn) : "";
+        if (stopPhraseIn(said, ctx.script.stop_phrases)) return "stop";
+        if (asked > 1 || !firstPhraseIn(said, ctx.script.identity_phrases)) return window;
+        await speak(fixed.identity!);
+        dispatch({ type: "IDENTITY_ASKED", prompt_id: fixed.identity!.prompt_id }, false);
+        await speak(question);
+      }
     };
     const stop = async (): Promise<void> => {
       // An explicit stop ends the flow at once. One kind goodbye; no persuading, no second try (rule 12).
@@ -201,9 +227,10 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
         break;
       }
       if (heard.evidence.conduct_signal === "identity_question") {
-        // Any time she asks, Relay says what it is. No rung is used up; the question on the table still stands.
+        // Any time she asks, Recall says what it is. No rung is used up; the question on the table still stands.
         await speak(fixed.identity!);
         dispatch({ type: "IDENTITY_ASKED", prompt_id: fixed.identity!.prompt_id });
+        if (ended()) await speakIfThere(fixed.close_kind); // the agreed call length ran out: a kind close, never a silent hang-up
         continue;
       }
       history.push({ turn_id: heard.turn_id, turn_state: heard.state });
@@ -226,19 +253,28 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
       }
       if (machine().state !== "recalled") continue;
       if (machine().context.answer_turn_id === null) {
-        // She is with it. Ask the open follow-up, and capture what she says next - in her words, not Relay's.
+        // She is with it. Ask the open follow-up, and capture what she says next - in her words, not Recall's.
         await speak(fixed.elaborate!);
         continue;
       }
 
       const captured = await runtime.call("capture_contribution", { topic_id: topicId, audio_intervals: [{ asset_id: window.asset_id, ...heard.evidence.span }] });
       dispatch({ type: "CONTRIBUTION_CAPTURED", contribution_hash: captured.content_hash, trims: captured.trims.length, generated_first_person_words: captured.generated_first_person_words });
+      if (ended()) {
+        // The agreed call length ran out while her words were being captured. She is not asked to confirm anything now.
+        await speakIfThere(fixed.close_kind);
+        break;
+      }
 
       // She hears exactly what would be kept - her own recording, never a synthesis - and then the question.
       await driver.playback({ asset_id: window.asset_id, spans: captured.kept });
       await speak(fixed.store_question!);
-      const storeReply = await hear();
+      const storeReply = await hearReply(fixed.store_question!);
       if (!storeReply) break;
+      if (storeReply === "stop") {
+        await stop();
+        break;
+      }
       const store = await runtime.call("confirm_and_store", { step: "confirm", contribution_hash: captured.content_hash, audio_window: storeReply });
       if (store.step !== "confirm") throw new Error("unreachable");
       if (store.stop_requested) {
@@ -252,14 +288,27 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
       }
 
       await speak(fixed.share_question!);
-      const shareReply = await hear();
+      const shareReply = await hearReply(fixed.share_question!);
       if (!shareReply) break; // a stop here leaves nothing stored: commit comes last (section 5)
-      const share = await runtime.call("confirm_share", { contribution_hash: captured.content_hash, audio_window: shareReply });
+      if (shareReply === "stop") {
+        await stop();
+        break;
+      }
+      let share: ToolOutput<"confirm_share">;
+      try {
+        share = await runtime.call("confirm_share", { contribution_hash: captured.content_hash, audio_window: shareReply });
+      } catch (e) {
+        if (!(e instanceof ToolTimeoutError)) throw e;
+        // Her answer to the share question never blocks storing (section 5): the reducer resolves it as "not shared",
+        // and the record of that is taken with no window, so the commit still has the gate's share decision to check.
+        dispatch({ type: "TOOL_TIMEOUT", tool: e.tool });
+        share = await runtime.call("confirm_share", { contribution_hash: captured.content_hash, audio_window: null });
+      }
       if (share.stop_requested) {
         await stop();
         break;
       }
-      dispatch({ type: "SHARE_CONFIRMATION_RECORDED", confirmation_id: share.share_confirmation_id, decision: share.decision, contribution_hash: share.contribution_hash });
+      if (!machine().context.share_resolved) dispatch({ type: "SHARE_CONFIRMATION_RECORDED", confirmation_id: share.share_confirmation_id, decision: share.decision, contribution_hash: share.contribution_hash });
 
       const committed = await runtime.call("confirm_and_store", { step: "commit", contribution_hash: captured.content_hash, policy_token_id: tokenId });
       if (committed.step !== "commit") throw new Error("unreachable");
@@ -274,43 +323,75 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
       // She hung up. That is a stop like any other: nothing is stored beyond metadata, and nobody calls back.
       dispatch({ type: "STOP", how: "hang_up" }, false);
     } else if (e instanceof GateError) {
-      // A missing gate stops the flow. Mid-call, Relay says the safe-narrowing line - a success state (rule 7).
+      // A missing gate stops the flow. Mid-call, Recall says the safe-narrowing line - a success state (rule 7).
       const inCall = IN_CALL.includes(machine().state);
       dispatch({ type: "GATE_MISSING", gate: e.gate, detail: e.detail });
       if (inCall && connected) await speakIfThere(fixed.narrowing);
     } else if (e instanceof ToolTimeoutError) {
+      const inCall = IN_CALL.includes(machine().state);
       dispatch({ type: "TOOL_TIMEOUT", tool: e.tool });
       if (machine().context.fallback_active && connected && !ended()) {
-        // Fixed script, no tools: restate the current question once, then close kindly.
-        const current = ctx.session.spoken.at(-1);
+        // Fixed script, no tools: restate the current question once, then close kindly. The question is the last
+        // thing Recall ASKED - not the identity line, which answers a question of hers and asks nothing.
+        const current = ctx.session.spoken.filter((s) => s.script_id !== ctx.script.lines.identity.id).at(-1);
         const again = current ? ctx.session.prompts.find((p) => p.prompt_id === current.prompt_id) : undefined;
         if (again) {
           await speakIfThere(again);
           dispatch({ type: "FIXED_RESTATEMENT_DELIVERED", prompt_id: again.prompt_id }, false);
         }
         await speakIfThere(fixed.close_kind);
-        dispatch({ type: "CALL_CLOSED" }, false);
+        // The agreed call length may have run out while the question was being restated; the run has then already ended kindly.
+        if (!ended()) dispatch({ type: "CALL_CLOSED" }, false);
+      } else if (inCall && connected && machine().state === "no_answer_today") {
+        await speakIfThere(fixed.close_kind); // the call length ran out at the same moment: still a kind close
       }
     } else throw e;
   }
 
-  return finish(env, connected ? openLine.hangUp : null, connected);
+  const result = await finish(env, connected ? openLine.hangUp : null, connected);
+  if (surfaceAfterwards !== null) throw surfaceAfterwards;
+  return result;
 }
 
-async function finish(env: RunEnv, hangUp: (() => Promise<void>) | null, connected: boolean): Promise<RunResult> {
-  const { ctx, runtime, store } = env;
-  if (hangUp) await hangUp();
+/** Both tries of the safety alert failed. Her call has been handed off and she has heard the safety line; this is for whoever runs Recall. */
+export class SafetyAlertError extends Error {
+  constructor(public readonly cause: unknown) {
+    super(`the safety alert could not be sent: ${cause instanceof Error ? cause.message : "unknown error"}`);
+    this.name = "SafetyAlertError";
+  }
+}
 
-  // Rule 8: at call end, anything she did not confirm is dropped. Only a committed contribution is kept.
-  if (ctx.session.stored === null && (ctx.session.contribution !== null || ctx.session.call_asset_id !== null)) {
-    ctx.session.contribution = null;
-    ctx.session.store_confirmation = null;
-    ctx.session.share_confirmation = null;
-    ctx.session.unconfirmed_audio_discarded = true;
+/** One more try when a tool does not respond in time - or, for the safety alert, when it fails in any way at all. */
+async function twice<T>(work: () => Promise<T>, onAnyFailure = false): Promise<T> {
+  try {
+    return await work();
+  } catch (e) {
+    if (!onAnyFailure && !(e instanceof ToolTimeoutError)) throw e;
+    return work();
+  }
+}
+
+async function finish(env: RunEnv, hangUp: (() => Promise<void>) | null, attempted: boolean): Promise<RunResult> {
+  const { ctx, runtime, store } = env;
+  // A line that will not close must not cost the record of the call: the bookkeeping below still runs, and the failure surfaces after it.
+  let hangUpFailure: unknown = null;
+  if (hangUp) await hangUp().catch((e: unknown) => void (hangUpFailure = e ?? new Error("hang-up failed")));
+
+  // Rule 8: at call end, anything she did not confirm is dropped. Only a committed contribution is kept - and
+  // that goes for the tool log too, which would otherwise still hold her words.
+  if (ctx.session.stored === null) {
+    if (ctx.session.contribution !== null || ctx.session.call_asset_id !== null) {
+      ctx.session.contribution = null;
+      ctx.session.store_confirmation = null;
+      ctx.session.share_confirmation = null;
+      ctx.session.unconfirmed_audio_discarded = true;
+    }
+    runtime.forgetHerWords();
   }
 
-  // What happened on the topic, and the fact of the call. Metadata only; a tool that does not respond must not mask how the run ended.
-  if (connected && ctx.session.topic) {
+  // What happened on the topic, and the fact of the call - answered or not, since the agreed time between calls
+  // counts from when her phone last rang. Metadata only; a tool that does not respond must not mask how the run ended.
+  if (attempted && ctx.session.topic) {
     try {
       const last = ctx.session.assessments.at(-1);
       await runtime.call("record_retrieval_outcome", { topic_id: ctx.session.topic.topic_id, scaffold_id: ctx.session.spoken.filter((s) => s.rung !== null).at(-1)?.script_id ?? null, state: last?.state ?? "none" });
@@ -325,6 +406,7 @@ async function finish(env: RunEnv, hangUp: (() => Promise<void>) | null, connect
   } catch (e) {
     if (!(e instanceof ToolTimeoutError)) throw e;
   }
+  if (hangUpFailure !== null) throw hangUpFailure;
   // Nothing is sent to anyone here. The receipt and the record appear when an approved member opens the dashboard (rule 5).
   return { machine: store.getState().machine, receipt };
 }

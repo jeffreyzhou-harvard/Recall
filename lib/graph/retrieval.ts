@@ -7,11 +7,11 @@
  * the policy filter doing real work.
  */
 import type { GraphStore } from "./store";
-import { SPEAKABLE_AS_FACT, type EdgeType, type GraphEdge, type GraphNode, type MediaSpan, type NodeType, type SourceClass } from "./types";
+import { SPEAKABLE_AS_FACT, type EdgeType, type GraphEdge, type GraphNode, type MediaSpan, type NodeType, type Provenance, type SourceClass } from "./types";
 
 /**
  * Only topical edges are walked. Walking SPOKEN_BY or CONTRIBUTED_BY would put everything she or her
- * family ever said two hops from every topic: a memory archive to browse, which is exactly what Relay
+ * family ever said two hops from every topic: a memory archive to browse, which is exactly what Recall
  * is not (AGENTS.md section 14).
  */
 const TRAVERSABLE: ReadonlySet<EdgeType> = new Set(["ABOUT", "DEPICTS", "EVIDENCE_FOR", "RELATED_TO"]);
@@ -114,7 +114,7 @@ interface Reached {
   pathEdges: string[];
 }
 
-async function walk(store: GraphStore, startId: string, maxHops: number): Promise<Reached[]> {
+async function walk(store: GraphStore, startId: string, maxHops: number, mayFollow: (edge: GraphEdge) => Promise<boolean>): Promise<Reached[]> {
   const start = await store.getNode(startId);
   if (!start) throw new Error(`retrieval: topic "${startId}" is not in the graph`);
   const seen = new Map<string, Reached>([[startId, { node: start, hops: 0, pathNodes: [startId], pathEdges: [] }]]);
@@ -125,6 +125,8 @@ async function walk(store: GraphStore, startId: string, maxHops: number): Promis
       // An unconfirmed edge is not a path: a guess that two things are related must not make one reachable from the other.
       const edges: GraphEdge[] = (await store.edgesOf(at.node.id)).filter((e) => TRAVERSABLE.has(e.type) && SPEAKABLE_AS_FACT.has(e.prov.status));
       for (const edge of edges) {
+        // Nor is an edge from a source this call may not use: what cannot be said cannot be the way to something else either.
+        if (!(await mayFollow(edge))) continue;
         const otherId = edge.from === at.node.id ? edge.to : edge.from;
         if (seen.has(otherId)) continue;
         const other = await store.getNode(otherId);
@@ -151,29 +153,31 @@ function backingArtifactId(node: GraphNode): string {
 }
 
 export async function retrieveCandidates(store: GraphStore, params: RetrievalParams): Promise<RetrievalResult> {
-  const reached = (await walk(store, params.topic_id, params.max_hops)).filter((r) => CANDIDATE_TYPES.has(r.node.type));
   const allowed = new Set(params.allowed_sources);
+  /** ONE set of filters, for a node and for an edge alike: a tie between two people is a fact like any other, and gets no easier a test. */
+  const whyNot = async (p: Provenance, artifactId: string): Promise<ExclusionReason | null> => {
+    // First, always: an observation or an inference is not context, whatever the policy allows.
+    if (!SPEAKABLE_AS_FACT.has(p.status)) return "not_confirmed";
+    if (!allowed.has(p.source_class)) return "source_class_not_allowed";
+    if (p.expires_at !== null && p.expires_at <= params.now_iso) return "expired";
+    if (!p.audience_scope.includes(params.audience)) return "audience_out_of_scope";
+    const permitted = (await store.edgesOf(artifactId)).some((e) => e.type === "PERMITTED_IN" && e.to === params.policy_id);
+    return permitted ? null : "artifact_not_permitted_by_policy";
+  };
+
+  const reached = (await walk(store, params.topic_id, params.max_hops, async (e) => (await whyNot(e.prov, e.prov.source_id)) === null)).filter((r) => CANDIDATE_TYPES.has(r.node.type));
   const excluded: Exclusion[] = [];
   const kept: Reached[] = [];
 
   for (const r of reached) {
-    const p = r.node.prov;
-    let reason: ExclusionReason | null = null;
-    // First, always: an observation or an inference is not context, whatever the policy allows.
-    if (!SPEAKABLE_AS_FACT.has(p.status)) reason = "not_confirmed";
-    else if (!allowed.has(p.source_class)) reason = "source_class_not_allowed";
-    else if (p.expires_at !== null && p.expires_at <= params.now_iso) reason = "expired";
-    else if (!p.audience_scope.includes(params.audience)) reason = "audience_out_of_scope";
-    else {
-      const artifactEdges = await store.edgesOf(backingArtifactId(r.node));
-      const permitted = artifactEdges.some((e) => e.type === "PERMITTED_IN" && e.to === params.policy_id);
-      if (!permitted) reason = "artifact_not_permitted_by_policy";
-    }
+    const reason = await whyNot(r.node.prov, backingArtifactId(r.node));
     if (reason) excluded.push({ node_id: r.node.id, reason });
     else kept.push(r);
   }
 
-  const supersededIds = new Set(kept.flatMap((r) => r.node.prov.supersedes));
+  // A claim that has been replaced stays replaced, even if what replaced it cannot itself be used on this call
+  // (expired, or for another audience): setting the newer account aside must not bring the older one back.
+  const supersededIds = new Set(reached.filter((r) => SPEAKABLE_AS_FACT.has(r.node.prov.status)).flatMap((r) => r.node.prov.supersedes));
   const live = kept.filter((r) => {
     if (!supersededIds.has(r.node.id)) return true;
     excluded.push({ node_id: r.node.id, reason: "superseded" });
@@ -214,8 +218,7 @@ export async function retrieveCandidates(store: GraphStore, params: RetrievalPar
     for (const e of await store.edgesOf(personId)) {
       if (e.type !== "RELATED_TO" || typeof e.props.relation !== "string") continue;
       if (!people.has(e.from) || !people.has(e.to) || relations.some((r) => r.edge_id === e.id)) continue;
-      if (!SPEAKABLE_AS_FACT.has(e.prov.status) || !allowed.has(e.prov.source_class)) continue;
-      if (e.prov.expires_at !== null && e.prov.expires_at <= params.now_iso) continue;
+      if ((await whyNot(e.prov, e.prov.source_id)) !== null) continue;
       relations.push({ edge_id: e.id, from: e.from, to: e.to, relation: e.props.relation, said_as: typeof e.props.said_as === "string" ? e.props.said_as : null });
     }
   }
