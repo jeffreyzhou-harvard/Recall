@@ -79,6 +79,12 @@ describe("seed validation", () => {
     const unsourced = withNode({ id: "claim:y", type: "EpisodicClaim", label: "y", props: { text: "y" }, source: "artifact:nowhere" });
     expect(() => buildGraph(unsourced, assets)).toThrow(/undeclared source/);
   });
+
+  it("refuses a contradiction noted only in provenance, since verification reads the edge", () => {
+    const seed = mergeSeeds(FAMILY_SEED, CONFLICTING_CLAIMS);
+    seed.edges = seed.edges.filter((e) => e.type !== "CONTRADICTS");
+    expect(() => buildGraph(seed, new AssetIndex(CONFLICT_MANIFEST))).toThrow(/no CONTRADICTS edge/);
+  });
 });
 
 describe("content hashing", () => {

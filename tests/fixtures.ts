@@ -31,24 +31,30 @@ export const BLOCKED_TOPIC_FORWARD = diwaliForward({
 
 // --- derived calls ---------------------------------------------------------------
 
-const relayLine = (id: string, start: number, end: number, text: string): Turn => {
+const line = (speaker: Turn["speaker"], id: string, start: number, end: number, text: string): Turn => {
   const words = text.split(" ");
   const step = (end - start) / words.length;
   return {
     turn_id: id,
-    speaker: "relay",
+    speaker,
     start_ms: start,
     end_ms: end,
     is_final: true,
     words: words.map((w, i) => ({ w, start_ms: Math.round(start + i * step), end_ms: Math.round(start + (i + 1) * step) - 10 })),
   };
 };
+const relayLine = (id: string, start: number, end: number, text: string): Turn => line("relay", id, start, end, text);
+const herLine = (id: string, start: number, end: number, text: string): Turn => line("participant", id, start, end, text);
 const silence = (id: string, start: number, end: number): Turn => ({ turn_id: id, speaker: "participant", start_ms: start, end_ms: end, is_final: true, words: [] });
 const call = (turns: Turn[]): CallTranscript => ({ ...GOLDEN_TRANSCRIPT, note: "derived in tests", turns });
 
 /** The golden call, except she gives no reply when asked to approve. */
 export const unclearAssentCall = (): CallTranscript =>
   call([...["r1", "p1", "r2", "p2", "r3", "pb1"].map(goldenTurn), silence("p3", 36200, 37200)]);
+
+/** The golden call, except her reply to "want me to send that?" is whatever `reply` says. */
+export const assentReplyCall = (reply: string): CallTranscript =>
+  call([...["r1", "p1", "r2", "p2", "r3", "pb1"].map(goldenTurn), herLine("p3", 36200, 37800, reply)]);
 
 /** After the re-anchor there is no reply: a second lost-thread signal, then the gentle wrap-up line. */
 export const doubleLostCall = (): CallTranscript =>
