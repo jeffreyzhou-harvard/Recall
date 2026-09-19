@@ -1,5 +1,5 @@
 /**
- * The one way Relay ever reaches out to family (AGENTS.md rules 5 and 15): a
+ * The one way Recall ever reaches out to family (AGENTS.md rules 5 and 15): a
  * fixed-text safety alert to the designated caregivers, through the channel
  * chosen in the joint setup.
  *

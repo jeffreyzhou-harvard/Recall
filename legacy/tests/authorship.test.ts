@@ -109,19 +109,19 @@ describe("the edit-decision list", () => {
 });
 
 describe("capturing words", () => {
-  it("refuses Relay's speech and played-back audio", () => {
-    const relay = goldenTurn("r1");
-    expect(() => participantWordsIn(turns, [{ start_ms: relay.start_ms, end_ms: relay.end_ms }])).toThrow(AuthorshipError);
+  it("refuses Recall's speech and played-back audio", () => {
+    const recall = goldenTurn("r1");
+    expect(() => participantWordsIn(turns, [{ start_ms: recall.start_ms, end_ms: recall.end_ms }])).toThrow(AuthorshipError);
     expect(() => participantWordsIn(turns, [{ start_ms: 0, end_ms: 40_000 }])).toThrow(/only her own words/);
   });
 });
 
-describe("everything Relay says", () => {
+describe("everything Recall says", () => {
   it("maps every fact to a verified citation, and has no fact-free free text", () => {
     const prompts = run.ctx.session.prompts;
     expect(prompts.length).toBeGreaterThan(0);
     for (const p of prompts) {
-      expect(p.voice).toBe("relay");
+      expect(p.voice).toBe("recall");
       expect(p.segments.map((s) => s.text).join("")).toBe(p.text);
       for (const s of p.segments.filter((s) => s.kind === "fact")) {
         expect(s.citation_ids.length, `"${s.text}" has no citation`).toBeGreaterThan(0);

@@ -43,7 +43,7 @@ const line = (speaker: Turn["speaker"], id: string, start: number, end: number, 
     words: words.map((w, i) => ({ w, start_ms: Math.round(start + i * step), end_ms: Math.round(start + (i + 1) * step) - 10 })),
   };
 };
-const relayLine = (id: string, start: number, end: number, text: string): Turn => line("relay", id, start, end, text);
+const recallLine = (id: string, start: number, end: number, text: string): Turn => line("recall", id, start, end, text);
 const herLine = (id: string, start: number, end: number, text: string): Turn => line("participant", id, start, end, text);
 const silence = (id: string, start: number, end: number): Turn => ({ turn_id: id, speaker: "participant", start_ms: start, end_ms: end, is_final: true, words: [] });
 const call = (turns: Turn[]): CallTranscript => ({ ...GOLDEN_TRANSCRIPT, note: "derived in tests", turns });
@@ -58,14 +58,14 @@ export const assentReplyCall = (reply: string): CallTranscript =>
 
 /** After the re-anchor there is no reply: a second lost-thread signal, then the gentle wrap-up line. */
 export const doubleLostCall = (): CallTranscript =>
-  call([...["r1", "p1", "r2"].map(goldenTurn), silence("p2", 16500, 19500), relayLine("r3", 21000, 25200, "That's alright. We can come back to this another time.")]);
+  call([...["r1", "p1", "r2"].map(goldenTurn), silence("p2", 16500, 19500), recallLine("r3", 21000, 25200, "That's alright. We can come back to this another time.")]);
 
 /** A tool times out after the first lost-thread signal: the brief again, once, then the closing line. */
 export const toolTimeoutCall = (): CallTranscript =>
   call([
     ...["r1", "p1"].map(goldenTurn),
-    relayLine("r2", 9800, 13000, "Anika wants your help with Diwali dessert."),
-    relayLine("r3", 15000, 17600, "Thank you. We'll talk again soon."),
+    recallLine("r2", 9800, 13000, "Anika wants your help with Diwali dessert."),
+    recallLine("r3", 15000, 17600, "Thank you. We'll talk again soon."),
   ]);
 
 // --- seed overlays ---------------------------------------------------------------
@@ -100,7 +100,7 @@ export const manifestWith = (...assets: Array<{ id: string; duration_ms: number 
   ],
 });
 
-/** A second source-backed claim that contradicts the first. Relay must use neither. */
+/** A second source-backed claim that contradicts the first. Recall must use neither. */
 export const CONFLICTING_CLAIMS: SeedFile = {
   version: 1,
   description: "test: contradicting claim",

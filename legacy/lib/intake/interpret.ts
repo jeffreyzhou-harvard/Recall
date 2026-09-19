@@ -4,15 +4,15 @@
  * The deterministic interpreter does one thing: it looks for the exact names
  * of things the graph already knows, inside the asker's own words (the message
  * and the photo caption). It never guesses, paraphrases, or reads the image.
- * If nothing matches, the ask has no subject, Relay cannot render a cited
+ * If nothing matches, the ask has no subject, Recall cannot render a cited
  * brief, and the flow stops safely and asks the family to clarify - the right
  * outcome, not a failure to work around.
  *
  * This is where the discovery loop pays off in the participation loop: once
- * she or the family has told Relay about Maya, Cape May, or making gulab jamun,
- * an ask can simply name them and Relay already knows what is meant. Only
+ * she or the family has told Recall about Maya, Cape May, or making gulab jamun,
+ * an ask can simply name them and Recall already knows what is meant. Only
  * CONFIRMED knowledge is matchable. A face cluster nobody has named, or a
- * relationship Relay merely inferred, can never become what an ask is "about".
+ * relationship Recall merely inferred, can never become what an ask is "about".
  *
  * A model-backed interpreter for the live side demo implements the same
  * interface and is held to the same output: ids of nodes that exist.
@@ -30,7 +30,7 @@ export interface AskInterpretation {
   /** The subset of subjects nobody said: worked out by rule from public reference facts. Marked as such in the graph. */
   deduced_subject_topic_ids: string[];
   event_ids: string[];
-  /** People, places, activities, and preferences the ask names, that she or the family already told Relay about. */
+  /** People, places, activities, and preferences the ask names, that she or the family already told Recall about. */
   mention_ids: string[];
   /** Which topics each photo shows, per the asker's caption. */
   depicts: Record<string, string[]>;

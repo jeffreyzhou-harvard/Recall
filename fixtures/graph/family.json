@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Susan's memory graph: what she and her family have told Relay, each with who said it and when. Plus Relay's record of earlier calls.",
+  "description": "Susan's memory graph: what she and her family have told Recall, each with who said it and when. Plus Recall's record of earlier calls.",
   "sources": {
     "artifact:setup-record": {
       "source_class": "joint_setup",
@@ -78,7 +78,7 @@
       "source_class": "session_audit",
       "asset_id": null,
       "observed_at": "2026-11-03T15:00:00.000Z",
-      "author": "system:relay",
+      "author": "system:recall",
       "extraction_method": "system_event",
       "confidence": 1,
       "audience_scope": [
@@ -157,7 +157,7 @@
     {
       "id": "artifact:call-history",
       "type": "Artifact",
-      "label": "Relay's record of earlier calls",
+      "label": "Recall's record of earlier calls",
       "props": {
         "kind": "call",
         "text": null,

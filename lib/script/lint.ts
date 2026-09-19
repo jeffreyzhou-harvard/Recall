@@ -1,7 +1,7 @@
 /**
  * The language lint (AGENTS.md section 12, test 8). One pure function over
  * lines of text; the script in /scripts and the tests both run it, over the
- * fixtures and over every line Relay actually rendered.
+ * fixtures and over every line Recall actually rendered.
  *
  * It finds: evaluative or testing language (rule 11), diagnostic and
  * emotional-state words (rule 4), the rule 9 word list, anything that asks her
@@ -41,7 +41,7 @@ export function lintLines(lines: readonly LintLine[], banned: readonly BannedEnt
 }
 
 /**
- * How Relay talks (EVIDENCE.md, section C). One question per turn; and sentences kept short, because it is
+ * How Recall talks (EVIDENCE.md, section C). One question per turn; and sentences kept short, because it is
  * syntactic complexity - not speed - that costs comprehension. Checked over every line spoken to her.
  */
 export function lintConduct(lines: readonly LintLine[], conduct: { max_questions_per_line: number; max_words_per_sentence: number }): LintFinding[] {

@@ -1,19 +1,19 @@
 /**
  * Tools 18-19: the safety handoff (AGENTS.md rule 15).
  *
- * Relay is not an emergency service, and it does not sit on a safety concern.
+ * Recall is not an emergency service, and it does not sit on a safety concern.
  * The check is a lexical match on her literal words - never a judgment about
  * her - and the alert is fixed text: a category and a time, to the designated
  * caregivers only. Neither tool has a field in which her words could travel.
  */
-import { RELAY_AGENT_ID, type Provenance } from "@/lib/graph/types";
+import { RECALL_AGENT_ID, type Provenance } from "@/lib/graph/types";
 import { turnText } from "@/lib/providers/transcription";
 import { matchSafetyPhrase } from "@/lib/safety/phrases";
 import { fill } from "@/lib/script/call-script";
 import type { ToolImpl } from "../runtime";
 
 export const check_safety_phrases: ToolImpl<"check_safety_phrases"> = async (input, ctx) => {
-  // Her turns only. Relay's own speech, and her own audio played back to her, are never checked.
+  // Her turns only. Recall's own speech, and her own audio played back to her, are never checked.
   const turn = (await ctx.transcription.turnsIn(input.audio_window)).filter((t) => t.speaker === "participant" && t.is_final && t.words.length > 0).at(-1);
   if (!turn) return { turn_id: null, category: null };
   const match = matchSafetyPhrase(ctx.safetyPhrases, turnText(turn));
@@ -69,7 +69,7 @@ export const send_safety_alert: ToolImpl<"send_safety_alert"> = async (input, ct
     media_hash: null,
     span: null,
     observed_at: at,
-    author: RELAY_AGENT_ID,
+    author: RECALL_AGENT_ID,
     extraction_method: "system_event",
     confidence: 1,
     audience_scope: [policy.person_id],
@@ -80,7 +80,7 @@ export const send_safety_alert: ToolImpl<"send_safety_alert"> = async (input, ct
     patient_confirmed: false,
     confirmations: [],
   };
-  if (!(await ctx.graph.getNode(logId))) await ctx.graph.putNode({ id: logId, type: "Artifact", label: "Relay's safety log for this call", props: { kind: "audit_log", text: null, alt: null }, prov });
+  if (!(await ctx.graph.getNode(logId))) await ctx.graph.putNode({ id: logId, type: "Artifact", label: "Recall's safety log for this call", props: { kind: "audit_log", text: null, alt: null }, prov });
   const eventId = `safety-event:${ctx.session.session_id}:${input.category}`;
   await ctx.graph.putNode({ id: eventId, type: "SafetyEvent", label: "Safety handoff", props: { category: input.category, at, recipients: sent.map((s) => s.caregiver_id) }, prov });
   ctx.session.safety_alert_sent = true;

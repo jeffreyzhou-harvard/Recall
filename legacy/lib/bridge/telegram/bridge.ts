@@ -11,7 +11,7 @@ import { BridgeError, GuardedThreadBridge, type SupportReceipt, type ThreadMessa
 import { TelegramApiError, type OutboundFile, type TelegramClient } from "./api";
 import { chatIdForPerson, type TelegramBindings } from "./bindings";
 
-/** Where a forward came from on Telegram, so Relay's answer lands directly under the question. */
+/** Where a forward came from on Telegram, so Recall's answer lands directly under the question. */
 export interface TelegramOrigin {
   chat_id: number;
   message_id: number;
@@ -26,7 +26,7 @@ export function voiceCardText(card: VoiceCard): string {
 }
 
 export function supportReceiptText(receipt: SupportReceipt): string {
-  return ["What Relay made possible:", ...receipt.lines.map((l) => `• ${l.text}`)].join("\n");
+  return ["What Recall made possible:", ...receipt.lines.map((l) => `• ${l.text}`)].join("\n");
 }
 
 export class TelegramThreadBridge extends GuardedThreadBridge {

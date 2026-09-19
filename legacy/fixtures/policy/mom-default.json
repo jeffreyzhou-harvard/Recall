@@ -1,7 +1,7 @@
 {
   "policy_id": "policy:mom-default",
   "version": 1,
-  "description": "Agreed once, together, in the joint setup. Relay never widens it on its own.",
+  "description": "Agreed once, together, in the joint setup. Recall never widens it on its own.",
   "person_id": "person:mom",
   "established_by": "artifact:setup-record",
   "approved_people": [

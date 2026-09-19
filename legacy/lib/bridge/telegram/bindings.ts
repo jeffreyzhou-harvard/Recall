@@ -4,7 +4,7 @@
  * which people.
  *
  * Telegram ids are personal data. Bindings come from the environment
- * (RELAY_TELEGRAM_BINDINGS) or a git-ignored file - never from a committed
+ * (RECALL_TELEGRAM_BINDINGS) or a git-ignored file - never from a committed
  * fixture. A binding grants nothing by itself: the identity gate and the
  * access policy still decide, on every run, whether the ask goes anywhere.
  */
@@ -26,12 +26,12 @@ export function parseBindings(json: string | undefined): TelegramBindings {
   try {
     raw = JSON.parse(json);
   } catch {
-    throw new Error("RELAY_TELEGRAM_BINDINGS is not valid JSON");
+    throw new Error("RECALL_TELEGRAM_BINDINGS is not valid JSON");
   }
   const parsed = telegramBindingsSchema.safeParse(raw);
   if (!parsed.success) {
     const why = (i: z.core.$ZodIssue): string => (i.code === "invalid_key" ? "Telegram ids are integers, written as strings" : i.message);
-    throw new Error(`RELAY_TELEGRAM_BINDINGS is invalid: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${why(i)}`).join("; ")}`);
+    throw new Error(`RECALL_TELEGRAM_BINDINGS is invalid: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${why(i)}`).join("; ")}`);
   }
   return parsed.data;
 }

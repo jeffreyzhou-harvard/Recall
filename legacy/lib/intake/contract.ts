@@ -1,5 +1,5 @@
 /**
- * What Relay ingests when a relative forwards an ask - and, just as much, what
+ * What Recall ingests when a relative forwards an ask - and, just as much, what
  * it refuses to (rule 8, data minimization).
  *
  * The schema is strict: a bridge cannot pass chat history, other messages,

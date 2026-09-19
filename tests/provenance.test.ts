@@ -76,7 +76,7 @@ describe("provenance receipt", () => {
 
   it("does not exist for a contribution she did not confirm", async () => {
     const { run, OPENING, SAID, HER_LINE } = await import("./helpers");
-    const r = await run([...OPENING, ["her", "Oh, the little house by the water!"], ["playback"], ["relay", SAID.storeQuestion], ["her", "No."], ["relay", SAID.closeNotStored]]);
+    const r = await run([...OPENING, ["her", "Oh, the little house by the water!"], ["playback"], ["recall", SAID.storeQuestion], ["her", "No."], ["recall", SAID.closeNotStored]]);
     expect(r.recording.provenance_receipt).toBeNull();
     expect(HER_LINE).toBeTruthy();
   });
@@ -108,7 +108,7 @@ describe("PROV-style event log", () => {
     expect(await verifySealed(sealed)).toBe(true);
 
     const tampered = structuredClone(sealed);
-    const entity = tampered.records.find((r) => r.kind === "entity" && r.type === "relay:Contribution")!;
+    const entity = tampered.records.find((r) => r.kind === "entity" && r.type === "recall:Contribution")!;
     (entity as { attrs: Record<string, unknown> }).attrs.generated_first_person_words = 4;
     expect(await verifySealed(tampered)).toBe(false);
 

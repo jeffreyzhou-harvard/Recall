@@ -4,10 +4,10 @@
  *
  * That is all that lives here - seven data files:
  *
- *   graph/family.json          what Susan and her family have told Relay, with who said it and when,
- *                              and Relay's record of earlier calls
+ *   graph/family.json          what Susan and her family have told Recall, with who said it and when,
+ *                              and Recall's record of earlier calls
  *   policy/susan-setup.json    the joint setup: what she and her family agreed
- *   call-script.json           every fixed line Relay can say, with script ids, and the banned-phrase list
+ *   call-script.json           every fixed line Recall can say, with script ids, and the banned-phrase list
  *   family-copy.json           every fixed line the family side can show
  *   record-thresholds.json     every number the per-topic record uses
  *   safety-phrases.json        the fixed safety list and the fixed alert text

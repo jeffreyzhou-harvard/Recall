@@ -39,7 +39,7 @@ export const build_caregiver_receipt: ToolImpl<"build_caregiver_receipt"> = asyn
     } else add(BY_RUNG[c.reached_at_rung]!, { topic: topic.label }, [topic.topic_id]);
   }
 
-  // "No correction, no distress" is a statement about what Relay logged, not about her: no line Relay spoke
+  // "No correction, no distress" is a statement about what Recall logged, not about her: no line Recall spoke
   // came from outside the reviewed script (which holds no correction), and no safety event fired (Appendix B, item 2).
   const onlyReviewedLines = session.spoken.every((s) => session.prompts.some((p) => p.prompt_id === s.prompt_id));
   if (connected && onlyReviewedLines && session.safety_category === null && machine.state !== "stopped") add("receipt_conduct", {});

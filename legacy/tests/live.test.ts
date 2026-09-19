@@ -1,5 +1,5 @@
 /**
- * The live path: Deepgram, Muse Spark, and a video call driving a real Relay
+ * The live path: Deepgram, Muse Spark, and a video call driving a real Recall
  * session. No network and no keys here - sockets and fetch are fakes. The real
  * services are exercised separately (see scripts/e2e-live.mjs).
  */
@@ -17,7 +17,7 @@ import { cutWav } from "@/lib/provenance/wav";
 import { DeepgramLive, transcribeWav, type HeardTurn, type SocketLike } from "@/lib/providers/deepgram";
 import { MuseAnswerInterpreter, museScaffoldAdvisor } from "@/lib/providers/muse/reasoning";
 import { MuseApiError, MuseSpark, type MuseFetch } from "@/lib/providers/muse/spark";
-import { RelayService } from "@/lib/service/relay-service";
+import { RecallService } from "@/lib/service/recall-service";
 import { initialState, reduce } from "@/lib/state/reducer";
 import { policySchema, type ScaffoldAdvisor } from "@/lib/tools";
 import { replay, visitedStates } from "@/lib/state/reducer";
@@ -152,7 +152,7 @@ describe("Muse Spark", () => {
 
 const SECOND = new Uint8Array(32_000); // one second of 16 kHz 16-bit silence
 
-/** Stands in for Relay's call page and for Deepgram: acks what it is told to say, and "hears" her scripted replies. */
+/** Stands in for Recall's call page and for Deepgram: acks what it is told to say, and "hears" her scripted replies. */
 function rig(replies: Array<(atMs: number) => HeardTurn | null>, options: { silence_ms?: number } = {}) {
   const assets = new AssetIndex(MANIFEST);
   const commands: CallCommand[] = [];
@@ -167,7 +167,7 @@ function rig(replies: Array<(atMs: number) => HeardTurn | null>, options: { sile
   call.attach((command) => {
     commands.push(command);
     if (command.type === "hangup") return;
-    hear(3); // Relay's line, or the playback, takes three seconds of call time
+    hear(3); // Recall's line, or the playback, takes three seconds of call time
     call.acknowledge(command.type === "say" ? { type: "said", prompt_id: command.prompt_id } : { type: "played", playback_id: command.playback_id });
     if (command.type === "say" && ["wrap_up", "close_kindly"].some((k) => command.prompt_id.includes(k))) return;
     queueMicrotask(() => {
@@ -192,7 +192,7 @@ const says = (text: string) => (atMs: number): HeardTurn => {
 async function runLive(replies: Array<(atMs: number) => HeardTurn | null>, scaffoldAdvisor?: ScaffoldAdvisor, bridgeFor: (call: LiveCall) => MemoryThreadBridge = () => new MemoryThreadBridge()) {
   const r = rig(replies);
   const bridge = bridgeFor(r.call);
-  const service = new RelayService({ graph: MemoryGraphStore.from(buildGraph(FAMILY_SEED, r.assets)), policy: policySchema.parse(POLICY), assets: r.assets, clock: { now: () => Date.parse("2026-11-05T17:30:00.000Z"), iso: () => "2026-11-05T17:30:00.000Z" }, bridge, transcription: r.call, callDriver: () => (queueMicrotask(r.join), r.call), scaffoldAdvisor });
+  const service = new RecallService({ graph: MemoryGraphStore.from(buildGraph(FAMILY_SEED, r.assets)), policy: policySchema.parse(POLICY), assets: r.assets, clock: { now: () => Date.parse("2026-11-05T17:30:00.000Z"), iso: () => "2026-11-05T17:30:00.000Z" }, bridge, transcription: r.call, callDriver: () => (queueMicrotask(r.join), r.call), scaffoldAdvisor });
   const forward = diwaliForward();
   await service.forwardAsk(forward);
   const run = await service.runSession(forward.thread_id as string, "session:live");
@@ -252,7 +252,7 @@ describe("a live video call drives a real session", () => {
     expect(run.call.ended).toBe(true);
   });
 
-  it("never takes Relay's own voice for hers: anything heard while Relay was talking is discarded", async () => {
+  it("never takes Recall's own voice for hers: anything heard while Recall was talking is discarded", async () => {
     const r = rig([]);
     r.join();
     await r.call.connect();
@@ -264,7 +264,7 @@ describe("a live video call drives a real session", () => {
     r.hear(3);
     const window = await r.call.listen();
     const turns = await r.call.allTurns(window.asset_id);
-    expect(turns.map((t) => `${t.speaker}: ${t.words.map((w) => w.w).join(" ")}`)).toEqual(["relay: Anika wants your help.", "participant: Make the kheer."]);
+    expect(turns.map((t) => `${t.speaker}: ${t.words.map((w) => w.w).join(" ")}`)).toEqual(["recall: Anika wants your help.", "participant: Make the kheer."]);
   });
 
   it("ends safely when nobody joins, and when the call drops - without claiming anything happened that did not", async () => {

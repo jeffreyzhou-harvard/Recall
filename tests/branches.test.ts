@@ -7,8 +7,8 @@ import { ACCOUNTS_DIFFER, CAPTURE_AND_CONFIRM, HER_LINE, OPENING, SAID, SAID_RUN
 
 const nodesOf = <T extends NodeType>(r: Awaited<ReturnType<typeof run>>, type: T): Promise<Array<NodeOf<T>>> => r.graph.nodesOfType(type);
 const newClaims = async (r: Awaited<ReturnType<typeof run>>) => (await r.graph.nodesOfType("EpisodicClaim")).filter((c) => c.prov.source_class === "recall_call");
-const UP_TO_ASSOCIATION: Step[] = [...OPENING, ["her", "Cape May...?"], ["relay", SAID.rung2], ["her", "I'm not sure."], ["relay", SAID.rung3]];
-const RECALLED: Step[] = [...UP_TO_ASSOCIATION, ["her", "Maya, my daughter!"], ["relay", SAID.elaborate]];
+const UP_TO_ASSOCIATION: Step[] = [...OPENING, ["her", "Cape May...?"], ["recall", SAID.rung2], ["her", "I'm not sure."], ["recall", SAID.rung3]];
+const RECALLED: Step[] = [...UP_TO_ASSOCIATION, ["her", "Maya, my daughter!"], ["recall", SAID.elaborate]];
 
 describe("the call is never placed", () => {
   it("outside the agreed window: blocked, no call, nothing ingested", async () => {
@@ -26,7 +26,7 @@ describe("the call is never placed", () => {
     ["the weekly limit", (p: Record<string, any>) => (p.call_frequency.max_calls_per_week = 3), "weekly_call_limit_reached"],
     ["a caregiver pause", (p: Record<string, any>) => (p.calls_paused = true), "calls_paused"],
     ["no saved contact", (p: Record<string, any>) => (p.attestations.number_saved_in_her_phone = false), "setup_attestations_missing"],
-    ["Relay never introduced to her", (p: Record<string, any>) => (p.attestations.relay_introduced_to_her = false), "setup_attestations_missing"],
+    ["Recall never introduced to her", (p: Record<string, any>) => (p.attestations.recall_introduced_to_her = false), "setup_attestations_missing"],
   ])("%s: blocked", async (_name, patch, reason) => {
     const r = await runFixture({ policy: policyWith(patch) });
     expect(r.recording.final_state).toBe("blocked");
@@ -44,8 +44,8 @@ describe("the call is never placed", () => {
 
   it("she does not pick up: no answer today, and nobody calls back", async () => {
     const rig = await buildFixtureRig({ transcript: null });
-    const service = new (await import("@/lib/service/relay-service")).RelayService({
-      ...(rig.service as unknown as { deps: ConstructorParameters<typeof import("@/lib/service/relay-service").RelayService>[0] }).deps,
+    const service = new (await import("@/lib/service/recall-service")).RecallService({
+      ...(rig.service as unknown as { deps: ConstructorParameters<typeof import("@/lib/service/recall-service").RecallService>[0] }).deps,
       callDriver: () => ({ call_asset_id: "call-golden", connect: () => Promise.reject(Object.assign(new Error("nobody joined"), { name: "CallUnavailableError" })), speak: async () => {}, playback: async () => {}, listen: () => Promise.reject(new Error("unreachable")), hangUp: async () => {} }),
     });
     const r = await service.runScheduledCall("session:no-pickup");
@@ -56,7 +56,7 @@ describe("the call is never placed", () => {
 
 describe("the ladder", () => {
   it("climbs to recognition when association does not reach it, and she picks one of the two", async () => {
-    const r = await run([...UP_TO_ASSOCIATION, ["her", "Hmm."], ["relay", SAID.rung4], ["her", "My daughter."], ["relay", SAID.elaborate], ...CAPTURE_AND_CONFIRM()]);
+    const r = await run([...UP_TO_ASSOCIATION, ["her", "Hmm."], ["recall", SAID.rung4], ["her", "My daughter."], ["recall", SAID.elaborate], ...CAPTURE_AND_CONFIRM()]);
     expect(r.recording.final_state).toBe("stored");
     expect(replay(r.recording.trace).context).toMatchObject({ rungs_fired: [1, 2, 3, 4], reached_at_rung: 4 });
     expect(SAID.rung4).toBe("Did you go to Cape May with your daughter or your sister?");
@@ -64,7 +64,7 @@ describe("the ladder", () => {
   });
 
   it("naming the other option is not graded, and the memory is never stated outright: the ladder ends at recognition with a kind close", async () => {
-    const r = await run([...UP_TO_ASSOCIATION, ["her", "Hmm."], ["relay", SAID.rung4], ["her", "My sister."], ["relay", SAID.closeKind]]);
+    const r = await run([...UP_TO_ASSOCIATION, ["her", "Hmm."], ["recall", SAID.rung4], ["her", "My sister."], ["recall", SAID.closeKind]]);
     expect(r.recording.final_state).toBe("no_answer_today");
     expect(replay(r.recording.trace).context).toMatchObject({ rungs_fired: [1, 2, 3, 4], reached_at_rung: null });
     expect(spokenText(r).some((t) => /you told me|your daughter maya/i.test(t))).toBe(false); // no correction, and no fact put to her
@@ -75,14 +75,14 @@ describe("the ladder", () => {
   });
 
   it("the last rung exists only for a procedural category - and even there only after rungs 1-4 (shown with a test-only script)", async () => {
-    const r = await run([...UP_TO_ASSOCIATION, ["her", "Hmm."], ["relay", SAID.rung4], ["her", "My sister."], ["relay", SAID_RUNG5], ["her", "We had a little house near the beach there."], ["playback"], ["relay", SAID.storeQuestion], ["her", "Yes."], ["relay", SAID.shareQuestion], ["her", "Yes."], ["relay", SAID.closeWarm]], { script: SCRIPT_WITH_REORIENTATION });
+    const r = await run([...UP_TO_ASSOCIATION, ["her", "Hmm."], ["recall", SAID.rung4], ["her", "My sister."], ["recall", SAID_RUNG5], ["her", "We had a little house near the beach there."], ["playback"], ["recall", SAID.storeQuestion], ["her", "Yes."], ["recall", SAID.shareQuestion], ["her", "Yes."], ["recall", SAID.closeWarm]], { script: SCRIPT_WITH_REORIENTATION });
     expect(r.recording.topic).toMatchObject({ reorientation_allowed: true });
     expect(replay(r.recording.trace).context).toMatchObject({ rungs_fired: [1, 2, 3, 4, 5], reached_at_rung: 5 });
     expect(r.recording.provenance_receipt!.literal_transcript).toBe("We had a little house near the beach there.");
   });
 
   it("every rejected rung is logged with a reason, and each rung fires at most once", async () => {
-    const r = await run([...UP_TO_ASSOCIATION, ["her", "Hmm."], ["relay", SAID.rung4], ["her", "My daughter."], ["relay", SAID.elaborate], ...CAPTURE_AND_CONFIRM()]);
+    const r = await run([...UP_TO_ASSOCIATION, ["her", "Hmm."], ["recall", SAID.rung4], ["her", "My daughter."], ["recall", SAID.elaborate], ...CAPTURE_AND_CONFIRM()]);
     const picks = r.recording.tool_log.filter((c) => c.tool === "select_scaffold").map((c) => c.output as { rung: number; rejected: Array<{ rung: number; reason: string }> });
     expect(picks.map((p) => p.rung)).toEqual([1, 2, 3, 4]);
     for (const p of picks) expect(p.rejected.map((x) => x.rung).sort()).toEqual([1, 2, 3, 4, 5].filter((n) => n !== p.rung));
@@ -91,7 +91,7 @@ describe("the ladder", () => {
   });
 
   it("two quiet windows on a topic: a gentle wrap-up, nothing kept", async () => {
-    const r = await run([...OPENING, ["silence"], ["relay", SAID.rung2], ["silence"], ["relay", SAID.closeKind]]);
+    const r = await run([...OPENING, ["silence"], ["recall", SAID.rung2], ["silence"], ["recall", SAID.closeKind]]);
     expect(r.recording.final_state).toBe("no_answer_today");
     expect(replay(r.recording.trace).context.ending_reason).toBe("two quiet windows on this topic");
     expect(r.recording.unconfirmed_audio_discarded).toBe(true);
@@ -100,7 +100,7 @@ describe("the ladder", () => {
   });
 
   it("she reaches it and offers nothing more this time: a kind close, nothing stored, and the topic still counts as reached", async () => {
-    const r = await run([...RECALLED, ["her", "I'm not sure."], ["relay", SAID.closeKind]]);
+    const r = await run([...RECALLED, ["her", "I'm not sure."], ["recall", SAID.closeKind]]);
     expect(r.recording.final_state).toBe("not_stored");
     const outcome = (await nodesOf(r, "TopicOutcome")).find((o) => o.props.session_id === "session:judged")!;
     expect(outcome.props).toMatchObject({ first_rung_reached_unaided: 3, highest_rung_used: 3 });
@@ -109,7 +109,7 @@ describe("the ladder", () => {
   it("a family-sourced, unconfirmed topic stops at rung 3, attributed, with an open question", async () => {
     const onlyWedding = policyWith((p) => (p.topics.allow = ["event:mayas-wedding"]));
     const r = await run(
-      [["relay", SAID.greeting], ["relay", "I'd love to hear about the wedding in New Jersey. What comes to mind?"], ["her", "A wedding?"], ["relay", "It's a day your family celebrated together."], ["her", "I'm not sure."], ["relay", "Maya mentioned the wedding in New Jersey. What do you remember about that?"], ["her", "I don't know."], ["relay", SAID.closeKind]],
+      [["recall", SAID.greeting], ["recall", "I'd love to hear about the wedding in New Jersey. What comes to mind?"], ["her", "A wedding?"], ["recall", "It's a day your family celebrated together."], ["her", "I'm not sure."], ["recall", "Maya mentioned the wedding in New Jersey. What do you remember about that?"], ["her", "I don't know."], ["recall", SAID.closeKind]],
       { policy: onlyWedding },
     );
     expect(r.recording.topic).toMatchObject({ topic_id: "event:mayas-wedding", family_sourced: true });
@@ -121,7 +121,7 @@ describe("the ladder", () => {
   });
 
   it("the retrieval layer only picks WHICH cue: with it, Maya; cleared, plain id order - and the ladder climbs the same either way", async () => {
-    const steps: Step[] = [...OPENING, ["her", "Cape May...?"], ["relay", SAID.rung2], ["her", "I'm not sure."], ["relay", SAID.rung3photo], ["her", "I don't know."], ["relay", SAID.rung4], ["her", "My daughter."], ["relay", SAID.elaborate], ["her", "I'm not sure."], ["relay", SAID.closeKind]];
+    const steps: Step[] = [...OPENING, ["her", "Cape May...?"], ["recall", SAID.rung2], ["her", "I'm not sure."], ["recall", SAID.rung3photo], ["her", "I don't know."], ["recall", SAID.rung4], ["her", "My daughter."], ["recall", SAID.elaborate], ["her", "I'm not sure."], ["recall", SAID.closeKind]];
     const rig = await buildFixtureRig({ transcript: (await import("./helpers")).call(steps) });
     const records = await rig.service.clearRetrievalLayer();
     expect(records).toBe(4);
@@ -137,8 +137,8 @@ describe("the ladder", () => {
 });
 
 describe("conflicting accounts", () => {
-  it("neither is spoken; Relay carries on with what is left, and never says which is right", async () => {
-    const r = await run([...OPENING, ["her", "Cape May...?"], ["relay", SAID.rung2], ["her", "I'm not sure."], ["relay", SAID.rung3photo], ["her", "My daughter!"], ["relay", SAID.elaborate], ...CAPTURE_AND_CONFIRM()], { overlays: [ACCOUNTS_DIFFER] });
+  it("neither is spoken; Recall carries on with what is left, and never says which is right", async () => {
+    const r = await run([...OPENING, ["her", "Cape May...?"], ["recall", SAID.rung2], ["her", "I'm not sure."], ["recall", SAID.rung3photo], ["her", "My daughter!"], ["recall", SAID.elaborate], ...CAPTURE_AND_CONFIRM()], { overlays: [ACCOUNTS_DIFFER] });
     const conflicted = ["claim:cape-may-with-maya", "claim:maya-remembers-cape-may"];
     expect(replay(r.recording.trace).context.conflicting_claim_ids.sort()).toEqual(conflicted);
     const cited = r.recording.prompts.flatMap((p) => p.segments.flatMap((s) => s.citation_ids));
@@ -155,7 +155,7 @@ describe("confirmation", () => {
     ["declined", "No.", "she said no"],
     ["silence", null, "her answer was unclear"],
   ])("%s: nothing is stored and the audio is dropped", async (_n, reply, reason) => {
-    const r = await run([...RECALLED, ["her", HER_LINE], ["playback"], ["relay", SAID.storeQuestion], reply ? ["her", reply] : ["silence"], ["relay", SAID.closeNotStored]]);
+    const r = await run([...RECALLED, ["her", HER_LINE], ["playback"], ["recall", SAID.storeQuestion], reply ? ["her", reply] : ["silence"], ["recall", SAID.closeNotStored]]);
     expect(r.recording.final_state).toBe("not_stored");
     expect(replay(r.recording.trace).context.ending_reason).toBe(reason);
     expect(r.recording.contribution).toBeNull();
@@ -181,7 +181,7 @@ describe("confirmation", () => {
 
 describe("a tool does not respond", () => {
   it("mid-call: the current question once more, then a kind close", async () => {
-    const r = await run([...OPENING, ["her", "Cape May...?"], ["relay", SAID.rung1], ["relay", SAID.closeKind]], { faults: [{ tool: "select_scaffold", on_call: 2, kind: "timeout" }] });
+    const r = await run([...OPENING, ["her", "Cape May...?"], ["recall", SAID.rung1], ["recall", SAID.closeKind]], { faults: [{ tool: "select_scaffold", on_call: 2, kind: "timeout" }] });
     expect(r.recording.final_state).toBe("no_answer_today");
     expect(spokenText(r)).toEqual([SAID.greeting, SAID.rung1, SAID.rung1, SAID.closeKind]);
     expect(r.recording.trace.filter((t) => t.event === "FIXED_RESTATEMENT_DELIVERED" && t.accepted)).toHaveLength(1);
@@ -206,7 +206,7 @@ describe("a tool does not respond", () => {
   });
 
   it("at the commit: nothing is stored", async () => {
-    const r = await run([...RECALLED, ["her", HER_LINE], ["playback"], ["relay", SAID.storeQuestion], ["her", "Yes."], ["relay", SAID.shareQuestion], ["her", "Yes."]], { faults: [{ tool: "confirm_and_store", on_call: 2, kind: "timeout" }] });
+    const r = await run([...RECALLED, ["her", HER_LINE], ["playback"], ["recall", SAID.storeQuestion], ["her", "Yes."], ["recall", SAID.shareQuestion], ["her", "Yes."]], { faults: [{ tool: "confirm_and_store", on_call: 2, kind: "timeout" }] });
     expect(r.recording.final_state).toBe("not_stored");
     expect(await newClaims(r)).toEqual([]);
   });
@@ -214,10 +214,10 @@ describe("a tool does not respond", () => {
 
 describe("she can always stop it", () => {
   it.each([
-    ["at the invitation", [...OPENING, ["her", "Please stop."], ["relay", SAID.stopAck]] as Step[]],
-    ["mid-ladder", [...UP_TO_ASSOCIATION, ["her", "I have to go."], ["relay", SAID.stopAck]] as Step[]],
-    ["at the store question", [...RECALLED, ["her", HER_LINE], ["playback"], ["relay", SAID.storeQuestion], ["her", "Stop, please."], ["relay", SAID.stopAck]] as Step[]],
-    ["at the share question - commit comes last, so nothing is stored", [...RECALLED, ["her", HER_LINE], ["playback"], ["relay", SAID.storeQuestion], ["her", "Yes."], ["relay", SAID.shareQuestion], ["her", "Goodbye."], ["relay", SAID.stopAck]] as Step[]],
+    ["at the invitation", [...OPENING, ["her", "Please stop."], ["recall", SAID.stopAck]] as Step[]],
+    ["mid-ladder", [...UP_TO_ASSOCIATION, ["her", "I have to go."], ["recall", SAID.stopAck]] as Step[]],
+    ["at the store question", [...RECALLED, ["her", HER_LINE], ["playback"], ["recall", SAID.storeQuestion], ["her", "Stop, please."], ["recall", SAID.stopAck]] as Step[]],
+    ["at the share question - commit comes last, so nothing is stored", [...RECALLED, ["her", HER_LINE], ["playback"], ["recall", SAID.storeQuestion], ["her", "Yes."], ["recall", SAID.shareQuestion], ["her", "Goodbye."], ["recall", SAID.stopAck]] as Step[]],
   ])("an explicit stop %s", async (_n, steps) => {
     const r = await run(steps);
     expect(r.recording.final_state).toBe("stopped");
@@ -234,8 +234,8 @@ describe("she can always stop it", () => {
   it("a hang-up is a stop like any other", async () => {
     const rig = await buildFixtureRig();
     let listens = 0;
-    const service = new (await import("@/lib/service/relay-service")).RelayService({
-      ...(rig.service as unknown as { deps: ConstructorParameters<typeof import("@/lib/service/relay-service").RelayService>[0] }).deps,
+    const service = new (await import("@/lib/service/recall-service")).RecallService({
+      ...(rig.service as unknown as { deps: ConstructorParameters<typeof import("@/lib/service/recall-service").RecallService>[0] }).deps,
       callDriver: () => ({ call_asset_id: "call-golden", connect: async () => {}, speak: async () => {}, playback: async () => {}, hangUp: async () => {}, listen: () => (listens++, Promise.reject(Object.assign(new Error("the call dropped"), { name: "CallUnavailableError" }))) }),
     });
     const r = await service.runScheduledCall("session:hang-up");
@@ -261,12 +261,12 @@ describe("she can always stop it", () => {
 });
 
 describe("her audio never stays behind (rule 8)", () => {
-  const depsOf = (rig: Awaited<ReturnType<typeof buildFixtureRig>>) => (rig.service as unknown as { deps: ConstructorParameters<typeof import("@/lib/service/relay-service").RelayService>[0] }).deps;
+  const depsOf = (rig: Awaited<ReturnType<typeof buildFixtureRig>>) => (rig.service as unknown as { deps: ConstructorParameters<typeof import("@/lib/service/recall-service").RecallService>[0] }).deps;
 
   it("an error nobody planned for still hangs up - which is what wipes the call - and the error itself is what surfaces", async () => {
     const rig = await buildFixtureRig();
     let hangUps = 0;
-    const service = new (await import("@/lib/service/relay-service")).RelayService({
+    const service = new (await import("@/lib/service/recall-service")).RecallService({
       ...depsOf(rig),
       // Hanging up fails too, on the way out. It must neither replace the real error nor be tried twice.
       callDriver: () => ({ call_asset_id: "call-golden", connect: async () => {}, speak: async () => {}, playback: async () => {}, listen: () => Promise.reject(new Error("the line caught fire")), hangUp: async () => (hangUps++, Promise.reject(new Error("and the hang-up failed"))) }),
@@ -276,7 +276,7 @@ describe("her audio never stays behind (rule 8)", () => {
   });
 
   it("every ordinary ending hangs up exactly once", async () => {
-    for (const steps of [[...RECALLED, ...CAPTURE_AND_CONFIRM()], [...OPENING, ["her", "Please stop."], ["relay", SAID.stopAck]], [...OPENING, ["her", "I can't breathe."], ["relay", SAID.safety]]] as Step[][]) {
+    for (const steps of [[...RECALLED, ...CAPTURE_AND_CONFIRM()], [...OPENING, ["her", "Please stop."], ["recall", SAID.stopAck]], [...OPENING, ["her", "I can't breathe."], ["recall", SAID.safety]]] as Step[][]) {
       const rig = await buildFixtureRig({ transcript: (await import("./helpers")).call(steps) });
       const deps = depsOf(rig);
       const make = deps.callDriver!;
@@ -295,7 +295,7 @@ describe("her audio never stays behind (rule 8)", () => {
   it("a call that was never answered is closed as well", async () => {
     const rig = await buildFixtureRig();
     let hangUps = 0;
-    const service = new (await import("@/lib/service/relay-service")).RelayService({
+    const service = new (await import("@/lib/service/recall-service")).RecallService({
       ...depsOf(rig),
       callDriver: () => ({ call_asset_id: "call-golden", connect: () => Promise.reject(Object.assign(new Error("nobody joined"), { name: "CallUnavailableError" })), speak: async () => {}, playback: async () => {}, listen: () => Promise.reject(new Error("unreachable")), hangUp: async () => void hangUps++ }),
     });
@@ -306,7 +306,7 @@ describe("her audio never stays behind (rule 8)", () => {
 
 describe("the safety handoff", () => {
   it("drops the recall flow, alerts the designated caregiver BEFORE saying anything, and says the fixed line once", async () => {
-    const r = await run([...UP_TO_ASSOCIATION, ["her", "I fell in the kitchen this morning."], ["relay", SAID.safety]]);
+    const r = await run([...UP_TO_ASSOCIATION, ["her", "I fell in the kitchen this morning."], ["recall", SAID.safety]]);
     expect(r.recording.final_state).toBe("safety_handoff");
     expect(spokenText(r).filter((t) => t === SAID.safety)).toHaveLength(1);
     const tools = toolsCalled(r);
@@ -314,21 +314,21 @@ describe("the safety handoff", () => {
     expect(tools.slice(tools.indexOf("send_safety_alert"))).not.toContain("assess_conversation_state"); // nothing else processed that turn
     const alerts = r.alerts.sentTo("person:maya");
     expect(alerts).toHaveLength(1);
-    expect(alerts[0]!.text).toBe("Relay safety note, 2026-11-05 15:30 UTC: during a Relay call, Susan said something on Relay's safety list (a fall). Relay is not an emergency service and cannot tell what is happening. Please call Susan.");
+    expect(alerts[0]!.text).toBe("Recall safety note, 2026-11-05 15:30 UTC: during a Recall call, Susan said something on Recall's safety list (a fall). Recall is not an emergency service and cannot tell what is happening. Please call Susan.");
     expect(alerts[0]!.text).not.toMatch(/kitchen|morning/); // never her words
     expect((await nodesOf(r, "SafetyEvent"))[0]!.props).toEqual({ category: "fall", at: alerts[0]!.at, recipients: ["person:maya"] });
     expect(r.recording.safety_category).toBe("fall");
-    expect(r.recording.caregiver_receipt!.lines.map((l) => l.text)).toEqual(["Relay stopped the call and sent a safety note to the designated caregiver."]);
+    expect(r.recording.caregiver_receipt!.lines.map((l) => l.text)).toEqual(["Recall stopped the call and sent a safety note to the designated caregiver."]);
   });
 
   it("accepts the false positive: 'I fell in love with Maya' sends only the neutral alert", async () => {
-    const r = await run([...UP_TO_ASSOCIATION, ["her", "I fell in love with Maya the day she was born."], ["relay", SAID.safety]]);
+    const r = await run([...UP_TO_ASSOCIATION, ["her", "I fell in love with Maya the day she was born."], ["recall", SAID.safety]]);
     expect(r.recording.final_state).toBe("safety_handoff");
     expect(r.alerts.count()).toBe(1);
   });
 
   it("at the confirmation too - and the alert neither appears in nor counts toward the Weekly Note", async () => {
-    const r = await run([...RECALLED, ["her", HER_LINE], ["playback"], ["relay", SAID.storeQuestion], ["her", "Help me, someone is in my house."], ["relay", SAID.safety]]);
+    const r = await run([...RECALLED, ["her", HER_LINE], ["playback"], ["recall", SAID.storeQuestion], ["her", "Help me, someone is in my house."], ["recall", SAID.safety]]);
     expect(r.recording.final_state).toBe("safety_handoff");
     expect(await newClaims(r)).toEqual([]);
     const note = await r.service.weeklyNote("person:maya");
@@ -343,7 +343,7 @@ describe("the safety handoff", () => {
     deps.callDriver = () => {
       const driver = make();
       const speak = driver.speak.bind(driver);
-      // She is gone by the time Relay would speak: the line after her turn cannot be said.
+      // She is gone by the time Recall would speak: the line after her turn cannot be said.
       driver.speak = async (p) => (p.text === SAID.safety ? Promise.reject(Object.assign(new Error("the call dropped"), { name: "CallUnavailableError" })) : speak(p));
       return driver;
     };
@@ -352,19 +352,19 @@ describe("the safety handoff", () => {
     expect(rig.alerts.sentTo("person:maya")).toHaveLength(1);
   });
 
-  it("is never triggered by Relay's own speech", async () => {
+  it("is never triggered by Recall's own speech", async () => {
     const phrases = structuredClone((await import("@/fixtures")).SAFETY_PHRASES);
-    phrases.categories.fall!.phrases.push("what comes to mind"); // words only Relay says
-    const r = await run([...OPENING, ["silence"], ["relay", SAID.rung2], ["silence"], ["relay", SAID.closeKind]], { safetyPhrases: phrases });
+    phrases.categories.fall!.phrases.push("what comes to mind"); // words only Recall says
+    const r = await run([...OPENING, ["silence"], ["recall", SAID.rung2], ["silence"], ["recall", SAID.closeKind]], { safetyPhrases: phrases });
     expect(r.recording.final_state).toBe("no_answer_today");
     expect(r.alerts.count()).toBe(0);
   });
 });
 
-describe("who Relay is", () => {
+describe("who Recall is", () => {
   it("answers each identity phrase with the fixed line, uses up no rung, and carries on", async () => {
-    const r = await run([...OPENING, ["her", "Wait, who is this?"], ["relay", SAID.identity], ["her", "Are you a real person?"], ["relay", SAID.identity], ["her", "Oh, Maya's little house by the beach!"], ["playback"], ["relay", SAID.storeQuestion], ["her", "Yes."], ["relay", SAID.shareQuestion], ["her", "No."], ["relay", SAID.closeWarm]]);
-    expect(SAID.identity).toBe("I'm Relay, a computer assistant, not a person. Maya set me up to keep you company.");
+    const r = await run([...OPENING, ["her", "Wait, who is this?"], ["recall", SAID.identity], ["her", "Are you a real person?"], ["recall", SAID.identity], ["her", "Oh, Maya's little house by the beach!"], ["playback"], ["recall", SAID.storeQuestion], ["her", "Yes."], ["recall", SAID.shareQuestion], ["her", "No."], ["recall", SAID.closeWarm]]);
+    expect(SAID.identity).toBe("I'm Recall, a computer assistant, not a person. Maya set me up to keep you company.");
     expect(r.recording.final_state).toBe("stored");
     expect(replay(r.recording.trace).context).toMatchObject({ rungs_fired: [1], reached_at_rung: 1 });
     expect(visitedStates(replay(r.recording.trace))).toEqual(["idle", "scheduled", "policy_passed", "connected", "topic_selected", "asking", "recalled", "confirming", "confirmed", "stored"]);
@@ -374,7 +374,7 @@ describe("who Relay is", () => {
   it("every phrase on the identity list is heard as that question", async () => {
     const { CALL_SCRIPT } = await import("@/fixtures");
     for (const phrase of CALL_SCRIPT.identity_phrases) {
-      const r = await run([...OPENING, ["her", `${phrase}?`], ["relay", SAID.identity], ["her", "Goodbye."], ["relay", SAID.stopAck]]);
+      const r = await run([...OPENING, ["her", `${phrase}?`], ["recall", SAID.identity], ["her", "Goodbye."], ["recall", SAID.stopAck]]);
       expect(r.recording.trace.filter((t) => t.event === "IDENTITY_ASKED" && t.accepted), phrase).toHaveLength(1);
     }
   });
@@ -383,7 +383,7 @@ describe("who Relay is", () => {
 describe("the agreed call length", () => {
   it("is enforced by the reducer: once it has passed, the next step is the kind close", async () => {
     // A one-minute limit, and a reply that comes after it has passed.
-    const late = (await import("./helpers")).call([...OPENING, ["her", "Cape May...?"], ["relay", SAID.closeKind]]);
+    const late = (await import("./helpers")).call([...OPENING, ["her", "Cape May...?"], ["recall", SAID.closeKind]]);
     Object.assign(late.turns[2]!, { start_ms: 64_000, end_ms: 66_000, words: late.turns[2]!.words.map((w, i) => ({ ...w, start_ms: 64_000 + i * 500, end_ms: 64_400 + i * 500 })) });
     Object.assign(late.turns[3]!, { start_ms: 67_000, end_ms: 69_000, words: late.turns[3]!.words.map((w, i) => ({ ...w, start_ms: 67_000 + i * 100, end_ms: 67_080 + i * 100 })) });
     const r = await runFixture({ transcript: late, policy: policyWith((p) => (p.speech.max_call_minutes = 1)) });

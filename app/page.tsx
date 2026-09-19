@@ -4,7 +4,7 @@ import Link from "next/link";
 export default function Home() {
   return (
     <main className="mx-auto max-w-2xl px-6 py-16">
-      <h1 className="text-3xl font-semibold">Relay</h1>
+      <h1 className="text-3xl font-semibold">Recall</h1>
       <p className="mt-3 text-lg">Access changed. Authorship didn&apos;t.</p>
       <p className="mt-8">
         The interface has not been designed yet. The engine underneath it runs:{" "}

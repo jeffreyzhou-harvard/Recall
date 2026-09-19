@@ -1,5 +1,5 @@
 /**
- * Tools 1-2: which topic is due, and whether Relay may call her about it now.
+ * Tools 1-2: which topic is due, and whether Recall may call her about it now.
  *
  * Topic choice is a deterministic ranking. No model free-picks a topic, and no
  * family member can cause a call: the only inputs are the graph, the joint
@@ -77,7 +77,7 @@ export const get_next_recall_topic: ToolImpl<"get_next_recall_topic"> = async (i
 
   // Freshness first - never revisited, then longest ago - so that every memory comes round again, call after call,
   // rather than being visited once. Among those equally due: the one told most often; then by when in her life it is
-  // from, where someone has said (ages 6-30, then recent, then the years between; unknown last); then a topic Relay
+  // from, where someone has said (ages 6-30, then recent, then the years between; unknown last); then a topic Recall
   // already knows a helpful cue for; then id. Nothing here is a model's judgment.
   const period = (f: TopicFacet): number => (f.life_period ? LIFE_PERIODS.indexOf(f.life_period) : LIFE_PERIODS.length);
   eligible.sort((a, b) => {

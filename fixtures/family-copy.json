@@ -4,7 +4,7 @@
   "lines": {
     "note_warm": {
       "id": "FAM-NOTE-WARM",
-      "text": "Relay talked with {name} about {topic} this week. Want to give her a call?"
+      "text": "Recall talked with {name} about {topic} this week. Want to give her a call?"
     },
     "note_gap": {
       "id": "FAM-NOTE-GAP",
@@ -24,7 +24,7 @@
     },
     "record_header": {
       "id": "FAM-REC-HEADER",
-      "text": "This is a record of what happened in Relay calls, not a measure of {name}'s memory overall. Practice on a topic, call quality, and time of day all affect it."
+      "text": "This is a record of what happened in Recall calls, not a measure of {name}'s memory overall. Practice on a topic, call quality, and time of day all affect it."
     },
     "record_unaided": {
       "id": "FAM-REC-UNAIDED",
@@ -48,7 +48,7 @@
     },
     "change_summary": {
       "id": "FAM-CHG-01",
-      "text": "In recent Relay calls, more prompting was needed across several topics than in earlier calls. This is a record of Relay calls, not a clinical assessment. If you have concerns, you can export the record to share with a doctor."
+      "text": "In recent Recall calls, more prompting was needed across several topics than in earlier calls. This is a record of Recall calls, not a clinical assessment. If you have concerns, you can export the record to share with a doctor."
     },
     "export_note": {
       "id": "FAM-EXPORT-NOTE",
@@ -56,15 +56,15 @@
     },
     "contribution_prompt": {
       "id": "FAM-CONTRIB-PROMPT",
-      "text": "Tell Relay about a memory you share with {name}."
+      "text": "Tell Recall about a memory you share with {name}."
     },
     "contribution_question_hint": {
       "id": "FAM-CONTRIB-HINT",
-      "text": "This box is for telling Relay something you remember. To find out what {name} remembers, give her a call."
+      "text": "This box is for telling Recall something you remember. To find out what {name} remembers, give her a call."
     },
     "contribution_thanks": {
       "id": "FAM-CONTRIB-THANKS",
-      "text": "Thank you. Relay will gently ask {name} about it, in her own time."
+      "text": "Thank you. Recall will gently ask {name} about it, in her own time."
     },
     "receipt_unaided": {
       "id": "FAM-RCPT-1",
@@ -84,7 +84,7 @@
     },
     "receipt_reorientation": {
       "id": "FAM-RCPT-5",
-      "text": "{topic} - Relay shared the memory in this call."
+      "text": "{topic} - Recall shared the memory in this call."
     },
     "receipt_not_reached": {
       "id": "FAM-RCPT-NONE",
@@ -100,7 +100,7 @@
     },
     "receipt_safety": {
       "id": "FAM-RCPT-SAFETY",
-      "text": "Relay stopped the call and sent a safety note to the designated caregiver."
+      "text": "Recall stopped the call and sent a safety note to the designated caregiver."
     },
     "receipt_conduct": {
       "id": "FAM-RCPT-CONDUCT",

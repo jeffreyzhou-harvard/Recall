@@ -15,7 +15,7 @@
  * note, an access event, an export event, a family contribution. None of them
  * returns graph content.
  */
-import { patientConfirmed, RELAY_AGENT_ID, type GraphEdge, type GraphNode, type Provenance, type SourceClass } from "@/lib/graph/types";
+import { patientConfirmed, RECALL_AGENT_ID, type GraphEdge, type GraphNode, type Provenance, type SourceClass } from "@/lib/graph/types";
 import { edgeId } from "@/lib/graph/seed";
 import type { GraphStore } from "@/lib/graph/store";
 import type { OutcomeRow } from "./record";
@@ -89,7 +89,7 @@ export class FamilyView {
     return rows;
   }
 
-  /** Topics Relay talked with her about since `sinceIso`, newest first: how each is named aloud, and when. */
+  /** Topics Recall talked with her about since `sinceIso`, newest first: how each is named aloud, and when. */
   async topicsTalkedAboutSince(sinceIso: string): Promise<Array<{ spoken_as: string; at: string }>> {
     const out: Array<{ spoken_as: string; at: string }> = [];
     for (const o of await this.graph.nodesOfType("TopicOutcome")) {
@@ -184,7 +184,7 @@ export class FamilyView {
 
   private async logArtifact(at: string): Promise<string> {
     if (!(await this.graph.getNode(LOG_ARTIFACT_ID))) {
-      await this.graph.putNode({ id: LOG_ARTIFACT_ID, type: "Artifact", label: "Family-side log", props: { kind: "audit_log", text: null, alt: null }, prov: this.prov(at, RELAY_AGENT_ID, LOG_ARTIFACT_ID, "session_audit") });
+      await this.graph.putNode({ id: LOG_ARTIFACT_ID, type: "Artifact", label: "Family-side log", props: { kind: "audit_log", text: null, alt: null }, prov: this.prov(at, RECALL_AGENT_ID, LOG_ARTIFACT_ID, "session_audit") });
     }
     return LOG_ARTIFACT_ID;
   }
@@ -194,7 +194,7 @@ export class FamilyView {
   }
 
   private async put(node: Omit<GraphNode, "prov">, at: string): Promise<void> {
-    await this.graph.putNode({ ...node, prov: this.prov(at, RELAY_AGENT_ID, await this.logArtifact(at), "session_audit") } as GraphNode);
+    await this.graph.putNode({ ...node, prov: this.prov(at, RECALL_AGENT_ID, await this.logArtifact(at), "session_audit") } as GraphNode);
   }
 
   /** Rule 8: a topic category and a time. There is no parameter through which the question itself could be stored. */
@@ -214,7 +214,7 @@ export class FamilyView {
     const id = await this.nextId("WeeklyNote", "weekly-note");
     await this.put({ id, type: "WeeklyNote", label: "Weekly Note", props: { member_id: memberId, posted_at: postedAt, lines, shared_contribution_id: sharedRef } }, postedAt);
     if (sharedRef) {
-      const edge: GraphEdge = { id: edgeId("POSTED_IN", sharedRef, id), type: "POSTED_IN", from: sharedRef, to: id, props: {}, prov: this.prov(postedAt, RELAY_AGENT_ID, LOG_ARTIFACT_ID, "session_audit") };
+      const edge: GraphEdge = { id: edgeId("POSTED_IN", sharedRef, id), type: "POSTED_IN", from: sharedRef, to: id, props: {}, prov: this.prov(postedAt, RECALL_AGENT_ID, LOG_ARTIFACT_ID, "session_audit") };
       await this.graph.putEdge(edge);
     }
   }
@@ -229,7 +229,7 @@ export class FamilyView {
     const claimId = `claim:family-contribution:${n}`;
     const prov = this.prov(input.received_at, input.contributor_id, artifactId, "family_contribution", input.photo_asset);
     const about = [input.who, input.when_where].filter((s): s is string => !!s && s.trim() !== "").join(" - ");
-    await this.graph.putNode({ id: artifactId, type: "Artifact", label: "A family memory, as it was told to Relay", props: { kind: input.medium === "photo" ? "photo" : "family_story", text: input.what_happened, alt: about || null }, prov });
+    await this.graph.putNode({ id: artifactId, type: "Artifact", label: "A family memory, as it was told to Recall", props: { kind: input.medium === "photo" ? "photo" : "family_story", text: input.what_happened, alt: about || null }, prov });
     await this.graph.putNode({ id: claimId, type: "EpisodicClaim", label: about || "A family memory", props: { text: input.what_happened }, prov });
     const edges: Array<[GraphEdge["type"], string, string]> = [
       ["EVIDENCE_FOR", artifactId, claimId],

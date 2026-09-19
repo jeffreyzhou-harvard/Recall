@@ -9,7 +9,7 @@ import type { SeedFile } from "@/lib/graph/seed";
 import type { CallTranscript, Turn } from "@/lib/providers/transcription";
 import { fill } from "@/lib/script/call-script";
 
-// --- what Relay says on the golden topic, built from the reviewed script so a test can never drift from it ---
+// --- what Recall says on the golden topic, built from the reviewed script so a test can never drift from it ---
 const L = CALL_SCRIPT.lines;
 const FS = CALL_SCRIPT.ladder.categories.family_summers!;
 export const SAID = {
@@ -33,7 +33,7 @@ export const SAID = {
 export const HER_LINE = "We went to Cape May every summer.";
 
 /**
- * TEST ONLY. Relay's real script has no reorientation line, because every topic it has is autobiographical and
+ * TEST ONLY. Recall's real script has no reorientation line, because every topic it has is autobiographical and
  * such a memory is never stated outright (EVIDENCE.md, section B). The last rung's machinery still has to be
  * right for the day a procedural topic exists - so this script pretends the golden category is one.
  */
@@ -45,7 +45,7 @@ export const SCRIPT_WITH_REORIENTATION = ((): typeof CALL_SCRIPT => {
 })();
 export const SAID_RUNG5 = fill({ id: "LADDER-5-TEST-ONLY", text: REORIENTATION_TEXT }, { relation: "daughter", person: "Maya", place: "Cape May" });
 
-export type Step = ["relay", string] | ["her", string] | ["silence"] | ["playback"];
+export type Step = ["recall", string] | ["her", string] | ["silence"] | ["playback"];
 
 /** A prerecorded call from a list of steps. Timings are regular: each turn two seconds, a second apart, inside the 60 s asset. */
 export function call(steps: readonly Step[]): CallTranscript {
@@ -59,7 +59,7 @@ export function call(steps: readonly Step[]): CallTranscript {
     const each = 2000 / Math.max(1, tokens.length);
     return {
       turn_id: `t${i + 1}`,
-      speaker: kind === "relay" ? "relay" : kind === "playback" ? "playback" : "participant",
+      speaker: kind === "recall" ? "recall" : kind === "playback" ? "playback" : "participant",
       start_ms: start,
       end_ms: end,
       is_final: true,
@@ -69,13 +69,13 @@ export function call(steps: readonly Step[]): CallTranscript {
   return { asset_id: "call-golden", provider: "fixture", timing_status: "placeholder", turns };
 }
 
-/** The opening every call shares: what Relay is, then the invitation. */
+/** The opening every call shares: what Recall is, then the invitation. */
 export const OPENING: Step[] = [
-  ["relay", SAID.greeting],
-  ["relay", SAID.rung1],
+  ["recall", SAID.greeting],
+  ["recall", SAID.rung1],
 ];
 /** From her own words to the warm close, with both yeses. */
-export const CAPTURE_AND_CONFIRM = (store = "Yes.", share = "Yes."): Step[] => [["her", HER_LINE], ["playback"], ["relay", SAID.storeQuestion], ["her", store], ["relay", SAID.shareQuestion], ["her", share], ["relay", SAID.closeWarm]];
+export const CAPTURE_AND_CONFIRM = (store = "Yes.", share = "Yes."): Step[] => [["her", HER_LINE], ["playback"], ["recall", SAID.storeQuestion], ["her", store], ["recall", SAID.shareQuestion], ["her", share], ["recall", SAID.closeWarm]];
 
 export const run = (steps: readonly Step[], options: FixtureOptions = {}): Promise<FixtureRun> => runFixture({ ...options, transcript: call(steps) });
 
@@ -98,14 +98,14 @@ export { CALL_SCRIPT, FAMILY_SEED, MANIFEST, POLICY };
 // --- calling tools directly, the way the orchestrator would, up to a chosen point ------------------------------
 import { buildFixtureRig, type FixtureRig } from "@/fixtures/harness";
 import { ProvLog } from "@/lib/provenance/prov-log";
-import { createRelayStore } from "@/lib/state/store";
+import { createRecallStore } from "@/lib/state/store";
 import { GateKeeper, TOOL_IMPLS, ToolRuntime, newSession, type ToolContext } from "@/lib/tools";
-import type { RelayDeps } from "@/lib/service/relay-service";
+import type { RecallDeps } from "@/lib/service/recall-service";
 
 export interface Bench extends FixtureRig {
   ctx: ToolContext;
   runtime: ToolRuntime;
-  store: ReturnType<typeof createRelayStore>;
+  store: ReturnType<typeof createRecallStore>;
   topicId: string;
   tokenId: string;
   verified: string[];
@@ -114,8 +114,8 @@ export interface Bench extends FixtureRig {
 /** A call session taken as far as verified evidence: topic chosen, policy granted, graph queried, claims verified. */
 export async function bench(options: FixtureOptions = {}): Promise<Bench> {
   const rig = await buildFixtureRig(options);
-  const deps = (rig.service as unknown as { deps: RelayDeps }).deps;
-  const store = createRelayStore();
+  const deps = (rig.service as unknown as { deps: RecallDeps }).deps;
+  const store = createRecallStore();
   const ctx: ToolContext = { graph: deps.graph, setup: deps.setup, assets: deps.assets, clock: deps.clock, gate: new GateKeeper(), transcription: deps.transcription, session: newSession("session:bench"), prov: new ProvLog(), script: deps.script, copy: deps.copy, safetyPhrases: deps.safetyPhrases, alerts: deps.alerts, machine: () => store.getState().machine };
   const runtime = new ToolRuntime({ clock: deps.clock, call: ctx }, TOOL_IMPLS);
   const now = deps.clock.iso();

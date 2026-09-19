@@ -1,7 +1,7 @@
 /** Tools 1-3: inspect the forwarded ask, verify who is involved, and evaluate the policy. */
 import { edgeId } from "@/lib/graph/seed";
 import { relationOf } from "@/lib/graph/relations";
-import { RELAY_AGENT_ID, SPEAKABLE_AS_FACT, type ArtifactNode, type GraphEdge, type PersonNode, type RelationshipNode } from "@/lib/graph/types";
+import { RECALL_AGENT_ID, SPEAKABLE_AS_FACT, type ArtifactNode, type GraphEdge, type PersonNode, type RelationshipNode } from "@/lib/graph/types";
 import { GateError } from "../gates";
 import { evaluatePolicy } from "../policy";
 import type { ToolImpl } from "../runtime";
@@ -11,8 +11,8 @@ const out = (edges: GraphEdge[], type: GraphEdge["type"], from: string): GraphEd
 
 export const inspect_request: ToolImpl<"inspect_request"> = async (input, ctx) => {
   const ask = await ctx.graph.findCurrentAsk(input.thread_id);
-  // Rule 5: Relay only ever acts on a forwarded ask. With nothing forwarded there is nothing to do.
-  if (!ask) throw new GateError("permission", `no forwarded ask for "${input.thread_id}"; Relay never initiates contact`);
+  // Rule 5: Recall only ever acts on a forwarded ask. With nothing forwarded there is nothing to do.
+  if (!ask) throw new GateError("permission", `no forwarded ask for "${input.thread_id}"; Recall never initiates contact`);
 
   const edges = await ctx.graph.edgesOf(ask.id);
   const asker = out(edges, "ASKED_BY", ask.id)[0]?.to;
@@ -102,7 +102,7 @@ export const resolve_identity_and_relationships: ToolImpl<"resolve_identity_and_
     }
   }
   // ...or by a tie she, or an approved relative, stated in discovery ("That's my daughter Maya"). Only a
-  // CONFIRMED tie counts: a relationship Relay merely inferred verifies nobody. And a verified tie is not
+  // CONFIRMED tie counts: a relationship Recall merely inferred verifies nobody. And a verified tie is not
   // permission - whether this person may ask at all is still the access policy's decision, next.
   for (const e of await ctx.graph.edgesOf(ask.addressee_id)) {
     const between = [e.from, e.to];
@@ -176,7 +176,7 @@ export const get_access_policy: ToolImpl<"get_access_policy"> = async (input, ct
       from: artifact.artifact_id,
       to: token.policy_id,
       props: { policy_token_id: token.token_id },
-      prov: { ...source, author: RELAY_AGENT_ID, extraction_method: "system_event", observed_at: nowIso, span: null, status: "reference", confirmations: [] },
+      prov: { ...source, author: RECALL_AGENT_ID, extraction_method: "system_event", observed_at: nowIso, span: null, status: "reference", confirmations: [] },
     });
   }
   return {

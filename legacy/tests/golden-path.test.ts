@@ -81,7 +81,7 @@ describe("golden path", () => {
   });
 
   it("never calls a tool before the step it depends on, and uses all twelve", () => {
-    // Relay speaks first, so the brief is rendered before any reply can be assessed: the enforced
+    // Recall speaks first, so the brief is rendered before any reply can be assessed: the enforced
     // sequence is a dependency order, not a first-appearance order. Each tool's prerequisite is
     // the step that must already have succeeded for the call to be legitimate.
     const REQUIRES: Partial<Record<ToolName, ToolName>> = {

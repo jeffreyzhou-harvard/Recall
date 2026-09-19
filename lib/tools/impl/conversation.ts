@@ -4,7 +4,7 @@
  *
  * `assess_conversation_state` works from the words of a final turn and nothing
  * else. It reports what was observably said - she named something, she asked
- * Relay to repeat, she said nothing. It has no output field for emotion,
+ * Recall to repeat, she said nothing. It has no output field for emotion,
  * cognition, or any judgment of the person, so none can be produced (rule 4).
  * It is not a test: nothing here is "right" or "wrong", only reached or not yet.
  */
@@ -64,20 +64,20 @@ export const assess_conversation_state: ToolImpl<"assess_conversation_state"> = 
 
   const transcript = turnText(turn);
   const said = tokens(transcript);
-  const relaySaid = ctx.session.spoken.map((s) => s.text).join(" ");
-  const relayTokens = new Set(tokens(relaySaid));
-  const novel = said.filter((w) => !relayTokens.has(w));
+  const recallSaid = ctx.session.spoken.map((s) => s.text).join(" ");
+  const recallTokens = new Set(tokens(recallSaid));
+  const novel = said.filter((w) => !recallTokens.has(w));
 
-  const before = (await ctx.transcription.allTurns(window.asset_id)).filter((t) => t.speaker === "relay" && t.end_ms <= turn.start_ms).pop();
+  const before = (await ctx.transcription.allTurns(window.asset_id)).filter((t) => t.speaker === "recall" && t.end_ms <= turn.start_ms).pop();
   const latency = before ? turn.start_ms - before.end_ms : null;
 
-  // What of the verified subgraph her words touch that Relay has not already said in this call.
+  // What of the verified subgraph her words touch that Recall has not already said in this call.
   const matched: string[] = [];
   for (const v of ctx.session.verified) {
     if (v.id === policy.person_id) continue;
     const node = await ctx.graph.getNode(v.id);
     const names = node ? spokenNames(node) : [((await ctx.graph.getEdge(v.id))?.props.said_as as string | null | undefined) ?? ""];
-    if (names.some((n) => n !== "" && containsPhrase(transcript, n) && !containsPhrase(relaySaid, n))) matched.push(v.id);
+    if (names.some((n) => n !== "" && containsPhrase(transcript, n) && !containsPhrase(recallSaid, n))) matched.push(v.id);
   }
 
   const conduct = firstPhraseIn(transcript, ctx.script.stop_phrases) ? ("stop_request" as const) : firstPhraseIn(transcript, ctx.script.identity_phrases) ? ("identity_question" as const) : null;
@@ -87,7 +87,7 @@ export const assess_conversation_state: ToolImpl<"assess_conversation_state"> = 
   if (conduct) return done("no_answer", `conduct:${conduct}`);
   if (firstPhraseIn(transcript, ctx.script.unsure_phrases)) return done("no_answer", "said_unsure");
 
-  // After a recognition rung both options are words Relay just said, so the reply is read against what was offered.
+  // After a recognition rung both options are words Recall just said, so the reply is read against what was offered.
   const offered = ctx.session.spoken.at(-1)?.rung === 4 ? ctx.session.last_recognition : null;
   if (offered) {
     const saidAs = async (edgeId: string): Promise<string> => ((await ctx.graph.getEdge(edgeId))?.props.said_as as string | null) ?? "";
@@ -97,11 +97,11 @@ export const assess_conversation_state: ToolImpl<"assess_conversation_state"> = 
     return done("no_answer", "did_not_name_one_of_the_two_offered");
   }
 
-  if (said.length > 0 && novel.length === 0) return done("no_answer", "echo_of_relay_words");
+  if (said.length > 0 && novel.length === 0) return done("no_answer", "echo_of_recall_words");
   const asksForRepair = (transcript.includes("?") || /\b(pardon|sorry)\b/.test(said.join(" "))) && /\b(what|pardon|sorry|again|repeat|say that)\b/.test(said.join(" "));
   if (asksForRepair) return done("asked_repeat", "repair_request");
   if (said.length >= 4 && novel.length >= 2) return done("new_detail_offered", "substantive_reply");
-  if (matched.length > 0) return done("recalled", "named_something_relay_had_not_said");
+  if (matched.length > 0) return done("recalled", "named_something_recall_had_not_said");
   if (firstPhraseIn(transcript, ctx.script.affirm_phrases)) return done("recalled", "said_she_is_with_it");
   return done("no_answer", "nothing_about_the_topic");
 };
@@ -300,7 +300,7 @@ export const render_prompt: ToolImpl<"render_prompt"> = async (input, ctx) => {
   await ctx.gate.requireToken(ctx.session.policy_token_id, input.topic_id, ctx.clock.iso());
 
   const line = allScriptLines(ctx.script).find((l) => l.id === input.scaffold_id);
-  if (!line) throw new GateError("evidence", `"${input.scaffold_id}" is not a line in the reviewed call script; Relay says nothing else`);
+  if (!line) throw new GateError("evidence", `"${input.scaffold_id}" is not a line in the reviewed call script; Recall says nothing else`);
   const evidence = new Map(ctx.gate.requireVerifiedEvidence(input.citations).map((v) => [v.id, v]));
 
   const displayName = async (personId: string): Promise<string> => {
@@ -314,7 +314,7 @@ export const render_prompt: ToolImpl<"render_prompt"> = async (input, ctx) => {
   for (const slot of slotsOf(line.text)) {
     if ((SETUP_SLOTS as readonly string[]).includes(slot)) {
       if (slot in input.slot_ids) throw new GateError("evidence", `"{${slot}}" is filled from the joint setup, never by a caller`);
-      values[slot] = slot === "emergency_number" ? policy.safety.emergency_number : await displayName(slot === "name" ? policy.person_id : slot === "set_up_by" ? policy.relay_set_up_by : policy.safety.designated_caregivers[0]!.person_id);
+      values[slot] = slot === "emergency_number" ? policy.safety.emergency_number : await displayName(slot === "name" ? policy.person_id : slot === "set_up_by" ? policy.recall_set_up_by : policy.safety.designated_caregivers[0]!.person_id);
       factIds[slot] = [];
       continue;
     }
@@ -359,7 +359,7 @@ export const render_prompt: ToolImpl<"render_prompt"> = async (input, ctx) => {
     throw e;
   }
   const findings = [...lintLines([{ id: line.id, text, surface: "call" }], ctx.script.banned), ...lintConduct([{ id: line.id, text, surface: "call" }], ctx.script.conduct)];
-  if (findings.length > 0) throw new GateError("evidence", `the line contains language Relay never uses: "${findings[0]!.phrase}" (rule ${findings[0]!.rule})`);
+  if (findings.length > 0) throw new GateError("evidence", `the line contains language Recall never uses: "${findings[0]!.phrase}" (rule ${findings[0]!.rule})`);
 
   const segments: ToolOutput<"render_prompt">["segments"] = [];
   let rest = line.text;
@@ -371,7 +371,7 @@ export const render_prompt: ToolImpl<"render_prompt"> = async (input, ctx) => {
   }
   if (rest) segments.push({ text: rest, kind: "connective", citation_ids: [] });
 
-  const prompt: ToolOutput<"render_prompt"> = { prompt_id: `prompt:${ctx.session.session_id}:${ctx.session.prompts.length + 1}`, script_id: line.id, voice: "relay", text, rung: rungOf(line.id), segments };
+  const prompt: ToolOutput<"render_prompt"> = { prompt_id: `prompt:${ctx.session.session_id}:${ctx.session.prompts.length + 1}`, script_id: line.id, voice: "recall", text, rung: rungOf(line.id), segments };
   ctx.session.prompts.push(prompt);
   return prompt;
 };

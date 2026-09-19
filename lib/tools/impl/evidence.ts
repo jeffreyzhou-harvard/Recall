@@ -36,7 +36,7 @@ const edgeCitation = (edge: GraphEdge): Citation => ({
 /** Checks every fact shares, node or edge: still fresh, confirmed by a person, and its media (if any) is the media it was cut from. */
 function provenanceProblem(ctx: ToolContext, prov: Provenance, nowIso: string): string | null {
   if (prov.expires_at !== null && prov.expires_at <= nowIso) return "expired";
-  // Rule 6: Relay speaks only what a person confirmed. An observation or an inference is never a fact.
+  // Rule 6: Recall speaks only what a person confirmed. An observation or an inference is never a fact.
   if (!SPEAKABLE_AS_FACT.has(prov.status)) return `not_confirmed:${prov.status}`;
   if (prov.asset_id !== null) {
     try {
@@ -56,7 +56,7 @@ export const verify_claim_support: ToolImpl<"verify_claim_support"> = async (inp
 
   // Only what this topic legitimately reaches can be verified: the topic, and what retrieval returned for it
   // under the policy. Anything else in the graph is out of scope, so verification can never be used to
-  // launder an unfiltered node into something Relay may say.
+  // launder an unfiltered node into something Recall may say.
   const inScope = new Set<string>([input.topic_id, ...ctx.session.candidates.map((c) => c.root_id), ...ctx.session.relations.map((r) => r.edge_id)]);
   const mayBind = new Set<string>([policy.person_id, ...policy.approved_people]);
 
@@ -119,7 +119,7 @@ export const verify_claim_support: ToolImpl<"verify_claim_support"> = async (inp
 
     const contradiction = edges.find((e) => e.type === "CONTRADICTS");
     if (contradiction) {
-      // Two accounts differ. Relay speaks neither, and never says which is right.
+      // Two accounts differ. Recall speaks neither, and never says which is right.
       const pair = [contradiction.from, contradiction.to].sort() as [string, string];
       if (!conflicts.some((c) => c.a === pair[0] && c.b === pair[1])) conflicts.push({ a: pair[0], b: pair[1] });
       reject("contradicted");
