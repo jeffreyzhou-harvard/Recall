@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildFixtureRig, runFixture } from "@/fixtures/harness";
 import type { NodeOf, NodeType } from "@/lib/graph/types";
 import { replay, visitedStates } from "@/lib/state/reducer";
-import { ACCOUNTS_DIFFER, CAPTURE_AND_CONFIRM, HER_LINE, OPENING, SAID, overlay, policyWith, run, spokenText, toolsCalled, type Step } from "./helpers";
+import { ACCOUNTS_DIFFER, CAPTURE_AND_CONFIRM, HER_LINE, OPENING, SAID, SAID_RUNG5, SCRIPT_WITH_REORIENTATION, overlay, policyWith, run, spokenText, toolsCalled, type Step } from "./helpers";
 
 const nodesOf = <T extends NodeType>(r: Awaited<ReturnType<typeof run>>, type: T): Promise<Array<NodeOf<T>>> => r.graph.nodesOfType(type);
 const newClaims = async (r: Awaited<ReturnType<typeof run>>) => (await r.graph.nodesOfType("EpisodicClaim")).filter((c) => c.prov.source_class === "recall_call");
@@ -63,10 +63,21 @@ describe("the ladder", () => {
     expect(r.recording.caregiver_receipt!.lines[0]!.text).toBe("Cape May summers - recalled with a recognition prompt in this call.");
   });
 
-  it("naming the other option is not graded: no judgment is spoken, only more help", async () => {
-    const r = await run([...UP_TO_ASSOCIATION, ["her", "Hmm."], ["relay", SAID.rung4], ["her", "My sister."], ["relay", SAID.rung5], ["her", "We had a little house near the beach there."], ["playback"], ["relay", SAID.storeQuestion], ["her", "Yes."], ["relay", SAID.shareQuestion], ["her", "Yes."], ["relay", SAID.closeWarm]]);
+  it("naming the other option is not graded, and the memory is never stated outright: the ladder ends at recognition with a kind close", async () => {
+    const r = await run([...UP_TO_ASSOCIATION, ["her", "Hmm."], ["relay", SAID.rung4], ["her", "My sister."], ["relay", SAID.closeKind]]);
+    expect(r.recording.final_state).toBe("no_answer_today");
+    expect(replay(r.recording.trace).context).toMatchObject({ rungs_fired: [1, 2, 3, 4], reached_at_rung: null });
+    expect(spokenText(r).some((t) => /you told me|your daughter maya/i.test(t))).toBe(false); // no correction, and no fact put to her
+    const last = r.recording.tool_log.filter((c) => c.tool === "select_scaffold").at(-1)!.output as { rung: number | null; rejected: Array<{ rung: number; reason: string }> };
+    expect(last.rung).toBeNull();
+    expect(last.rejected.find((x) => x.rung === 5)!.reason).toMatch(/autobiographical memory.*EVIDENCE\.md, section B/);
+    expect(r.recording.topic).toMatchObject({ reorientation_allowed: false });
+  });
+
+  it("the last rung exists only for a procedural category - and even there only after rungs 1-4 (shown with a test-only script)", async () => {
+    const r = await run([...UP_TO_ASSOCIATION, ["her", "Hmm."], ["relay", SAID.rung4], ["her", "My sister."], ["relay", SAID_RUNG5], ["her", "We had a little house near the beach there."], ["playback"], ["relay", SAID.storeQuestion], ["her", "Yes."], ["relay", SAID.shareQuestion], ["her", "Yes."], ["relay", SAID.closeWarm]], { script: SCRIPT_WITH_REORIENTATION });
+    expect(r.recording.topic).toMatchObject({ reorientation_allowed: true });
     expect(replay(r.recording.trace).context).toMatchObject({ rungs_fired: [1, 2, 3, 4, 5], reached_at_rung: 5 });
-    expect(SAID.rung5).toBe("You and your daughter Maya spent summers together at Cape May. You told me about them. What do you remember about those?");
     expect(r.recording.provenance_receipt!.literal_transcript).toBe("We had a little house near the beach there.");
   });
 
@@ -75,7 +86,7 @@ describe("the ladder", () => {
     const picks = r.recording.tool_log.filter((c) => c.tool === "select_scaffold").map((c) => c.output as { rung: number; rejected: Array<{ rung: number; reason: string }> });
     expect(picks.map((p) => p.rung)).toEqual([1, 2, 3, 4]);
     for (const p of picks) expect(p.rejected.map((x) => x.rung).sort()).toEqual([1, 2, 3, 4, 5].filter((n) => n !== p.rung));
-    expect(picks[3]!.rejected.find((x) => x.rung === 5)!.reason).toBe("more support than needed; held in reserve");
+    expect(picks[3]!.rejected.find((x) => x.rung === 5)!.reason).toMatch(/^disabled: this is an autobiographical memory/); // disabled, not merely held in reserve
     expect(picks[1]!.rejected.find((x) => x.rung === 1)!.reason).toMatch(/never repeated/);
   });
 
@@ -291,7 +302,7 @@ describe("the safety handoff", () => {
     expect(tools.slice(tools.indexOf("send_safety_alert"))).not.toContain("assess_conversation_state"); // nothing else processed that turn
     const alerts = r.alerts.sentTo("person:maya");
     expect(alerts).toHaveLength(1);
-    expect(alerts[0]!.text).toBe("Relay safety note, 2026-11-05 17:30 UTC: during a Relay call, Susan said something on Relay's safety list (a fall). Relay is not an emergency service and cannot tell what is happening. Please call Susan.");
+    expect(alerts[0]!.text).toBe("Relay safety note, 2026-11-05 15:30 UTC: during a Relay call, Susan said something on Relay's safety list (a fall). Relay is not an emergency service and cannot tell what is happening. Please call Susan.");
     expect(alerts[0]!.text).not.toMatch(/kitchen|morning/); // never her words
     expect((await nodesOf(r, "SafetyEvent"))[0]!.props).toEqual({ category: "fall", at: alerts[0]!.at, recipients: ["person:maya"] });
     expect(r.recording.safety_category).toBe("fall");

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Every line Relay can say that carries no factual claim, each with a stable script id (AGENTS.md section 6.2). Slots in braces are filled only from graph node values and the joint setup. Any other line Relay says must carry citations. Changes need a second reviewer (section 13).",
+  "description": "Every line Relay can say that carries no factual claim, each with a stable script id (AGENTS.md section 6.2). Slots in braces are filled only from graph node values and the joint setup. Any other line Relay says must carry citations. Changes need a second reviewer (section 13). The ladder's last rung, stating a fact outright, exists only for `procedural` topic categories: it is never said of an autobiographical or identity memory (EVIDENCE.md, section B).",
   "lines": {
     "greeting": {
       "id": "GREETING",
@@ -66,6 +66,7 @@
     },
     "categories": {
       "family_summers": {
+        "memory_kind": "autobiographical",
         "context": {
           "id": "LADDER-2-FAMILY-SUMMERS",
           "text": "It's a place your family went together."
@@ -84,28 +85,27 @@
           "id": "LADDER-4-FAMILY-SUMMERS",
           "text": "Did you go to {place} with your {option_a} or your {option_b}?"
         },
-        "reorientation": {
-          "id": "LADDER-5-FAMILY-SUMMERS",
-          "text": "You and your {relation} {person} spent summers together at {place}. You told me about them. What do you remember about those?"
-        },
         "elaborate": {
           "id": "ELABORATE-FAMILY-SUMMERS",
           "text": "What do you remember about those summers?"
         }
       },
       "workplace": {
+        "memory_kind": "autobiographical",
         "context": {
           "id": "LADDER-2-WORKPLACE",
           "text": "It's a place where you used to work."
         }
       },
       "hometown": {
+        "memory_kind": "autobiographical",
         "context": {
           "id": "LADDER-2-HOMETOWN",
           "text": "It's a town where you used to live."
         }
       },
       "family_event": {
+        "memory_kind": "autobiographical",
         "context": {
           "id": "LADDER-2-FAMILY-EVENT",
           "text": "It's a day your family celebrated together."
@@ -376,5 +376,9 @@
     "i remember",
     "i do remember",
     "of course"
-  ]
+  ],
+  "conduct": {
+    "max_questions_per_line": 1,
+    "max_words_per_sentence": 16
+  }
 }

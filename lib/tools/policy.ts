@@ -46,7 +46,11 @@ export const policySchema = z
     }),
     allowed_source_classes: z.array(z.enum(SOURCE_CLASSES)),
     blocked_terms: z.array(z.string()),
-    speech: z.strictObject({ pace: z.enum(["slow", "standard"]), max_call_minutes: z.number().int().positive() }),
+    /**
+     * 10 minutes is a ceiling, not a target: 5-8 is the default to set (EVIDENCE.md, section E). `pace` is kept for
+     * her comfort, but it is sentence length - not speed - that the evidence ties to being understood.
+     */
+    speech: z.strictObject({ pace: z.enum(["slow", "standard"]), max_call_minutes: z.number().int().positive().max(10) }),
     review: z.strictObject({ store_confirmation_required: z.literal(true), share_confirmation_required: z.literal(true) }),
     safety: z.strictObject({
       designated_caregivers: z.array(z.strictObject({ person_id: z.string().min(1), alert_channel: z.string().min(1) })).min(1),

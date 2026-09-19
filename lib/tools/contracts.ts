@@ -45,19 +45,30 @@ const trim = z.strictObject({ kind: z.enum(["silence", "disfluency"]), start_ms:
 
 /** Something in her turn that is about the call itself rather than the topic. Lexical, from the call script's phrase lists. */
 export const CONDUCT_SIGNALS = ["stop_request", "identity_question"] as const;
+export const RESPONSE_FORMATS = ["open", "forced_choice", "yes_no"] as const;
 export const CUE_KINDS = ["person", "photo", "family_claim"] as const;
 export const NOTE_LINE_KINDS = ["warm", "share", "gap", "difference", "pointer"] as const;
 export const QUERY_CATEGORIES = ["event", "place", "person", "other"] as const;
 
 export const contracts = {
   get_next_recall_topic: {
-    description: "The topic due for a revisit: deterministic ranking by how long since it was last revisited, then by whether the retrieval layer knows a cue that helps, within the joint setup's allow and block lists. A model never free-picks a topic.",
+    description: "The topic due for a revisit: deterministic ranking by how long since it was last revisited, then by how often it has been told, then by when in her life it is from, then by whether the retrieval layer knows a cue that helps - within the joint setup's allow and block lists. The same memory comes round again, call after call. A model never free-picks a topic.",
     input: z.strictObject({ person_id: id, schedule_context: z.strictObject({ now: iso }) }),
     output: z.strictObject({
       topic: z
-        .strictObject({ topic_id: id, topic_type: z.string(), label: z.string(), spoken_as: z.string(), category: z.string(), family_sourced: z.boolean(), last_revisited_at: iso.nullable() })
+        .strictObject({
+          topic_id: id,
+          topic_type: z.string(),
+          label: z.string(),
+          spoken_as: z.string(),
+          category: z.string(),
+          family_sourced: z.boolean(),
+          /** False for every autobiographical or identity memory: the last rung never states one outright (EVIDENCE.md, section B). */
+          reorientation_allowed: z.boolean(),
+          last_revisited_at: iso.nullable(),
+        })
         .nullable(),
-      ranked: z.array(z.strictObject({ topic_id: id, rank: z.number().int(), last_revisited_at: iso.nullable(), has_effective_cue: z.boolean() })),
+      ranked: z.array(z.strictObject({ topic_id: id, rank: z.number().int(), last_revisited_at: iso.nullable(), times_told: z.number().int(), life_period: z.string().nullable(), has_effective_cue: z.boolean() })),
       excluded: z.array(z.strictObject({ topic_id: id, reason: z.string() })),
       decided_by: z.literal("deterministic_ranking"),
     }),
@@ -113,12 +124,14 @@ export const contracts = {
         /** Verified graph ids her words touched that Relay had not yet said in this call. */
         matched_ids: z.array(id),
         conduct_signal: z.enum(CONDUCT_SIGNALS).nullable(),
+        /** What kind of prompt she was answering. Logged beside every reply: a forced choice and an open reply are not equally trustworthy (EVIDENCE.md, section C). */
+        response_format: z.enum(RESPONSE_FORMATS),
         response_latency_ms: z.number().int().nullable(),
       }),
     }),
   },
   select_scaffold: {
-    description: "Choose the least support per the five-rung ladder: free recall, context, association, recognition, reorientation. One rung at a time, each at most once, never above rung 3 for a family-sourced unconfirmed topic, never rung 5 before 1-4. Records every rejected rung and why. The retrieval layer only ever picks which cue, never whether to climb.",
+    description: "Choose the least support per the five-rung ladder: free recall, context, association, recognition, reorientation. One rung at a time, each at most once, never above rung 3 for a family-sourced unconfirmed topic, never rung 5 before 1-4, and never rung 5 at all for an autobiographical or identity memory. Records every rejected rung and why. The retrieval layer only ever picks which cue, never whether to climb.",
     input: z.strictObject({ topic_id: id, state: z.enum([...TURN_STATES, "opening"]), verified_ids: z.array(id), rungs_fired: z.array(rung) }),
     output: z.strictObject({
       rung: rung.nullable(),
@@ -176,6 +189,8 @@ export const contracts = {
         decision: z.enum(["yes", "no", "unclear"]),
         /** She asked to stop instead of answering. Nothing is kept, and the call ends (rule 12). */
         stop_requested: z.boolean(),
+        /** A yes/no answer: the format most open to a yes that means no. Her own recording was played back first; that is the check. */
+        response_format: z.literal("yes_no"),
         contribution_hash: sha256,
         audio: z.strictObject({ asset_id: id, span: span.nullable(), media_hash: sha256 }),
         recorded_at: iso,
@@ -289,6 +304,7 @@ export const contracts = {
       share_confirmation_id: id,
       decision: z.enum(["yes", "no", "unclear", "timeout"]),
       stop_requested: z.boolean(),
+      response_format: z.literal("yes_no"),
       contribution_hash: sha256,
       recorded_at: iso,
       confirmation_hash: sha256,

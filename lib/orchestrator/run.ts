@@ -24,7 +24,7 @@ import { IN_CALL, TERMINAL, type RelayEvent, type Rung } from "@/lib/state/machi
 import type { MachineState } from "@/lib/state/reducer";
 import type { RelayStore } from "@/lib/state/store";
 import { GateError, ToolTimeoutError, type ToolContext, type ToolOutput, type ToolRuntime } from "@/lib/tools";
-import type { CallDriver } from "./call-driver";
+import { CallUnavailableError, type CallDriver } from "./call-driver";
 
 export interface RunEnv {
   person_id: string;
@@ -42,7 +42,8 @@ export interface RunResult {
 }
 
 type Prompt = ToolOutput<"render_prompt">;
-const isDropped = (e: unknown): boolean => e instanceof Error && e.name === "CallUnavailableError";
+// By name as well as by class: a driver may live in another bundle, where `instanceof` would not hold.
+const isDropped = (e: unknown): boolean => e instanceof CallUnavailableError || (e instanceof Error && e.name === "CallUnavailableError");
 
 /**
  * The open line, held apart from the walk below so that it can ALWAYS be closed. Hanging up is what wipes
@@ -115,7 +116,7 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
     const topic = pick.topic;
     if (!topic) return { machine: machine(), receipt: null };
     const topicId = topic.topic_id;
-    dispatch({ type: "CALL_SCHEDULED", person_id: env.person_id, topic_id: topicId, topic_label: topic.label, family_sourced: topic.family_sourced });
+    dispatch({ type: "CALL_SCHEDULED", person_id: env.person_id, topic_id: topicId, topic_label: topic.label, family_sourced: topic.family_sourced, reorientation_allowed: topic.reorientation_allowed });
 
     const grant = await runtime.call("place_recall_call", { person_id: env.person_id, topic_id: topicId, window: { now } });
     if (grant.decision === "denied") {

@@ -23,7 +23,7 @@ Relay is not a digital replica, a "chat with her" interface, or a bot that relay
 
 ```bash
 npm install
-npm run check        # typecheck + tests + provenance verify
+npm run check        # typecheck + tests + language lint + provenance verify
 npm run dev          # http://localhost:3000/present is the judged path
 ```
 
@@ -31,12 +31,13 @@ Node 22+. No keys, no database, and no network are needed for any of the above.
 
 | Command | What it does |
 | --- | --- |
-| `npm run check` | `typecheck` + `test` + `verify`. Must pass before a task is called done. |
+| `npm run check` | `typecheck` + `test` + `lint:language` + `verify`. Must pass before a task is called done. |
+| `npm run lint:language` | The banned-phrase and conduct lint (`AGENTS.md` §12, test 8) over every fixed line and every line Relay rendered on the golden path. |
 | `npm run verify` | Asset hashes, seed validation, citation resolution, the judged path end to end, authorship invariants. |
 | `npm run verify:strict` | The pre-demo gate. Same, but **fails while any placeholder media or placeholder word timing remains.** |
 | `npm run assets:hash` | Re-hash `/assets` into the manifest. Refuses to touch a changed `final` asset without `--allow-replace`. |
 | `npm run assets:placeholder` | Generate stand-in media. Never overwrites an existing file. |
-| `npm run graph:seed` | Build an on-disk graph at `.data/` (family seed via real intake) for Cypher poking. |
+| `npm run graph:seed` | Build an on-disk LadybugDB graph at `.data/relay.lbug` from the family seed, for Cypher poking. |
 
 ## How it fits together
 
@@ -89,15 +90,17 @@ Cast is fixed: Susan, Maya (daughter), Priya (sister), Anika (granddaughter), Ca
 
 `/present` runs this offline, on prerecorded branches and fixture outputs. Telephony, ASR, and the network must never touch it.
 
-## What is not built yet
+## What is built, and what is not
 
-The brief pivoted on 2026-09-19 from a family-ask relay to scheduled recall calls. The tree still contains the earlier participation-loop code (forwarded ask, Telegram, a live video path). That mechanic is out of scope. Rebuild against `AGENTS.md`.
+**Built, and covered by `npm run check`:** the recall loop end to end on fixtures - topic pick, the call gate, the five-rung ladder, capture, store- and share-confirmation, commit last, the retrieval layer - plus the safety handoff, the AI-identity line, all 19 tools, and the family side as an engine: the redirect-only ask box, the contribution path, the Weekly Note, the per-topic record with change lines, and the export, all behind a whitelist projection. `/present` runs the whole golden path, family beats included, as a plain engine check. The fixtures (`call-script.json`, `family-copy.json`, `record-thresholds.json`, `safety-phrases.json`) exist. `EVIDENCE.md` records the design choices that were checked against the literature.
 
-- **The recall loop.** Topic pick, five-rung ladder, store- and share-confirmation, retrieval layer, and the family-redirect guarantee are specified, not yet the running product.
-- **The family app.** `/family` is not built. Contribution form, Weekly Note, per-topic record, change lines, and export still need fixtures (`call-script.json`, `family-copy.json`, `record-thresholds.json`, `safety-phrases.json`) and whitelist projections.
-- **The interface.** `/` and `/present` are still scaffolds of the earlier demo. Direction is "The Living Graph" (`AGENTS.md` §10).
+**Not built:**
+
+- **The interface.** `/family` and `/components` do not exist, and `/` and `/present` are unstyled scaffolds. Direction is "The Living Graph" (`AGENTS.md` §10). The family side is reachable only through `/api/family/*`, which has no sign-in yet.
+- **A live call.** The earlier video call was removed. The call feature - her speech transcribed on the web app - is being built separately; it plugs in as a `CallDriver` plus a `TranscriptionProvider` (`lib/orchestrator/call-driver.ts` says what a driver owes the engine). Until then a call runs only on the prerecorded fixture, and a turn of the schedule is a manual, operator-only request.
+- **Onboarding capture.** The "Who is this?" beat has no flow; her graph comes from the seed.
 - **Real media.** Everything in `/assets` is a generated stand-in. Word timings are placeholders. See below.
-- **Live telephony.** The judged path is fixture-backed. A live Deepgram / Muse side demo may exist later, behind a flag, never on `/present`.
+- **`legacy/`** holds the earlier family-ask relay (forwarded asks, thread bridge, Telegram). It is out of scope (`AGENTS.md` §14), excluded from the build, and can be deleted once the team agrees.
 
 ## Replacing the placeholder media
 

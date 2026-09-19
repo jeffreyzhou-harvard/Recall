@@ -43,13 +43,13 @@ export const FAMILY_COPY: FamilyCopy = familyCopySchema.parse(familyCopy);
 export const RECORD_THRESHOLDS: RecordThresholds = recordThresholdsSchema.parse(recordThresholds);
 export const SAFETY_PHRASES: SafetyPhrases = safetyPhrasesSchema.parse(safetyPhrases);
 
-/** Timing for the deterministic replay: a Thursday afternoon in New York, inside the agreed call window. */
+/** Timing for the deterministic replay: 10:30 on a Thursday morning in New York, inside the agreed call window (mornings: EVIDENCE.md, section E). */
 export const JUDGED_TIMING: {
   start_at: string;
   call_connect_delay_ms: number;
   tool_latency_ms: { default: number } & Partial<Record<ToolName, number>>;
 } = {
-  start_at: "2026-11-05T17:30:00.000Z",
+  start_at: "2026-11-05T15:30:00.000Z",
   call_connect_delay_ms: 2000,
   tool_latency_ms: { default: 40, query_context_graph: 120, verify_claim_support: 90 },
 };

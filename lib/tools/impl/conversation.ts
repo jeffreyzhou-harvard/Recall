@@ -12,7 +12,7 @@ import { cueHints, preferCues } from "@/lib/graph/retrieval-layer";
 import type { GraphEdge, GraphNode } from "@/lib/graph/types";
 import { tokens, turnText } from "@/lib/providers/transcription";
 import { allScriptLines, containsPhrase, fill, firstPhraseIn, slotsOf, ScriptError, type ScriptLine } from "@/lib/script/call-script";
-import { endsInOpenQuestion, lintLines } from "@/lib/script/lint";
+import { endsInOpenQuestion, lintConduct, lintLines } from "@/lib/script/lint";
 import { FAMILY_SOURCED_MAX_RUNG, type Rung } from "@/lib/state/machine";
 import type { ToolOutput } from "../contracts";
 import type { ToolContext } from "../context";
@@ -46,6 +46,9 @@ export const assess_conversation_state: ToolImpl<"assess_conversation_state"> = 
     return result;
   };
 
+  // What she was answering: the recognition rung offers two choices; every other prompt here is open.
+  const format = ctx.session.spoken.at(-1)?.rung === 4 ? ("forced_choice" as const) : ("open" as const);
+
   // Silence is an endpointed window with no speech of hers: no turn at all, or a final turn with no words.
   const turn = turns.at(-1);
   if (!turn || turn.words.length === 0) {
@@ -53,7 +56,7 @@ export const assess_conversation_state: ToolImpl<"assess_conversation_state"> = 
       turn_id: `silence:${window.asset_id}:${window.start_ms}`,
       state: "no_answer",
       silent: true,
-      evidence: { transcript: "", span: { start_ms: window.start_ms, end_ms: window.end_ms }, matched_rule: "no_speech_in_window", matched_ids: [], conduct_signal: null, response_latency_ms: null },
+      evidence: { transcript: "", span: { start_ms: window.start_ms, end_ms: window.end_ms }, matched_rule: "no_speech_in_window", matched_ids: [], conduct_signal: null, response_format: format, response_latency_ms: null },
     });
   }
   // Endpointing first: a partial turn is never classified.
@@ -79,7 +82,7 @@ export const assess_conversation_state: ToolImpl<"assess_conversation_state"> = 
 
   const conduct = firstPhraseIn(transcript, ctx.script.stop_phrases) ? ("stop_request" as const) : firstPhraseIn(transcript, ctx.script.identity_phrases) ? ("identity_question" as const) : null;
   const done = (state: Assessment["state"], rule: string): Assessment =>
-    record({ turn_id: turn.turn_id, state, silent: false, evidence: { transcript, span: { start_ms: turn.start_ms, end_ms: turn.end_ms }, matched_rule: rule, matched_ids: matched.sort(), conduct_signal: conduct, response_latency_ms: latency } });
+    record({ turn_id: turn.turn_id, state, silent: false, evidence: { transcript, span: { start_ms: turn.start_ms, end_ms: turn.end_ms }, matched_rule: rule, matched_ids: matched.sort(), conduct_signal: conduct, response_format: format, response_latency_ms: latency } });
 
   if (conduct) return done("no_answer", `conduct:${conduct}`);
   if (firstPhraseIn(transcript, ctx.script.unsure_phrases)) return done("no_answer", "said_unsure");
@@ -234,6 +237,7 @@ export const select_scaffold: ToolImpl<"select_scaffold"> = async (input, ctx) =
   for (const rung of [1, 2, 3, 4, 5] as Rung[]) {
     // A rung that is disabled outright is always logged as disabled, never merely as "held in reserve".
     if (topic.family_sourced && rung > FAMILY_SOURCED_MAX_RUNG) rejected.push({ rung, reason: "disabled: the topic is family-sourced and she has not confirmed it, so a forced choice or a stated fact could plant a memory (rule 13)" });
+    else if (rung === 5 && !topic.reorientation_allowed) rejected.push({ rung, reason: "disabled: this is an autobiographical memory, and stating one outright shades into correction (EVIDENCE.md, section B)" });
     else if (chosen) rejected.push({ rung, reason: "more support than needed; held in reserve" });
     else if (rung <= highest) rejected.push({ rung, reason: fired.includes(rung) ? "already tried in this call; a rung is never repeated" : "below a rung that has already been tried" });
     else if (rung === 5 && !([1, 2, 3, 4] as Rung[]).every((r) => fired.includes(r))) rejected.push({ rung, reason: "reorientation is never reached before rungs 1-4 have each been tried in order" });
@@ -354,7 +358,7 @@ export const render_prompt: ToolImpl<"render_prompt"> = async (input, ctx) => {
     if (e instanceof ScriptError) throw new GateError("evidence", e.message);
     throw e;
   }
-  const findings = lintLines([{ id: line.id, text, surface: "call" }], ctx.script.banned);
+  const findings = [...lintLines([{ id: line.id, text, surface: "call" }], ctx.script.banned), ...lintConduct([{ id: line.id, text, surface: "call" }], ctx.script.conduct)];
   if (findings.length > 0) throw new GateError("evidence", `the line contains language Relay never uses: "${findings[0]!.phrase}" (rule ${findings[0]!.rule})`);
 
   const segments: ToolOutput<"render_prompt">["segments"] = [];
