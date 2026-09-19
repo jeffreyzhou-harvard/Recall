@@ -11,7 +11,7 @@
  * ranking) live once in ./retrieval.ts and run identically over either store;
  * a parity test holds the two to the same answers.
  */
-import { statusAfter, type Confirmation, type CurrentAskNode, type GraphData, type GraphEdge, type GraphNode, type NodeOf, type NodeType, type Provenance } from "./types";
+import { patientConfirmed, statusAfter, type Confirmation, type ErasableNodeType, type GraphData, type GraphEdge, type GraphNode, type NodeOf, type NodeType, type Provenance } from "./types";
 
 export function assertSourced(c: Confirmation): void {
   if (!c.source_id) throw new Error("a confirmation needs a source: the artifact holding the person's own words");
@@ -20,21 +20,16 @@ export function assertSourced(c: Confirmation): void {
 /** Shared by both stores so they cannot drift: validate, append, recompute. */
 export function withConfirmation(prov: Provenance, c: Confirmation): Provenance {
   assertSourced(c);
-  return { ...prov, status: statusAfter(prov.status, c), confirmations: [...prov.confirmations, c] };
+  const status = statusAfter(prov.status, c);
+  return { ...prov, status, patient_confirmed: patientConfirmed(status), confirmations: [...prov.confirmations, c] };
 }
-
-/** Newest forward first; id breaks a tie so the choice is deterministic. */
-export const newestAskFirst = (a: CurrentAskNode, b: CurrentAskNode): number =>
-  a.props.received_at === b.props.received_at ? (a.id < b.id ? -1 : 1) : a.props.received_at > b.props.received_at ? -1 : 1;
 
 export interface GraphStore {
   getNode(id: string): Promise<GraphNode | null>;
   getEdge(id: string): Promise<GraphEdge | null>;
   /** Every edge touching `id`, in either direction, ordered by edge id. */
   edgesOf(id: string): Promise<GraphEdge[]>;
-  /** The most recently forwarded ask for a thread. A new forward replaces the one before it as "current". */
-  findCurrentAsk(threadId: string): Promise<CurrentAskNode | null>;
-  /** Every node of one type, ordered by id. Intake uses this to match an ask against known topics and events. */
+  /** Every node of one type, ordered by id. */
   nodesOfType<T extends NodeType>(type: T): Promise<Array<NodeOf<T>>>;
   putNode(node: GraphNode): Promise<void>;
   putEdge(edge: GraphEdge): Promise<void>;
@@ -44,6 +39,12 @@ export interface GraphStore {
    * Nothing else about the fact can be edited, and nothing can remove a confirmation.
    */
   confirm(targetId: string, confirmation: Confirmation): Promise<Provenance>;
+  /**
+   * Delete every node of one of the two record layers a caregiver may clear (section 6.3), with its edges.
+   * The type is restricted at compile time and re-checked at run time: there is no way to remove a claim,
+   * an artifact, or a confirmation through a graph store. Returns how many nodes went.
+   */
+  removeNodesOfType(type: ErasableNodeType): Promise<number>;
   /** Whole graph, ordered by id. For the judge view and for parity tests. */
   snapshot(): Promise<GraphData>;
 }
@@ -51,6 +52,10 @@ export interface GraphStore {
 export async function loadInto(store: GraphStore, data: GraphData): Promise<void> {
   for (const node of data.nodes) await store.putNode(node);
   for (const edge of data.edges) await store.putEdge(edge);
+}
+
+export function assertErasable(type: string): asserts type is ErasableNodeType {
+  if (type !== "RetrievalRecord" && type !== "TopicOutcome") throw new Error(`"${type}" nodes cannot be removed: only the retrieval layer and the per-topic record can be cleared`);
 }
 
 export const byId = <T extends { id: string }>(a: T, b: T): number => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);

@@ -4,13 +4,12 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { FAMILY_SEED, MANIFEST } from "@/fixtures";
-import { runFixture, runJudgedPath } from "@/fixtures/harness";
-import { buildGraph, mergeSeeds, SeedValidationError, type SeedFile } from "@/lib/graph/seed";
+import { runJudgedPath } from "@/fixtures/harness";
+import { buildGraph } from "@/lib/graph/seed";
 import { AssetIndex, AssetResolutionError } from "@/lib/provenance/assets";
 import { canonicalJson, contentHash, sha256Bytes } from "@/lib/provenance/hash";
 import { verifySealed } from "@/lib/provenance/prov-log";
 import { THESIS_LINE } from "@/lib/provenance/receipt";
-import { CONFLICTING_CLAIMS, CONFLICT_MANIFEST, NEGATIVE_CONTROLS, unclearAssentCall } from "./fixtures";
 
 const ROOT = join(import.meta.dirname, "..");
 const assets = new AssetIndex(MANIFEST);
@@ -29,61 +28,21 @@ describe("asset manifest", () => {
   });
 
   it("refuses a span that runs outside the recording", () => {
-    expect(() => assets.resolveSpan("clip-cardamom", { start_ms: 5000, end_ms: 9000 })).toThrow(AssetResolutionError);
+    expect(() => assets.resolveSpan("clip-onboarding", { start_ms: 12000, end_ms: 19000 })).toThrow(AssetResolutionError);
     expect(() => assets.resolveSpan("no-such-asset", null)).toThrow(AssetResolutionError);
   });
 });
 
 describe("citations", () => {
-  it("every one resolves to a real span or hash - in the family seed, in what intake writes, and in the audit layer", async () => {
+  it("every one resolves to a real span or hash - in the family seed, and in everything a call writes", async () => {
     const run = await runJudgedPath();
     const data = await run.graph.snapshot();
-    expect(data.nodes.length).toBeGreaterThan(15);
-    for (const item of [...data.nodes, ...data.edges]) {
-      const prov = item.prov;
-      for (const field of ["source_id", "observed_at", "author", "extraction_method"] as const) expect(prov[field], `${item.id}.${field}`).toBeTruthy();
-      if (prov.asset_id !== null) expect(prov.media_hash, `${item.id} has an asset but no hash`).toBe(assets.resolveSpan(prov.asset_id, prov.span).sha256);
-      else expect(prov.span, `${item.id} has a span but no asset`).toBeNull();
+    expect(data.nodes.length).toBeGreaterThan(buildGraph(FAMILY_SEED, assets).nodes.length);
+    for (const x of [...data.nodes, ...data.edges]) {
+      expect(await run.graph.getNode(x.prov.source_id), `${x.id} cites ${x.prov.source_id}`).not.toBeNull();
+      if (x.prov.asset_id === null) continue;
+      expect(assets.resolveSpan(x.prov.asset_id, x.prov.span).sha256, x.id).toBe(x.prov.media_hash);
     }
-  });
-
-  it("the family seed is compact: a couple of dozen hand-curated facts, not an ontology", () => {
-    const data = buildGraph(FAMILY_SEED, assets);
-    expect(data.edges.length).toBeGreaterThanOrEqual(20);
-    expect(data.edges.length).toBeLessThanOrEqual(30);
-  });
-
-  it("test overlays validate too", () => {
-    expect(() => buildGraph(mergeSeeds(FAMILY_SEED, NEGATIVE_CONTROLS), assets)).not.toThrow();
-    expect(() => buildGraph(mergeSeeds(FAMILY_SEED, CONFLICTING_CLAIMS), new AssetIndex(CONFLICT_MANIFEST))).not.toThrow();
-  });
-});
-
-describe("seed validation", () => {
-  const withNode = (node: SeedFile["nodes"][number]): SeedFile => mergeSeeds(FAMILY_SEED, { version: 1, description: "test", sources: {}, nodes: [node], edges: [] });
-
-  it("refuses to store clinical or state language as fact", () => {
-    const bad = withNode({ id: "claim:x", type: "EpisodicClaim", label: "x", props: { text: "her cognition is declining" }, source: "artifact:setup-record" });
-    expect(() => buildGraph(bad, assets)).toThrow(/clinical or state language/);
-  });
-
-  it("refuses a clinical field name even with an innocent value", () => {
-    const bad = withNode({ id: "person:x", type: "Person", label: "x", props: { display_name: "X", role: "asker", mood: "fine" }, source: "artifact:setup-record" });
-    expect(() => buildGraph(bad, assets)).toThrow(SeedValidationError);
-  });
-
-  it("refuses an edge the schema does not allow, and a fact with no declared source", () => {
-    const seed = structuredClone(FAMILY_SEED);
-    seed.edges.push({ type: "DEPICTS", from: "person:mom", to: "topic:kheer", source: "artifact:setup-record" });
-    expect(() => buildGraph(seed, assets)).toThrow(/may not connect Person -> Topic/);
-    const unsourced = withNode({ id: "claim:y", type: "EpisodicClaim", label: "y", props: { text: "y" }, source: "artifact:nowhere" });
-    expect(() => buildGraph(unsourced, assets)).toThrow(/undeclared source/);
-  });
-
-  it("refuses a contradiction noted only in provenance, since verification reads the edge", () => {
-    const seed = mergeSeeds(FAMILY_SEED, CONFLICTING_CLAIMS);
-    seed.edges = seed.edges.filter((e) => e.type !== "CONTRADICTS");
-    expect(() => buildGraph(seed, new AssetIndex(CONFLICT_MANIFEST))).toThrow(/no CONTRADICTS edge/);
   });
 });
 
@@ -97,34 +56,48 @@ describe("content hashing", () => {
 });
 
 describe("provenance receipt", () => {
-  it("lists source, trims, assent, timestamp, hash, and destination", async () => {
+  it("lists source, trims, store-confirmation, share-confirmation, timestamp, and hash", async () => {
     const run = await runJudgedPath();
-    const receipt = run.recording.provenance_receipt!;
-
-    expect(receipt.waveform.asset_id).toBe("call-golden");
-    expect(receipt.waveform.sha256).toBe(assets.get("call-golden").sha256);
-    expect(receipt.literal_transcript).toBe("Make the kheer. Your grandfather always added cardamom last.");
-    expect(receipt.edits).toEqual({ silence_trims: 3, disfluency_trims: 0, generated_first_person_words: 0 });
-    expect(receipt.assent.recorded_at).toMatch(/^2026-11-05T/);
-    expect(receipt.assent.audio_span).toEqual({ start_ms: 36200, end_ms: 36700 });
-    expect(receipt.assent.assent_hash).toMatch(/^[0-9a-f]{64}$/);
-    expect(receipt.content_hash).toBe(run.ctx.session.contribution!.content_hash);
-    expect(receipt.delivered_to).toEqual(["artifact:thread-family"]);
-    expect(receipt.source_links).toContain("artifact:clip-cardamom");
-    expect(receipt.final_line).toBe(THESIS_LINE);
-    expect(receipt.final_line).toBe("Access changed. Authorship didn't.");
+    const p = run.recording.provenance_receipt!;
+    expect(p.waveform).toEqual({ asset_id: "call-golden", sha256: assets.get("call-golden").sha256, kept: run.ctx.session.contribution!.kept });
+    expect(p.literal_transcript).toBe("We went to Cape May every summer.");
+    expect(p.edits).toEqual({ silence_trims: 2, disfluency_trims: 0, generated_first_person_words: 0 });
+    expect(p.her_words_pct).toBe(100);
+    expect(p.store_confirmation).toMatchObject({ audio_sha256: assets.get("call-golden").sha256, audio_span: { start_ms: 49000, end_ms: 49500 } });
+    expect(p.share_confirmation.decision).toBe("yes");
+    expect(p.content_hash).toBe(run.ctx.session.contribution!.content_hash);
+    expect(p.stored_at >= p.share_confirmation.recorded_at).toBe(true); // commit came last
+    expect(p.rungs_used).toBe(3);
+    expect(p.retrieval_updates).toEqual([{ topic_label: "Cape May summers", cue_id: "person:maya", rung: 3, effective: true }]);
+    expect(p.prov_head).toBe(run.recording.prov.head);
+    expect(p.final_line).toBe(THESIS_LINE);
+    expect(THESIS_LINE).toBe("Cues, not answers - every memory stays in her own words.");
   });
 
-  it("does not exist for a contribution that never sent", async () => {
-    expect((await runFixture({ transcript: unclearAssentCall() })).recording.provenance_receipt).toBeNull();
+  it("does not exist for a contribution she did not confirm", async () => {
+    const { run, OPENING, SAID, HER_LINE } = await import("./helpers");
+    const r = await run([...OPENING, ["her", "Oh, the little house by the water!"], ["playback"], ["relay", SAID.storeQuestion], ["her", "No."], ["relay", SAID.closeNotStored]]);
+    expect(r.recording.provenance_receipt).toBeNull();
+    expect(HER_LINE).toBeTruthy();
   });
 
-  it("writes the audit layer: contribution approved_by assent, delivered_to the original thread", async () => {
+  it("writes the audit layer: the claim derived from the contribution, spoken by her, share-confirmed, about the topic", async () => {
     const run = await runJudgedPath();
-    const { edges } = await run.graph.snapshot();
-    const audit = edges.filter((e) => e.prov.source_class === "session_audit").map((e) => e.type).sort();
-    expect(audit).toEqual(["APPROVED_BY", "DELIVERED_TO", "DERIVED_FROM", "INCLUDED_SPAN", "SPOKEN_BY", "SPOKEN_BY"]);
-    expect(edges.find((e) => e.type === "DELIVERED_TO")!.to).toBe("artifact:thread-family");
+    const edges = (await run.graph.snapshot()).edges.filter((e) => e.from === "contribution:session:judged" || e.from === "claim:session:judged").map((e) => e.id).sort();
+    expect(edges).toEqual([
+      "ABOUT:claim:session:judged->event:cape-may-summers",
+      "ABOUT:claim:session:judged->place:cape-may",
+      "DERIVED_FROM:claim:session:judged->contribution:session:judged",
+      "DERIVED_FROM:contribution:session:judged->artifact:call:session:judged",
+      "DERIVED_FROM:contribution:session:judged->session:judged",
+      "INCLUDED_SPAN:contribution:session:judged->artifact:call:session:judged",
+      "SHARE_CONFIRMED_BY:contribution:session:judged->share-confirmation:session:judged",
+      "SPOKEN_BY:claim:session:judged->person:susan",
+      "SPOKEN_BY:contribution:session:judged->person:susan",
+    ]);
+    // What she said on this call can be spoken back to her on the next one: it verifies like any other claim of hers.
+    expect((await run.graph.getNode("claim:session:judged"))!.prov).toMatchObject({ status: "participant_confirmed", patient_confirmed: true, author: "person:susan" });
+    expect((await run.graph.nodesOfType("TopicOutcome")).find((o) => o.id === "outcome:session:judged")!.props).toMatchObject({ topic_id: "event:cape-may-summers", first_rung_reached_unaided: 3, highest_rung_used: 3 });
   });
 });
 
@@ -146,8 +119,9 @@ describe("PROV-style event log", () => {
   it("attributes the contribution to her and derives it from the call recording", async () => {
     const { records } = (await runJudgedPath()).recording.prov;
     const rel = (relation: string, from: string) => records.filter((r) => r.kind === "relation" && r.relation === relation && r.from === from).map((r) => (r as { to: string }).to);
-    expect(rel("wasAttributedTo", "contribution:session:fwd-diwali-dessert")).toEqual(["person:mom"]);
-    expect(rel("wasDerivedFrom", "contribution:session:fwd-diwali-dessert")).toEqual(["asset:call-golden"]);
-    expect(rel("wasDerivedFrom", "delivery:session:fwd-diwali-dessert")).toEqual(["contribution:session:fwd-diwali-dessert"]);
+    expect(rel("wasAttributedTo", "contribution:session:judged")).toEqual(["person:susan"]);
+    expect(rel("wasDerivedFrom", "contribution:session:judged")).toEqual(["asset:call-golden"]);
+    expect(rel("wasDerivedFrom", "claim:session:judged")).toEqual(["contribution:session:judged"]);
+    expect(rel("wasAttributedTo", "share-confirmation:session:judged")).toEqual(["person:susan"]);
   });
 });

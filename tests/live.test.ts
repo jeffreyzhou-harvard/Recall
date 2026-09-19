@@ -4,24 +4,21 @@
  * services are exercised separately (see scripts/e2e-live.mjs).
  */
 import { describe, expect, it } from "vitest";
-import { FAMILY_SEED, MANIFEST, POLICY } from "@/fixtures";
-import { GuardedThreadBridge, MemoryThreadBridge, type ThreadMessage } from "@/lib/bridge/thread-bridge";
+import { CALL_SCRIPT, FAMILY_COPY, FAMILY_SEED, MANIFEST, POLICY, RECORD_THRESHOLDS, SAFETY_PHRASES } from "@/fixtures";
 import type { CallCommand } from "@/lib/call/control";
 import { CallUnavailableError, LiveCall } from "@/lib/call/live-call";
-import { SystemClock } from "@/lib/clock";
-import { LexicalAnswerInterpreter, applyAnswer, type Answer } from "@/lib/discovery/answers";
 import { MemoryGraphStore } from "@/lib/graph/memory-store";
 import { buildGraph } from "@/lib/graph/seed";
 import { AssetIndex } from "@/lib/provenance/assets";
-import { cutWav } from "@/lib/provenance/wav";
 import { DeepgramLive, transcribeWav, type HeardTurn, type SocketLike } from "@/lib/providers/deepgram";
-import { MuseAnswerInterpreter, museScaffoldAdvisor } from "@/lib/providers/muse/reasoning";
+import { museScaffoldAdvisor } from "@/lib/providers/muse/reasoning";
 import { MuseApiError, MuseSpark, type MuseFetch } from "@/lib/providers/muse/spark";
 import { RelayService } from "@/lib/service/relay-service";
-import { initialState, reduce } from "@/lib/state/reducer";
-import { policySchema, type ScaffoldAdvisor } from "@/lib/tools";
+import { MemoryAlertChannel } from "@/lib/safety/alert";
+import type { RelayEvent } from "@/lib/state/machine";
 import { replay, visitedStates } from "@/lib/state/reducer";
-import { diwaliForward } from "./fixtures";
+import { SetupStore, type ScaffoldAdvisor } from "@/lib/tools";
+import { HER_LINE, SAID } from "./helpers";
 
 const KEY = "test-key-not-a-real-one";
 
@@ -164,12 +161,15 @@ function rig(replies: Array<(atMs: number) => HeardTurn | null>, options: { sile
     audioMs += seconds * 1000;
   };
   let reply = 0;
+  // Relay listens after an invitation, a cue, or a question - not after its greeting or a line that ends the call.
+  const NO_REPLY = new Set([SAID.greeting, SAID.closeWarm, SAID.closeKind, SAID.closeNotStored, SAID.stopAck, SAID.safety]);
+  const expectsReply = (text: string): boolean => !NO_REPLY.has(text);
   call.attach((command) => {
     commands.push(command);
     if (command.type === "hangup") return;
     hear(3); // Relay's line, or the playback, takes three seconds of call time
     call.acknowledge(command.type === "say" ? { type: "said", prompt_id: command.prompt_id } : { type: "played", playback_id: command.playback_id });
-    if (command.type === "say" && ["wrap_up", "close_kindly"].some((k) => command.prompt_id.includes(k))) return;
+    if (command.type !== "say" || !expectsReply(command.text)) return;
     queueMicrotask(() => {
       const turn = replies[reply++]?.(audioMs + 1000) ?? null;
       if (turn) {
@@ -189,127 +189,129 @@ const says = (text: string) => (atMs: number): HeardTurn => {
   return { start_ms: atMs, end_ms: words.at(-1)!.end_ms, words };
 };
 
-async function runLive(replies: Array<(atMs: number) => HeardTurn | null>, scaffoldAdvisor?: ScaffoldAdvisor, bridgeFor: (call: LiveCall) => MemoryThreadBridge = () => new MemoryThreadBridge()) {
+async function runLive(replies: Array<(atMs: number) => HeardTurn | null>, scaffoldAdvisor?: ScaffoldAdvisor) {
   const r = rig(replies);
-  const bridge = bridgeFor(r.call);
-  const service = new RelayService({ graph: MemoryGraphStore.from(buildGraph(FAMILY_SEED, r.assets)), policy: policySchema.parse(POLICY), assets: r.assets, clock: { now: () => Date.parse("2026-11-05T17:30:00.000Z"), iso: () => "2026-11-05T17:30:00.000Z" }, bridge, transcription: r.call, callDriver: () => (queueMicrotask(r.join), r.call), scaffoldAdvisor });
-  const forward = diwaliForward();
-  await service.forwardAsk(forward);
-  const run = await service.runSession(forward.thread_id as string, "session:live");
-  return { ...r, ...run, bridge };
+  const alerts = new MemoryAlertChannel();
+  const graph = MemoryGraphStore.from(buildGraph(FAMILY_SEED, r.assets));
+  const at = "2026-11-05T17:30:00.000Z";
+  const service = new RelayService({ graph, setup: new SetupStore(POLICY), assets: r.assets, clock: { now: () => Date.parse(at), iso: () => at }, transcription: r.call, script: CALL_SCRIPT, copy: FAMILY_COPY, thresholds: RECORD_THRESHOLDS, safetyPhrases: SAFETY_PHRASES, alerts, callDriver: () => (queueMicrotask(r.join), r.call), scaffoldAdvisor });
+  const run = await service.runScheduledCall("session:live");
+  return { ...r, ...run!, graph, alerts, service };
 }
+const GOLDEN = [says("Cape May...?"), says("I'm not sure."), says("Maya, my daughter!"), says(HER_LINE), says("Yes."), says("Yes.")];
 
-describe("a live video call drives a real session", () => {
-  it("the whole golden conversation, live: re-anchored, her exact words captured, played back, approved, delivered", async () => {
-    const run = await runLive([says("Which thing again?"), says("Make the kheer. Your grandfather always added cardamom last."), says("Yes.")]);
-    expect(visitedStates(replay(run.recording.trace))).toEqual(["idle", "ask_received", "policy_passed", "connected", "following", "lost", "reanchored", "contributed", "playback", "assented", "delivered"]);
-    expect(run.commands.map((c) => (c.type === "say" ? c.text : c.type))).toEqual(["Anika wants your help with Diwali dessert.", "Kheer or halwa. Anika sent this photo.", "Want me to send that to Anika?", "playback", "hangup"]);
-    const card = run.bridge.voiceCards()[0]!;
-    expect(card.literal_transcript).toBe("Make the kheer. Your grandfather always added cardamom last.");
-    expect(card.audio.asset_id).toMatch(/^live:room-1:w\d+$/); // cites a hashed window of the live call
-    expect(run.recording.provenance_receipt!.edits.generated_first_person_words).toBe(0);
+describe("a live video call drives a real recall session", () => {
+  it("the whole golden conversation, live: the ladder climbs, her exact words are captured, played back, confirmed, stored", async () => {
+    const run = await runLive(GOLDEN);
+    expect(visitedStates(replay(run.recording.trace))).toEqual(["idle", "scheduled", "policy_passed", "connected", "topic_selected", "asking", "lost", "reanchored", "lost", "reanchored", "recalled", "confirming", "confirmed", "stored"]);
+    expect(run.commands.map((c) => (c.type === "say" ? c.text : c.type))).toEqual([SAID.greeting, SAID.rung1, SAID.rung2, SAID.rung3, SAID.elaborate, "playback", SAID.storeQuestion, SAID.shareQuestion, SAID.closeWarm, "hangup"]);
+    const p = run.recording.provenance_receipt!;
+    expect(p.literal_transcript).toBe(HER_LINE);
+    expect(p.waveform.asset_id).toMatch(/^live:room-1:w\d+$/); // cites a hashed window of the live call
+    expect(p.edits.generated_first_person_words).toBe(0);
+    expect((await run.graph.getNode(p.claim_id))!.prov).toMatchObject({ author: "person:susan", patient_confirmed: true });
   });
 
-  it("plays back exactly the kept spans of the pending artifact, in call time", async () => {
-    const run = await runLive([says("Make the kheer."), says("Yes.")]);
-    const playback = run.commands.find((c) => c.type === "playback")!;
+  it("plays back exactly the kept spans of the pending contribution, in call time - her own audio, before the question", async () => {
+    const run = await runLive(GOLDEN);
+    const at = run.commands.findIndex((c) => c.type === "playback");
+    const playback = run.commands[at]!;
     const kept = run.ctx.session.contribution!.kept;
     if (playback.type !== "playback") throw new Error("unreachable");
     expect(playback.spans).toHaveLength(kept.length);
     expect(playback.spans[0]!.end_ms - playback.spans[0]!.start_ms).toBe(kept[0]!.end_ms - kept[0]!.start_ms);
+    expect(run.commands[at + 1]).toMatchObject({ type: "say", text: SAID.storeQuestion });
   });
 
-  it("silence after the re-anchor is a second lost-thread signal: a gentle wrap-up, nothing sent", async () => {
-    const run = await runLive([says("Which thing again?"), () => null]);
-    expect(run.recording.final_state).toBe("wrapped_up");
-    expect(run.bridge.voiceCards()).toEqual([]);
-    expect(run.recording.messages.map((m) => m.kind)).toEqual(["family_notice"]);
+  it("two quiet windows: a gentle wrap-up, and nothing is kept", async () => {
+    const run = await runLive([() => null, () => null]);
+    expect(run.recording.final_state).toBe("no_answer_today");
+    expect(run.commands.filter((c) => c.type === "say").map((c) => (c as { text: string }).text)).toEqual([SAID.greeting, SAID.rung1, SAID.rung2, SAID.closeKind]);
+    expect((await run.graph.nodesOfType("Contribution")).length).toBe(0);
   });
 
-  it("delivers while the call is still up: her recording exists, and cuts to the kept spans, at the moment it is posted", async () => {
-    // A transport like Telegram fetches the audio when the card is posted. After hang-up there is nothing left to fetch.
-    const atPost: Array<{ ended: boolean; cut_bytes: number; kept_ms: number }> = [];
-    class Fetching extends GuardedThreadBridge {
-      constructor(private readonly call: LiveCall) {
-        super();
-      }
-      protected async deliver(message: ThreadMessage): Promise<void> {
-        if (message.kind !== "voice_contribution") return;
-        const { asset_id, kept } = message.card.audio;
-        atPost.push({ ended: this.call.ended, cut_bytes: cutWav(this.call.wavFor(asset_id)!, kept)?.byteLength ?? 0, kept_ms: kept.reduce((ms, k) => ms + k.end_ms - k.start_ms, 0) });
-      }
-    }
-    await runLive([says("Make the kheer."), says("Yes.")], undefined, (call) => new Fetching(call) as unknown as MemoryThreadBridge);
-    expect(atPost).toHaveLength(1);
-    expect(atPost[0]!.ended).toBe(false);
-    expect(atPost[0]!.cut_bytes).toBe(44 + (atPost[0]!.kept_ms / 1000) * 32_000); // a WAV header and exactly her kept samples
-  });
-
-  it("wipes her audio when the call ends, delivered or not", async () => {
-    const run = await runLive([says("Make the kheer."), says("Yes.")]);
-    const delivered = run.bridge.voiceCards()[0]!.audio.asset_id;
-    expect([...run.call.wavFor(delivered)!].every((b) => b === 0)).toBe(true);
+  it("wipes her audio when the call ends, stored or not", async () => {
+    const run = await runLive(GOLDEN);
+    expect([...run.call.wavFor(run.recording.provenance_receipt!.waveform.asset_id)!].every((b) => b === 0)).toBe(true);
     expect(run.call.ended).toBe(true);
+  });
+
+  it("a safety phrase on a live call alerts her caregiver and ends the recall flow", async () => {
+    const run = await runLive([says("Cape May...?"), says("I fell this morning and my hip hurts.")]);
+    expect(run.recording.final_state).toBe("safety_handoff");
+    expect(run.alerts.sentTo("person:maya")).toHaveLength(1);
+    expect(run.alerts.sentTo("person:maya")[0]!.text).not.toMatch(/hip|morning/);
+    expect(run.commands.filter((c) => c.type === "say").at(-1)).toMatchObject({ text: SAID.safety });
   });
 
   it("never takes Relay's own voice for hers: anything heard while Relay was talking is discarded", async () => {
     const r = rig([]);
     r.join();
     await r.call.connect();
-    const speaking = r.call.speak({ prompt_id: "prompt:brief", text: "Anika wants your help." });
-    r.heard({ start_ms: 1500, end_ms: 2500, words: [{ w: "Anika", start_ms: 1500, end_ms: 1900 }, { w: "wants", start_ms: 2000, end_ms: 2500 }] }); // her mic picking up her own speaker
+    const speaking = r.call.speak({ prompt_id: "prompt:greeting", text: "Hi Susan, I'm Relay." });
+    r.heard({ start_ms: 1500, end_ms: 2500, words: [{ w: "Relay", start_ms: 1500, end_ms: 2500 }] }); // Deepgram hears Relay's own line through her speaker
     await speaking;
+    const listening = r.call.listen();
     r.hear(1);
-    r.heard(says("Make the kheer.")(5200));
-    r.hear(3);
-    const window = await r.call.listen();
-    const turns = await r.call.allTurns(window.asset_id);
-    expect(turns.map((t) => `${t.speaker}: ${t.words.map((w) => w.w).join(" ")}`)).toEqual(["relay: Anika wants your help.", "participant: Make the kheer."]);
+    r.heard(says("Cape May...?")(4600));
+    const window = await listening;
+    expect((await r.call.turnsIn(window)).filter((t) => t.speaker === "participant").map((t) => t.words.map((w) => w.w).join(" "))).toEqual(["Cape May...?"]);
   });
 
-  it("ends safely when nobody joins, and when the call drops - without claiming anything happened that did not", async () => {
-    const r = rig([]);
-    await expect(r.call.connect()).rejects.toBeInstanceOf(CallUnavailableError);
-    const at = { at: "2026-11-05T17:30:00.000Z" };
-    const dropped = (from: Parameters<typeof reduce>[1][]) => from.reduce((m, e) => reduce(m, e, at), initialState());
-    const asked = { type: "ASK_FORWARDED", ask_id: "a", thread_id: "t", asker_id: "p", addressee_id: "m" } as const;
-    const drop = { type: "CALL_DROPPED", detail: "nobody joined" } as const;
-    expect(dropped([asked, { type: "POLICY_GRANTED", policy_token_id: "k", audience: "t" }, drop])).toMatchObject({ state: "blocked", context: { family_notice: "not_this_time" } });
-    const inCall = dropped([asked, { type: "POLICY_GRANTED", policy_token_id: "k", audience: "t" }, { type: "CALL_CONNECTED", session_id: "s" }, { type: "BRIEF_DELIVERED", prompt_id: "p", citations: [] }, drop]);
-    expect(inCall.state).toBe("wrapped_up");
-    expect(inCall.trace.map((t) => t.event)).not.toContain("FIXED_RESTATEMENT_DELIVERED");
+  it("nobody joins: no answer today. She hangs up mid-call: stopped. Neither claims anything happened that did not", async () => {
+    const nobody = rig([]);
+    const graph = MemoryGraphStore.from(buildGraph(FAMILY_SEED, nobody.assets));
+    const at = "2026-11-05T17:30:00.000Z";
+    const deps = { graph, setup: new SetupStore(POLICY), assets: nobody.assets, clock: { now: () => Date.parse(at), iso: () => at }, transcription: nobody.call, script: CALL_SCRIPT, copy: FAMILY_COPY, thresholds: RECORD_THRESHOLDS, safetyPhrases: SAFETY_PHRASES, alerts: new MemoryAlertChannel() };
+    const unanswered = await new RelayService({ ...deps, callDriver: () => nobody.call }).runScheduledCall("session:nobody");
+    expect(unanswered!.recording.final_state).toBe("no_answer_today");
+    expect(unanswered!.recording.spoken).toEqual([]);
+
+    // She answers once, and then the line goes dead instead of a second reply.
+    const dropped: ReturnType<typeof rig> = rig([says("Cape May...?"), () => (dropped.call.acknowledge({ type: "ended" }), null)]);
+    const service = new RelayService({ ...deps, graph: MemoryGraphStore.from(buildGraph(FAMILY_SEED, dropped.assets)), assets: dropped.assets, transcription: dropped.call, callDriver: () => (queueMicrotask(dropped.join), dropped.call) });
+    const run = await service.runScheduledCall("session:dropped");
+    expect(run!.recording.final_state).toBe("stopped");
+    expect(replay(run!.recording.trace).context.stop_how).toBe("hang_up");
+    expect(run!.recording.provenance_receipt).toBeNull();
   });
 });
 
 describe("Muse Spark only proposes", () => {
-  it("may pick among the scaffolds the ladder found eligible - and is overruled the moment it steps outside them", async () => {
-    const replies = [says("Which thing again?"), says("Make the kheer."), says("Yes.")];
-    const chosen = async (advisor: ScaffoldAdvisor) => (await runLive(replies, advisor)).runtime.log.find((c) => c.tool === "select_scaffold")!.output as { scaffold_id: string; decided_by: string };
-
-    const offered: string[][] = [];
-    expect(await chosen(async (advice) => (offered.push(advice.eligible.map((e) => e.scaffold_id)), { scaffold_id: "source_backed_cue", citations: advice.eligible[1]!.citations }))).toEqual(expect.objectContaining({ scaffold_id: "source_backed_cue", decided_by: "muse_spark" }));
-    expect(offered).toEqual([["restate_options", "source_backed_cue"]]); // "repeat" and "name the asker" were never on offer: they do not answer "which thing?"
-
-    expect(await chosen(async () => ({ scaffold_id: "repeat", citations: ["person:anika"] }))).toEqual(expect.objectContaining({ scaffold_id: "restate_options", decided_by: "deterministic_ladder" }));
-    expect(await chosen(async (a) => ({ scaffold_id: a.eligible[0]!.scaffold_id, citations: ["pref:mom-festival-desserts"] }))).toEqual(expect.objectContaining({ decided_by: "deterministic_ladder" }));
-    expect(await chosen(async () => Promise.reject(new MuseApiError(500, "down")))).toEqual(expect.objectContaining({ scaffold_id: "restate_options", decided_by: "deterministic_ladder" }));
-    const viaSpark = museScaffoldAdvisor(sparkReturning({ scaffold_id: "restate_options", citations: ["topic:kheer"] }).spark);
-    expect((await chosen(viaSpark)).decided_by).toBe("muse_spark");
+  it("never chooses a rung. It may pick WHICH cue, where the retrieval layer has no preference - and is overruled the moment it steps outside what was offered", async () => {
+    // With the seeded retrieval layer, Maya is already the preferred cue: the advisor is not even asked.
+    let asked = 0;
+    const preferred = await runLive(GOLDEN, async (advice) => (asked++, { cue_id: advice.eligible[0]!.cue_id, citations: advice.eligible[0]!.citations }));
+    expect(asked).toBe(0);
+    expect(replay(preferred.recording.trace).context.cues_offered).toEqual([{ rung: 3, cue_id: "person:maya" }]);
   });
 
-  it("gets no more trust than the lexical matcher when reading facts: a name she never said is refused", async () => {
-    const graph = MemoryGraphStore.from(buildGraph(FAMILY_SEED, new AssetIndex(MANIFEST)));
-    const policy = policySchema.parse(POLICY);
-    const question = { question_id: "q", expects: "Person", show_photo_id: null, rungs: [], gap: { gap_id: "g", kind: "how_related", cluster_id: "c", photo_count: 1, expects: "Person", together_with: [], identified_as: { node_id: "person:anika", name: "Anika", edge_id: "e" } } } as never;
-    const answer: Answer = { answer_id: "a1", by: "person:mom", text: "She is my daughter.", at: "2026-11-01T15:00:00.000Z", recording: null };
-    const speaker = { id: "person:mom", is_participant: true };
-
-    const honest = new MuseAnswerInterpreter(sparkReturning({ facts: [{ kind: "relate", from: { id: "person:mom" }, relation: "child", to: { id: "person:anika" }, said_as: "daughter", basis: "stated" }] }).spark, graph);
-    expect((await applyAnswer(question, answer, await honest.interpret(question, answer, speaker, "person:mom"), { graph, policy })).created).toEqual(["RELATED_TO:child:person:mom->person:anika"]);
-
-    const inventive = new MuseAnswerInterpreter(sparkReturning({ facts: [{ kind: "relate", from: { id: "person:anika" }, relation: "lived_in", to: { type: "Place", name: "Boston" }, said_as: null, basis: "stated" }] }).spark, graph);
-    await expect(applyAnswer(question, { ...answer, answer_id: "a2" }, await inventive.interpret(question, answer, speaker, "person:mom"), { graph, policy })).rejects.toThrow(/"Boston" does not appear in what was said/);
-    expect(new LexicalAnswerInterpreter().label).toContain("lexical"); // the deterministic default remains
-    void SystemClock;
+  it("speaks Spark's pick through the real client, and falls back when Spark is slow, wrong, or down", async () => {
+    const { bench } = await import("./helpers");
+    const pickVia = async (advisor: ScaffoldAdvisor) => {
+      const b = await bench();
+      await b.service.clearRetrievalLayer(); // no preference, so the front-runners are level
+      Object.assign(b.ctx, { scaffoldAdvisor: advisor });
+      const events: RelayEvent[] = [
+        { type: "CALL_SCHEDULED", person_id: "person:susan", topic_id: b.topicId, topic_label: "x", family_sourced: false },
+        { type: "POLICY_GRANTED", policy_token_id: b.tokenId, max_call_minutes: 12 },
+        { type: "CALL_CONNECTED", session_id: "s" },
+        { type: "GREETING_DELIVERED", prompt_id: "p", discloses_ai: true },
+        { type: "TOPIC_SELECTED", topic_id: b.topicId, citations: [] },
+        { type: "RUNG_DELIVERED", rung: 1, prompt_id: "p1", citations: [], cue_id: null },
+        { type: "TURN_ASSESSED", turn_id: "t", turn_state: "no_answer", silent: false },
+        { type: "RUNG_DELIVERED", rung: 2, prompt_id: "p2", citations: [], cue_id: null },
+        { type: "TURN_ASSESSED", turn_id: "u", turn_state: "no_answer", silent: false },
+      ];
+      for (const e of events) b.store.getState().dispatch(e, { at: b.clock.iso() });
+      return b.runtime.call("select_scaffold", { topic_id: b.topicId, state: "no_answer", verified_ids: b.verified, rungs_fired: [1, 2] });
+    };
+    expect(await pickVia(async (a) => ({ cue_id: "person:maya", citations: a.eligible.find((e) => e.cue_id === "person:maya")!.citations }))).toMatchObject({ rung: 3, cue: { cue_id: "person:maya" }, decided_by: "muse_spark" });
+    const fallback = { rung: 3, cue: { cue_id: "artifact:photo-cape-may" }, decided_by: "deterministic_ladder" };
+    expect(await pickVia(async () => ({ cue_id: "person:priya", citations: ["person:priya"] }))).toMatchObject(fallback); // not on offer
+    expect(await pickVia(async (a) => ({ cue_id: a.eligible[0]!.cue_id, citations: ["claim:taught-at-lincoln"] }))).toMatchObject(fallback); // cites outside the cue
+    expect(await pickVia(async () => Promise.reject(new MuseApiError(500, "down")))).toMatchObject(fallback);
+    const { spark } = sparkReturning({ cue_id: "person:maya", citations: ["person:maya"] });
+    expect(await pickVia(museScaffoldAdvisor(spark))).toMatchObject({ rung: 3, cue: { cue_id: "person:maya" }, decided_by: "muse_spark" });
   });
 });

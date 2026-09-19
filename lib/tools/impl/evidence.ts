@@ -1,139 +1,139 @@
-/** Tools 4-5: policy-bounded retrieval, then verification. Only what passes both may ever be spoken. */
+/** Tools 3-4: policy-bounded retrieval, then verification. Only what passes both may ever be spoken. */
 import { citationOf, retrieveCandidates, type Citation } from "@/lib/graph/retrieval";
-import { SPEAKABLE_AS_FACT, type GraphNode } from "@/lib/graph/types";
-import { GateError } from "../gates";
+import { SPEAKABLE_AS_FACT, type GraphEdge, type GraphNode, type Provenance } from "@/lib/graph/types";
+import type { ToolContext } from "../context";
+import { GateError, type VerifiedEvidence } from "../gates";
 import type { ToolImpl } from "../runtime";
 
 export const query_context_graph: ToolImpl<"query_context_graph"> = async (input, ctx) => {
   const nowIso = ctx.clock.iso();
-  const token = await ctx.gate.requireToken(input.policy_token_id, input.ask_id, nowIso);
-  const outside = input.allowed_sources.filter((s) => !token.allowed_source_classes.includes(s));
-  if (outside.length > 0) {
-    throw new GateError("policy", `source classes outside the policy were requested: ${outside.join(", ")}`);
-  }
+  const token = await ctx.gate.requireToken(input.policy_token_id, input.topic_id, nowIso);
   const result = await retrieveCandidates(ctx.graph, {
-    ask_id: input.ask_id,
+    topic_id: input.topic_id,
     policy_id: token.policy_id,
-    audience: token.audience,
-    allowed_sources: input.allowed_sources,
+    audience: token.person_id,
+    allowed_sources: token.allowed_source_classes,
     max_hops: input.max_hops,
     now_iso: nowIso,
   });
   ctx.session.candidates = result.candidates;
+  ctx.session.relations = result.relations;
   return result;
 };
 
+const edgeCitation = (edge: GraphEdge): Citation => ({
+  node_id: edge.id,
+  source_id: edge.prov.source_id,
+  source_class: edge.prov.source_class,
+  asset_id: edge.prov.asset_id,
+  media_hash: edge.prov.media_hash,
+  span: edge.prov.span,
+  author: edge.prov.author,
+  observed_at: edge.prov.observed_at,
+  patient_confirmed: edge.prov.patient_confirmed,
+});
+
+/** Checks every fact shares, node or edge: still fresh, confirmed by a person, and its media (if any) is the media it was cut from. */
+function provenanceProblem(ctx: ToolContext, prov: Provenance, nowIso: string): string | null {
+  if (prov.expires_at !== null && prov.expires_at <= nowIso) return "expired";
+  // Rule 6: Relay speaks only what a person confirmed. An observation or an inference is never a fact.
+  if (!SPEAKABLE_AS_FACT.has(prov.status)) return `not_confirmed:${prov.status}`;
+  if (prov.asset_id !== null) {
+    try {
+      if (ctx.assets.resolveSpan(prov.asset_id, prov.span).sha256 !== prov.media_hash) return "evidence_hash_mismatch";
+    } catch {
+      return "evidence_unresolvable";
+    }
+  }
+  return null;
+}
+
 export const verify_claim_support: ToolImpl<"verify_claim_support"> = async (input, ctx) => {
   const nowIso = ctx.clock.iso();
-  await ctx.gate.requireToken(input.policy_token_id, input.ask_id, nowIso);
-  const ask = ctx.session.ask;
-  if (!ask || ask.ask_id !== input.ask_id) throw new GateError("evidence", "inspect_request has not run for this ask");
+  await ctx.gate.requireToken(input.policy_token_id, input.topic_id, nowIso);
+  const policy = ctx.setup.current();
+  if (ctx.session.topic?.topic_id !== input.topic_id) throw new GateError("evidence", "get_next_recall_topic has not chosen this topic");
 
-  // Only what this ask legitimately reaches can be verified: the ask's own facts and
-  // the candidates retrieval returned under the policy. Anything else in the graph is
-  // out of scope, so verification can never be used to launder an unfiltered node.
-  const inScope = new Set<string>([
-    ask.asker_id,
-    ask.addressee_id,
-    ...ask.topic_ids,
-    ...ask.event_ids,
-    ...ask.option_topic_ids,
-    ...ask.artifacts.map((a) => a.artifact_id),
-    ...ctx.session.candidates.map((c) => c.root_id),
-  ]);
+  // Only what this topic legitimately reaches can be verified: the topic, and what retrieval returned for it
+  // under the policy. Anything else in the graph is out of scope, so verification can never be used to
+  // launder an unfiltered node into something Relay may say.
+  const inScope = new Set<string>([input.topic_id, ...ctx.session.candidates.map((c) => c.root_id), ...ctx.session.relations.map((r) => r.edge_id)]);
+  const mayBind = new Set<string>([policy.person_id, ...policy.approved_people]);
 
-  const verified: Array<{ claim_id: string; citations: Citation[]; node: GraphNode }> = [];
+  const verified: Array<VerifiedEvidence & { kind: "node" | "edge"; citations: Citation[] }> = [];
   const rejected: Array<{ claim_id: string; reason: string }> = [];
   const conflicts: Array<{ a: string; b: string }> = [];
 
   for (const claimId of [...new Set(input.claim_ids)]) {
     const reject = (reason: string): void => void rejected.push({ claim_id: claimId, reason });
-    const node = await ctx.graph.getNode(claimId);
-    if (!node) {
+    const node: GraphNode | null = await ctx.graph.getNode(claimId);
+    const edge: GraphEdge | null = node ? null : await ctx.graph.getEdge(claimId);
+    if (!node && !edge) {
       reject("not_in_graph");
       continue;
     }
     if (!inScope.has(claimId)) {
-      reject("not_retrieved_for_this_ask");
+      reject("not_retrieved_for_this_topic");
       continue;
     }
-    if (node.prov.expires_at !== null && node.prov.expires_at <= nowIso) {
-      reject("expired");
+    const prov = (node ?? edge)!.prov;
+    const problem = provenanceProblem(ctx, prov, nowIso);
+    if (problem) {
+      reject(problem);
       continue;
     }
-    // Rule 6, extended: Relay speaks only what a person confirmed. An observation or an inference is never a fact.
-    if (!SPEAKABLE_AS_FACT.has(node.prov.status)) {
-      reject(`not_confirmed:${node.prov.status}`);
+    const source = await ctx.graph.getNode(prov.source_id);
+    if (source?.type !== "Artifact") {
+      reject("no_direct_evidence");
       continue;
     }
-    if (node.prov.asset_id !== null) {
-      try {
-        const asset = ctx.assets.resolveSpan(node.prov.asset_id, node.prov.span);
-        if (asset.sha256 !== node.prov.media_hash) {
-          reject("evidence_hash_mismatch");
-          continue;
-        }
-      } catch {
-        reject("evidence_unresolvable");
+
+    if (edge) {
+      // An identity or relationship binding ("Maya is her daughter") enters only through a named, approved person.
+      if (!mayBind.has(prov.author)) {
+        reject("binding_without_approved_source");
         continue;
       }
+      verified.push({ id: claimId, kind: "edge", speaker: prov.author, patient_confirmed: prov.patient_confirmed, citations: [edgeCitation(edge), citationOf(source)] });
+      continue;
     }
 
     const edges = await ctx.graph.edgesOf(claimId);
-    const citations = [citationOf(node)];
-
-    if (node.type === "EpisodicClaim" || node.type === "PreferenceExpertise") {
-      const evidence = edges.find((e) => e.type === "EVIDENCE_FOR" && e.to === claimId && e.from === node.prov.source_id);
-      if (!evidence) {
+    let speaker = prov.author;
+    if (node!.type === "EpisodicClaim" || node!.type === "PreferenceExpertise") {
+      if (!edges.some((e) => e.type === "EVIDENCE_FOR" && e.to === claimId && e.from === prov.source_id)) {
         reject("no_direct_evidence");
         continue;
       }
-      const speaker = edges.find((e) => e.type === "SPOKEN_BY" && e.from === claimId);
-      if (!speaker || speaker.to !== node.prov.author) {
+      const spokenBy = edges.find((e) => e.type === "SPOKEN_BY" && e.from === claimId);
+      if (!spokenBy || spokenBy.to !== prov.author) {
         reject("speaker_unattributed");
         continue;
       }
-      const artifact = await ctx.graph.getNode(node.prov.source_id);
-      if (artifact) citations.push(citationOf(artifact));
-    } else {
-      // The ask's own facts: supported only by an edge the forwarded ask itself established.
-      const direct =
-        claimId === ask.asker_id || claimId === ask.addressee_id
-          ? edges.some((e) => e.from === ask.ask_id && e.to === claimId && e.prov.source_class === "current_ask")
-          : edges.some(
-              (e) =>
-                (e.from === ask.ask_id && e.to === claimId) || // ABOUT a topic or event
-                (e.to === ask.ask_id && e.from === claimId && e.type === "EVIDENCE_FOR"), // a forwarded artifact
-            );
-      if (!direct) {
-        reject("no_direct_evidence");
-        continue;
-      }
+      speaker = spokenBy.to;
+    }
+    if (node!.type === "Person" && !mayBind.has(prov.author)) {
+      reject("binding_without_approved_source");
+      continue;
     }
 
     const contradiction = edges.find((e) => e.type === "CONTRADICTS");
     if (contradiction) {
+      // Two accounts differ. Relay speaks neither, and never says which is right.
       const pair = [contradiction.from, contradiction.to].sort() as [string, string];
       if (!conflicts.some((c) => c.a === pair[0] && c.b === pair[1])) conflicts.push({ a: pair[0], b: pair[1] });
       reject("contradicted");
       continue;
     }
-    verified.push({ claim_id: claimId, citations, node });
+    const citations = node!.id === source.id ? [citationOf(node!)] : [citationOf(node!), citationOf(source)];
+    verified.push({ id: claimId, kind: "node", speaker, patient_confirmed: prov.patient_confirmed, citations });
   }
 
-  // Remembered facts disagree, so Relay uses none of them: current ask only (AGENTS.md section 5).
-  const evidenceMode = conflicts.length > 0 ? ("current_ask_only" as const) : ("full" as const);
-  const kept = verified.filter((v) => {
-    if (evidenceMode === "full" || v.node.prov.source_class !== "prior_claim_with_source") return true;
-    rejected.push({ claim_id: v.claim_id, reason: "conflict_fallback_current_ask_only" });
-    return false;
-  });
-
-  ctx.gate.recordVerifiedEvidence(kept.map((v) => v.claim_id));
+  ctx.gate.recordVerifiedEvidence(verified.map(({ id, speaker, patient_confirmed }) => ({ id, speaker, patient_confirmed })));
+  ctx.session.verified = verified.map(({ id, speaker, patient_confirmed }) => ({ id, speaker, patient_confirmed }));
   return {
-    verified: kept.map(({ claim_id, citations }) => ({ claim_id, citations })),
+    verified: verified.map(({ id, kind, speaker, patient_confirmed, citations }) => ({ claim_id: id, kind, speaker, patient_confirmed, citations })),
     rejected: rejected.sort((a, b) => (a.claim_id < b.claim_id ? -1 : 1)),
     conflicts,
-    evidence_mode: evidenceMode,
   };
 };

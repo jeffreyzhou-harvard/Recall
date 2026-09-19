@@ -1,88 +1,117 @@
 /**
- * Drive the tools by hand, the way a model that ignored the intended order
- * would, so gate tests can call any tool directly against a real context.
+ * Test scaffolding. Branch data lives here, not in /fixtures: it exists only to
+ * exercise a gate or a failure transition, and is mostly derived from the
+ * judged data rather than written out again.
  */
-import { buildFixtureRig, type FixtureOptions, type FixtureRig } from "@/fixtures/harness";
+import { CALL_SCRIPT, FAMILY_SEED, MANIFEST, POLICY } from "@/fixtures";
+import { runFixture, type FixtureOptions, type FixtureRun } from "@/fixtures/harness";
+import type { SeedFile } from "@/lib/graph/seed";
+import type { CallTranscript, Turn } from "@/lib/providers/transcription";
+import { fill } from "@/lib/script/call-script";
+
+// --- what Relay says on the golden topic, built from the reviewed script so a test can never drift from it ---
+const L = CALL_SCRIPT.lines;
+const FS = CALL_SCRIPT.ladder.categories.family_summers!;
+export const SAID = {
+  greeting: fill(L.greeting, { name: "Susan", set_up_by: "Maya" }),
+  identity: fill(L.identity, { set_up_by: "Maya" }),
+  rung1: fill(CALL_SCRIPT.ladder.free_recall, { topic: "the summers at Cape May" }),
+  rung2: FS.context.text,
+  rung3: fill(FS.association!.person!, { cue: "Maya" }),
+  rung3photo: fill(FS.association!.photo!, { author: "Maya" }),
+  rung4: fill(FS.recognition!, { place: "Cape May", option_a: "daughter", option_b: "sister" }),
+  rung5: fill(FS.reorientation!, { relation: "daughter", person: "Maya", place: "Cape May" }),
+  elaborate: FS.elaborate!.text,
+  storeQuestion: L.store_question.text,
+  shareQuestion: L.share_question.text,
+  closeWarm: fill(L.close_warm, { name: "Susan" }),
+  closeKind: L.close_kind.text,
+  closeNotStored: L.close_not_stored.text,
+  narrowing: L.narrowing.text,
+  stopAck: L.stop_ack.text,
+  safety: fill(L.safety, { caregiver: "Maya", emergency_number: "911" }),
+};
+export const HER_LINE = "We went to Cape May every summer.";
+
+export type Step = ["relay", string] | ["her", string] | ["silence"] | ["playback"];
+
+/** A prerecorded call from a list of steps. Timings are regular: each turn two seconds, a second apart, inside the 60 s asset. */
+export function call(steps: readonly Step[]): CallTranscript {
+  let at = 1000;
+  const turns: Turn[] = steps.map((step, i) => {
+    const [kind, text] = step;
+    const start = at;
+    const end = start + 2000;
+    at = end + 1000;
+    const tokens = text ? text.split(" ") : [];
+    const each = 2000 / Math.max(1, tokens.length);
+    return {
+      turn_id: `t${i + 1}`,
+      speaker: kind === "relay" ? "relay" : kind === "playback" ? "playback" : "participant",
+      start_ms: start,
+      end_ms: end,
+      is_final: true,
+      words: kind === "silence" || kind === "playback" ? [] : tokens.map((w, j) => ({ w, start_ms: Math.round(start + j * each), end_ms: Math.round(start + (j + 1) * each - 20) })),
+    };
+  });
+  return { asset_id: "call-golden", provider: "fixture", timing_status: "placeholder", turns };
+}
+
+/** The opening every call shares: what Relay is, then the invitation. */
+export const OPENING: Step[] = [
+  ["relay", SAID.greeting],
+  ["relay", SAID.rung1],
+];
+/** From her own words to the warm close, with both yeses. */
+export const CAPTURE_AND_CONFIRM = (store = "Yes.", share = "Yes."): Step[] => [["her", HER_LINE], ["playback"], ["relay", SAID.storeQuestion], ["her", store], ["relay", SAID.shareQuestion], ["her", share], ["relay", SAID.closeWarm]];
+
+export const run = (steps: readonly Step[], options: FixtureOptions = {}): Promise<FixtureRun> => runFixture({ ...options, transcript: call(steps) });
+
+export const spokenText = (r: FixtureRun): string[] => r.recording.spoken.map((s) => s.text);
+export const toolsCalled = (r: FixtureRun): string[] => r.recording.tool_log.map((c) => c.tool);
+export const policyWith = (patch: (p: Record<string, any>) => void): unknown => {
+  const p = structuredClone(POLICY) as Record<string, any>;
+  patch(p);
+  return p;
+};
+
+/** An overlay seed: extra nodes and edges citing sources the base seed already declares. */
+export const overlay = (description: string, nodes: SeedFile["nodes"], edges: SeedFile["edges"], sources: SeedFile["sources"] = {}): SeedFile => ({ version: 1, description, sources, nodes, edges });
+
+/** Susan's own account and Maya's differ, and someone has said so: linked by CONTRADICTS, so neither may be spoken. */
+export const ACCOUNTS_DIFFER = overlay("Susan's and Maya's accounts of Cape May differ", [], [{ type: "CONTRADICTS", from: "claim:cape-may-with-maya", to: "claim:maya-remembers-cape-may", source: "artifact:setup-record" }]);
+
+export { CALL_SCRIPT, FAMILY_SEED, MANIFEST, POLICY };
+
+// --- calling tools directly, the way the orchestrator would, up to a chosen point ------------------------------
+import { buildFixtureRig, type FixtureRig } from "@/fixtures/harness";
 import { ProvLog } from "@/lib/provenance/prov-log";
 import { createRelayStore } from "@/lib/state/store";
-import { GateKeeper, TOOL_IMPLS, ToolRuntime, newSession, policySchema, type ToolContext, type ToolOutput } from "@/lib/tools";
-import { FixtureTranscription } from "@/lib/providers/transcription";
-import { GOLDEN_TRANSCRIPT, POLICY } from "@/fixtures";
-import { CALL, THREAD, goldenTurn } from "./fixtures";
+import { GateKeeper, TOOL_IMPLS, ToolRuntime, newSession, type ToolContext } from "@/lib/tools";
+import type { RelayDeps } from "@/lib/service/relay-service";
 
 export interface Bench extends FixtureRig {
   ctx: ToolContext;
   runtime: ToolRuntime;
-}
-
-/** A rig with the ask already forwarded, plus a bare tool runtime over the same graph, bridge, and clock. */
-export async function bench(options: FixtureOptions = {}): Promise<Bench> {
-  const rig = await buildFixtureRig(options);
-  await rig.service.forwardAsk(rig.forward);
-  return benchOn(rig, options);
-}
-
-/** A bare tool runtime over a rig that is already set up, for tests that prepare the graph themselves. */
-export function benchOn(rig: FixtureRig, options: FixtureOptions = {}): Bench {
-  const store = createRelayStore();
-  const ctx: ToolContext = {
-    graph: rig.graph,
-    policy: policySchema.parse(options.policy ?? POLICY),
-    assets: rig.assets,
-    clock: rig.clock,
-    gate: new GateKeeper(),
-    transcription: new FixtureTranscription([options.transcript ?? GOLDEN_TRANSCRIPT]),
-    session: newSession("session:bench"),
-    prov: new ProvLog(),
-    bridge: rig.bridge,
-    machine: () => store.getState().machine,
-  };
-  return { ...rig, ctx, runtime: new ToolRuntime(ctx, TOOL_IMPLS) };
-}
-
-export interface Prepared extends Bench {
-  ask: ToolOutput<"inspect_request">;
+  store: ReturnType<typeof createRelayStore>;
+  topicId: string;
   tokenId: string;
   verified: string[];
 }
 
-/** Tools 1-5. */
-export async function throughVerify(options: FixtureOptions = {}): Promise<Prepared> {
-  const b = await bench(options);
-  const { runtime } = b;
-  const ask = await runtime.call("inspect_request", { thread_id: THREAD });
-  await runtime.call("resolve_identity_and_relationships", { ask_id: ask.ask_id, participants: ask.participants });
-  const policy = await runtime.call("get_access_policy", { ask_id: ask.ask_id, person: ask.addressee_id, purpose: "answer_current_ask", audience: ask.requested_audience });
-  if (policy.decision !== "granted") throw new Error("expected the policy to be granted");
-  const retrieval = await runtime.call("query_context_graph", {
-    ask_id: ask.ask_id,
-    question: ask.text,
-    allowed_sources: policy.allowed_source_classes,
-    max_hops: 2,
-    policy_token_id: policy.policy_token_id,
-  });
-  const support = await runtime.call("verify_claim_support", {
-    ask_id: ask.ask_id,
-    claim_ids: [ask.asker_id, ...ask.topic_ids, ...ask.event_ids, ...ask.artifacts.map((a) => a.artifact_id), ...retrieval.candidates.map((c) => c.root_id)],
-    policy_token_id: policy.policy_token_id,
-  });
-  return { ...b, ask, tokenId: policy.policy_token_id, verified: support.verified.map((v) => v.claim_id) };
+/** A call session taken as far as verified evidence: topic chosen, policy granted, graph queried, claims verified. */
+export async function bench(options: FixtureOptions = {}): Promise<Bench> {
+  const rig = await buildFixtureRig(options);
+  const deps = (rig.service as unknown as { deps: RelayDeps }).deps;
+  const store = createRelayStore();
+  const ctx: ToolContext = { graph: deps.graph, setup: deps.setup, assets: deps.assets, clock: deps.clock, gate: new GateKeeper(), transcription: deps.transcription, session: newSession("session:bench"), prov: new ProvLog(), script: deps.script, copy: deps.copy, safetyPhrases: deps.safetyPhrases, alerts: deps.alerts, machine: () => store.getState().machine };
+  const runtime = new ToolRuntime({ clock: deps.clock, call: ctx }, TOOL_IMPLS);
+  const now = deps.clock.iso();
+  const pick = await runtime.call("get_next_recall_topic", { person_id: "person:susan", schedule_context: { now } });
+  const topicId = pick.topic!.topic_id;
+  const grant = await runtime.call("place_recall_call", { person_id: "person:susan", topic_id: topicId, window: { now } });
+  if (grant.decision !== "granted") throw new Error(`the bench call was denied: ${grant.reason}`);
+  const found = await runtime.call("query_context_graph", { topic_id: topicId, max_hops: 2, policy_token_id: grant.policy_token_id });
+  const support = await runtime.call("verify_claim_support", { topic_id: topicId, claim_ids: [topicId, ...found.candidates.map((c) => c.root_id), ...found.relations.map((r) => r.edge_id)], policy_token_id: grant.policy_token_id });
+  return { ...rig, ctx, runtime, store, topicId, tokenId: grant.policy_token_id, verified: support.verified.map((v) => v.claim_id) };
 }
-
-/** On from `throughVerify`: hear her answer and capture it. Leaves the contribution pending approval. */
-export async function throughCapture(): Promise<Prepared & { captured: ToolOutput<"capture_exact_contribution"> }> {
-  const prepared = await throughVerify();
-  const answer = goldenTurn("p2");
-  await prepared.runtime.call("assess_conversation_state", {
-    ask_id: prepared.ask.ask_id,
-    audio_window: { asset_id: CALL, start_ms: goldenTurn("r2").end_ms, end_ms: answer.end_ms },
-    turn_history: [],
-  });
-  const captured = await prepared.runtime.call("capture_exact_contribution", {
-    ask_id: prepared.ask.ask_id,
-    audio_intervals: [{ asset_id: CALL, start_ms: answer.start_ms, end_ms: answer.end_ms }],
-  });
-  return { ...prepared, captured };
-}
-
-export const assentWindow = () => ({ asset_id: CALL, start_ms: goldenTurn("pb1").end_ms, end_ms: goldenTurn("p3").end_ms });

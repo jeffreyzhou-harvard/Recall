@@ -1,123 +1,122 @@
-/** AGENTS.md section 12.1: the golden path, idle to delivered, on fixtures alone. */
-import { beforeAll, describe, expect, it } from "vitest";
+/** AGENTS.md section 12, test 1: the golden path, exactly as section 4 fixes it, run with the network disabled. */
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { runJudgedPath, type FixtureRun } from "@/fixtures/harness";
-import { MAIN_LINE } from "@/lib/state/machine";
+import { THESIS_LINE } from "@/lib/provenance/receipt";
+import { liveSessionView, receiptView, gatesView } from "@/lib/session/view";
 import { replay, visitedStates } from "@/lib/state/reducer";
-import { ENFORCED_SEQUENCE, type ToolName } from "@/lib/tools";
+import { ENFORCED_SEQUENCE } from "@/lib/tools";
+import { HER_LINE, SAID } from "./helpers";
 
 let run: FixtureRun;
+const fetchSpy = vi.fn(() => Promise.reject(new Error("the judged path must not touch the network")));
 
 beforeAll(async () => {
+  vi.stubGlobal("fetch", fetchSpy);
   run = await runJudgedPath();
 });
+afterAll(() => vi.unstubAllGlobals());
 
-describe("golden path", () => {
-  it("walks the documented main line exactly, idle to delivered", () => {
-    expect(visitedStates(replay(run.recording.trace))).toEqual([...MAIN_LINE]);
-    expect(run.recording.final_state).toBe("delivered");
+describe("the 90-second golden path", () => {
+  it("walks idle -> stored, one rung at a time, and stops climbing the moment she reaches it", () => {
+    const r = run.recording;
+    expect(r.final_state).toBe("stored");
+    expect(visitedStates(replay(r.trace))).toEqual(["idle", "scheduled", "policy_passed", "connected", "topic_selected", "asking", "lost", "reanchored", "lost", "reanchored", "recalled", "confirming", "confirmed", "stored"]);
+    expect(replay(r.trace).context.rungs_fired).toEqual([1, 2, 3]); // recognition and reorientation never fire
+    expect(replay(r.trace).context.reached_at_rung).toBe(3);
   });
 
-  it("emits a trace entry for every transition, and rejects nothing", () => {
-    const { trace } = run.recording;
+  it("says exactly the lines section 4 fixes, in order, and the first one says what Relay is", () => {
+    expect(run.recording.spoken.map((s) => s.text)).toEqual([SAID.greeting, SAID.rung1, SAID.rung2, SAID.rung3, SAID.elaborate, SAID.storeQuestion, SAID.shareQuestion, SAID.closeWarm]);
+    expect(SAID.greeting).toBe("Hi Susan, I'm Relay, an AI assistant Maya set up to keep you company.");
+    expect(SAID.rung1).toBe("I'd love to hear about the summers at Cape May. What comes to mind?");
+    expect(SAID.rung3).toBe("You and Maya used to go there together.");
+  });
+
+  it("logs free recall as a genuine miss before any cue is given", () => {
+    const assessed = run.recording.tool_log.filter((c) => c.tool === "assess_conversation_state").map((c) => (c.output as { state: string; evidence: { matched_rule: string } }));
+    expect(assessed.map((a) => a.state)).toEqual(["no_answer", "no_answer", "recalled", "new_detail_offered"]);
+    expect(assessed[0]!.evidence.matched_rule).toBe("echo_of_relay_words"); // "Cape May...?"
+    expect(assessed[2]!.evidence.matched_rule).toBe("named_something_relay_had_not_said"); // "Maya, my daughter!"
+  });
+
+  it("every transition emits exactly one trace event, and tool-caused ones carry their tool-call id", () => {
+    const { trace, tool_log } = run.recording;
     expect(trace.every((t) => t.accepted)).toBe(true);
     expect(trace.map((t) => t.seq)).toEqual(trace.map((_, i) => i + 1));
-    for (const state of MAIN_LINE.slice(1)) {
-      expect(trace.some((t) => t.to === state), `no trace entry enters "${state}"`).toBe(true);
-    }
-    expect(trace.every((t) => t.label.length > 0)).toBe(true);
+    for (const t of trace.filter((t) => t.tool_call_seq !== null)) expect(tool_log[t.tool_call_seq! - 1]).toBeDefined();
+    const byEvent = (e: string): string | undefined => tool_log[(trace.find((t) => t.event === e)!.tool_call_seq ?? 0) - 1]?.tool;
+    expect(byEvent("POLICY_GRANTED")).toBe("place_recall_call");
+    expect(byEvent("CONTRIBUTION_CAPTURED")).toBe("capture_contribution");
+    expect(byEvent("CONTRIBUTION_STORED")).toBe("confirm_and_store");
   });
 
-  it("says the three scripted lines, verbatim, in order", () => {
-    // Exactly these three and nothing else: the fixed-script lines were prepared but never said.
-    expect(run.ctx.session.spoken.map((s) => s.text)).toEqual([
-      "Anika wants your help with Diwali dessert.",
-      "Kheer or halwa. Anika sent this photo.",
-      "Want me to send that to Anika?",
+  it("runs the tools in the enforced order, with the safety check ahead of every turn of hers", () => {
+    const tools = run.recording.tool_log.map((c) => c.tool);
+    // Dependency order. (Relay renders its opening and its closing lines BEFORE the call, so that ending a call
+    // kindly never depends on a tool responding - which is why render_prompt first appears ahead of the listening tools.)
+    const first = (t: string): number => tools.indexOf(t as never);
+    const last = (t: string): number => tools.lastIndexOf(t as never);
+    const chain = ["get_next_recall_topic", "place_recall_call", "query_context_graph", "verify_claim_support", "render_prompt"];
+    expect(chain.map(first)).toEqual([...chain.map(first)].sort((a, b) => a - b));
+    expect(first("assess_conversation_state")).toBeLessThan(first("capture_contribution"));
+    expect(first("capture_contribution")).toBeLessThan(first("confirm_and_store"));
+    expect(first("confirm_and_store")).toBeLessThan(first("confirm_share")); // the store question, then the share question
+    expect(first("confirm_share")).toBeLessThan(last("confirm_and_store")); // and only then - last - the commit
+    expect(last("confirm_and_store")).toBeLessThan(first("record_retrieval_outcome"));
+    expect(last("build_caregiver_receipt")).toBe(tools.length - 1);
+    expect(new Set(tools).size).toBe(ENFORCED_SEQUENCE.length - 1); // every call tool but the safety alert
+    // Each assessment and each confirmation is directly preceded by a safety check on the same turn.
+    tools.forEach((t, i) => {
+      const hearsHer = t === "assess_conversation_state" || t === "confirm_share" || (t === "confirm_and_store" && (run.recording.tool_log[i]!.input as { step: string }).step === "confirm");
+      if (hearsHer) expect(tools[i - 1]).toBe("check_safety_phrases");
+    });
+    expect(tools.filter((t) => t === "send_safety_alert")).toEqual([]);
+  });
+
+  it("stores her exact words, with both confirmations, and nothing else of hers", async () => {
+    const p = run.recording.provenance_receipt!;
+    expect(p.literal_transcript).toBe(HER_LINE);
+    expect(p.edits).toEqual({ silence_trims: 2, disfluency_trims: 0, generated_first_person_words: 0 });
+    expect(p.store_confirmation.recorded_at < p.share_confirmation.recorded_at).toBe(true);
+    expect(p.share_confirmation.decision).toBe("yes");
+    expect(p.retrieval_updates).toEqual([{ topic_label: "Cape May summers", cue_id: "person:maya", rung: 3, effective: true }]);
+    expect(p.final_line).toBe(THESIS_LINE);
+
+    const claim = await run.graph.getNode(p.claim_id);
+    expect(claim).toMatchObject({ type: "EpisodicClaim", props: { text: HER_LINE }, prov: { author: "person:susan", status: "participant_confirmed", patient_confirmed: true, source_class: "recall_call" } });
+    // "a new edge from Cape May to the summers-together claim, sourced to this call"
+    const about = (await run.graph.edgesOf(p.claim_id)).filter((e) => e.type === "ABOUT").map((e) => e.to);
+    expect(about.sort()).toEqual(["event:cape-may-summers", "place:cape-may"]);
+  });
+
+  it("then: the redirect, the Weekly Note, the record, and the receipt, exactly as the dashboard beat shows them", async () => {
+    const ask = await run.service.askAboutHer("What did Mom say about her wedding?", "person:maya");
+    expect(ask.line.text).toBe("Susan's talked about this before. Want to give her a call?");
+    expect(ask.graph_content).toEqual([]);
+
+    const note = await run.service.weeklyNote("person:maya");
+    expect(note.note!.lines.slice(0, 2).map((l) => [l.kind, l.text])).toEqual([
+      ["warm", "Relay talked with Susan about the summers at Cape May this week. Want to give her a call?"],
+      ["share", HER_LINE],
     ]);
+    expect(note.note!.lines[1]!.attribution).toMatchObject({ speaker_name: "Susan", content_hash: run.recording.provenance_receipt!.content_hash });
+
+    const record = await run.service.topicRecord("person:maya");
+    expect(record.header!.text).toBe("This is a record of what happened in Relay calls, not a measure of Susan's memory overall. Practice on a topic, call quality, and time of day all affect it.");
+    expect(record.topics.find((t) => t.topic_name === "Cape May summers")!.lines[0]!.text).toBe("Cape May summers - recalled unaided in 6 of 8 recent calls.");
+    expect(run.recording.caregiver_receipt!.lines.map((l) => l.text)).toEqual(["Cape May summers - recalled after one contextual cue (Maya) in this call.", "No correction, no distress."]);
   });
 
-  it("retrieves only Anika's one current photo plus the one source-backed prior claim", () => {
-    const retrieval = run.runtime.log.find((c) => c.tool === "query_context_graph")!.output as {
-      candidates: Array<{ root_id: string }>;
-      excluded: Array<{ node_id: string; reason: string }>;
-    };
-    expect(retrieval.candidates.map((c) => c.root_id).sort()).toEqual(["artifact:photo:fwd-diwali-dessert:photo-desserts", "claim:cardamom-last"]);
-    expect(retrieval.excluded).toEqual([{ node_id: "pref:mom-festival-desserts", reason: "source_class_not_allowed" }]);
+  it("drives the panes from the same trace: gates, one cue card at a time, and the contribution card", () => {
+    expect(gatesView(run.recording).map((g) => g.status)).toEqual(["passed", "passed", "passed", "passed"]);
+    const rungThree = run.recording.spoken.find((s) => s.rung === 3)!;
+    expect(liveSessionView(run.recording, rungThree.at).cue).toMatchObject({ rung: 3, text: SAID.rung3 });
+    expect(liveSessionView(run.recording).cue).toBeNull(); // the stage clears when the call ends
+    expect(receiptView(run.recording).contribution!.provenance_rows).toEqual(["Source: live call", "Edited: 2 pauses trimmed, 0 words generated", "Confirmed by her voice", "Share confirmed by her voice"]);
   });
 
-  it("chooses the least support that answers what she asked, and records what it passed over", () => {
-    const pick = run.runtime.log.find((c) => c.tool === "select_scaffold")!.output as {
-      scaffold_id: string;
-      rejected: Array<{ scaffold_id: string; reason: string }>;
-    };
-    expect(pick.scaffold_id).toBe("restate_options");
-    expect(pick.rejected.map((r) => r.scaffold_id)).toEqual(["repeat", "name_asker", "source_backed_cue"]);
-    expect(pick.rejected.at(-1)!.reason).toMatch(/held in reserve/);
-  });
-
-  it("delivers her exact words to the original thread and nowhere else", () => {
-    const cards = run.bridge.voiceCards();
-    expect(cards).toHaveLength(1);
-    expect(cards[0]!.thread_id).toBe("artifact:thread-family");
-    expect(cards[0]!.literal_transcript).toBe("Make the kheer. Your grandfather always added cardamom last.");
-    expect(cards[0]!.provenance_rows).toEqual([
-      "Source: live call",
-      "Edited: 3 pauses trimmed, 0 words generated",
-      "Approved by Mom's voice",
-    ]);
-  });
-
-  it("builds the caregiver receipt with three observable outcomes and no score", () => {
-    const receipt = run.recording.caregiver_receipt!;
-    expect(receipt.lines.map((l) => `${l.dimension}: ${l.text}`)).toEqual([
-      "social: Mom answered Anika directly.",
-      "emotional: One re-anchor, no correction or distress escalation.",
-      "intellectual: She chose and added original family knowledge.",
-    ]);
-    expect(receipt.lines.every((l) => l.citations.length > 0)).toBe(true);
-    expect(receipt.artifact_metrics).toEqual({ her_words_pct: 100, generated_first_person_words: 0, silence_trims: 3 });
-    expect(receipt.scaffolds_logged).toBe(1);
-    expect(receipt.family_notice).toBeNull();
-  });
-
-  it("never calls a tool before the step it depends on, and uses all twelve", () => {
-    // Relay speaks first, so the brief is rendered before any reply can be assessed: the enforced
-    // sequence is a dependency order, not a first-appearance order. Each tool's prerequisite is
-    // the step that must already have succeeded for the call to be legitimate.
-    const REQUIRES: Partial<Record<ToolName, ToolName>> = {
-      resolve_identity_and_relationships: "inspect_request",
-      get_access_policy: "resolve_identity_and_relationships",
-      query_context_graph: "get_access_policy",
-      verify_claim_support: "query_context_graph",
-      render_prompt: "verify_claim_support",
-      assess_conversation_state: "render_prompt",
-      select_scaffold: "assess_conversation_state",
-      capture_exact_contribution: "assess_conversation_state",
-      request_assent: "capture_exact_contribution",
-      publish_contribution: "request_assent",
-      build_caregiver_receipt: "publish_contribution",
-    };
-    const done = new Set<ToolName>();
-    for (const call of run.runtime.log) {
-      const needs = REQUIRES[call.tool];
-      if (needs) expect(done.has(needs), `${call.tool} (call ${call.seq}) ran before ${needs}`).toBe(true);
-      done.add(call.tool);
-    }
-    expect([...done].sort()).toEqual([...ENFORCED_SEQUENCE].sort());
-    expect(run.runtime.log.at(-1)!.tool).toBe("build_caregiver_receipt");
-    for (const call of run.runtime.log) {
-      expect(call.error).toBeNull();
-      expect(call.output).not.toBeNull();
-      expect(call.latency_ms).toBeGreaterThan(0);
-    }
-    const publish = run.runtime.log.find((c) => c.tool === "publish_contribution")!;
-    expect(publish.state_transition).toEqual({ from: "assented", to: "delivered" });
-    expect(publish.policy_decision).toBe("token_valid");
-  });
-
-  it("keeps accessibility telemetry only: latency, thread-loss events, which scaffold fired", () => {
-    expect(Object.keys(run.ctx.session.telemetry).sort()).toEqual(["response_latencies_ms", "scaffolds_fired", "thread_loss_events"]);
-    expect(run.ctx.session.telemetry.thread_loss_events).toBe(1);
-    expect(run.ctx.session.telemetry.scaffolds_fired).toEqual(["restate_options"]);
+  it("never touched the network, and sent nothing to anyone", () => {
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(run.alerts.count()).toBe(0);
   });
 });

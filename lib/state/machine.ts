@@ -1,16 +1,17 @@
 /**
- * Relay state machine: states, events, and the transition table.
- *
- * One reducer drives every pane (AGENTS.md section 5). Visual, audio, and
- * trace effects all key off the transitions declared here, so the demo cannot
- * contradict itself.
+ * Relay state machine: states, events, and the one transition table
+ * (AGENTS.md section 5).
  *
  * Main line:
- *   idle -> ask_received -> policy_passed -> connected -> following
- *        -> lost -> reanchored -> contributed -> playback -> assented -> delivered
+ *   idle -> scheduled -> policy_passed -> connected -> topic_selected -> asking
+ *        -> lost -> reanchored -> recalled -> confirming -> confirmed -> stored
  *
- * Every failure transition below is deterministic. No model output can move
- * the machine: models only ever produce the typed events a tool emitted.
+ * The call nests as connected { greet -> select_topic -> ladder* -> capture -> confirm }.
+ * `lost -> reanchored` repeats once per rung as the ladder climbs.
+ *
+ * Every transition here is deterministic. No model output can move the
+ * machine: models only ever produce the typed events a tool emitted. The
+ * family flows (section 6.4) never enter this reducer at all.
  *
  * Changes to this file define the safety gates and need a second reviewer
  * (AGENTS.md section 13).
@@ -18,130 +19,157 @@
 
 export const MAIN_LINE = [
   "idle",
-  "ask_received",
+  "scheduled",
   "policy_passed",
   "connected",
-  "following",
+  "topic_selected",
+  "asking",
   "lost",
   "reanchored",
-  "contributed",
-  "playback",
-  "assented",
-  "delivered",
+  "recalled",
+  "confirming",
+  "confirmed",
+  "stored",
 ] as const;
 
 /**
- * Ways a run can end other than delivery. Each is a success state in the
- * sense of rule 7: stopping safely is the correct outcome, not an error to
- * route around.
+ * The five ways a run ends other than `stored`. Each is a success state in the sense of rule 7:
+ * stopping safely is the correct outcome, not an error to route around.
  */
 export const SAFE_ENDINGS = [
-  "blocked", // a gate failed before the call; the call was never placed
-  "narrowed", // a gate failed mid-call; Relay said the safe-narrowing line
-  "wrapped_up", // second lost-thread signal; "no answer today"
-  "not_sent", // assent was no or unclear, or a gate failed after capture
-  "closed_kindly", // tool timeout mid-call; restated once, then closed
+  "blocked", // the policy said no; the call was never placed
+  "no_answer_today", // the ladder had nothing more to offer, or she was quiet twice; a kind close
+  "not_stored", // she did not confirm it; nothing is kept
+  "stopped", // hang-up, an explicit stop, or a caregiver pause; nothing is kept, no follow-up call
+  "safety_handoff", // a phrase on the safety list; the recall flow is dropped and her caregiver is told
 ] as const;
 
-/** Tool timeout mid-call: the fixed script is running. Not terminal. */
-export const FALLBACK = "fallback" as const;
+export type RelayState = (typeof MAIN_LINE)[number] | (typeof SAFE_ENDINGS)[number];
 
-export type RelayState = (typeof MAIN_LINE)[number] | (typeof SAFE_ENDINGS)[number] | typeof FALLBACK;
+export const TERMINAL: ReadonlySet<RelayState> = new Set<RelayState>(["stored", ...SAFE_ENDINGS]);
+export const NON_TERMINAL: readonly RelayState[] = MAIN_LINE.filter((s) => s !== "stored");
 
-export const TERMINAL: ReadonlySet<RelayState> = new Set<RelayState>(["delivered", ...SAFE_ENDINGS]);
+/** States in which she is on the line. A safety match, an identity question, and the call clock apply in exactly these. */
+export const IN_CALL: readonly RelayState[] = ["connected", "topic_selected", "asking", "lost", "reanchored", "recalled", "confirming", "confirmed"];
+const BEFORE_CAPTURE: readonly RelayState[] = ["connected", "topic_selected", "asking", "lost", "reanchored", "recalled"];
+const AFTER_CAPTURE: readonly RelayState[] = ["confirming", "confirmed"];
 
-/** The call session nests inside the top-level state: connected { brief -> ask -> support* -> capture -> confirm }. */
-export type CallPhase = "brief" | "ask" | "support" | "capture" | "confirm";
+export type CallPhase = "greet" | "select_topic" | "ladder" | "capture" | "confirm";
 export const CALL_PHASE: Partial<Record<RelayState, CallPhase>> = {
-  connected: "brief",
-  following: "ask",
-  lost: "support",
-  reanchored: "support",
-  fallback: "support",
-  contributed: "capture",
-  playback: "confirm",
-  assented: "confirm",
+  connected: "greet",
+  topic_selected: "select_topic",
+  asking: "ladder",
+  lost: "ladder",
+  reanchored: "ladder",
+  recalled: "capture",
+  confirming: "confirm",
+  confirmed: "confirm",
 };
 
 /** What `assess_conversation_state` may emit. Observable turn states only: never emotion, never cognition. */
-export const TURN_STATES = ["followed", "asked_repeat", "no_answer", "answer_present"] as const;
+export const TURN_STATES = ["recalled", "asked_repeat", "no_answer", "new_detail_offered"] as const;
 export type TurnState = (typeof TURN_STATES)[number];
 
-export type AssentDecision = "yes" | "no" | "unclear";
-export type GateName = "identity" | "policy" | "evidence" | "permission" | "assent" | "authorship";
+export const RUNGS = [1, 2, 3, 4, 5] as const;
+export type Rung = (typeof RUNGS)[number];
+/** Rule 13: for a family-sourced, unconfirmed topic the ladder stops here. A forced choice or a stated fact could plant a memory. */
+export const FAMILY_SOURCED_MAX_RUNG: Rung = 3;
+/** Two windows in which she said nothing at all end the topic gently (section 5: "second lost signal"). */
+export const MAX_SILENT_WINDOWS = 2;
+
+export type StoreDecision = "yes" | "no" | "unclear";
+export type ShareDecision = "yes" | "no" | "unclear" | "timeout";
+export type StopHow = "hang_up" | "explicit_stop" | "caregiver_pause";
+export type GateName = "identity" | "policy" | "evidence" | "confirmation" | "authorship";
 
 export type RelayEvent =
-  | { type: "ASK_FORWARDED"; ask_id: string; thread_id: string; asker_id: string; addressee_id: string }
-  | { type: "POLICY_GRANTED"; policy_token_id: string; audience: string }
+  | { type: "CALL_SCHEDULED"; person_id: string; topic_id: string; topic_label: string; family_sourced: boolean }
+  | { type: "POLICY_GRANTED"; policy_token_id: string; max_call_minutes: number }
   | { type: "POLICY_DENIED"; reason: string }
+  | { type: "CALL_NOT_ANSWERED"; detail: string }
   | { type: "CALL_CONNECTED"; session_id: string }
-  | { type: "BRIEF_DELIVERED"; prompt_id: string; citations: string[] }
-  | { type: "TURN_ASSESSED"; turn_id: string; turn_state: TurnState }
-  | { type: "SCAFFOLD_DELIVERED"; scaffold_id: string; prompt_id: string; citations: string[] }
+  | { type: "GREETING_DELIVERED"; prompt_id: string; discloses_ai: true }
+  | { type: "TOPIC_SELECTED"; topic_id: string; citations: string[] }
+  | { type: "RUNG_DELIVERED"; rung: Rung; prompt_id: string; citations: string[]; cue_id: string | null }
+  | { type: "TURN_ASSESSED"; turn_id: string; turn_state: TurnState; silent: boolean }
+  | { type: "LADDER_EXHAUSTED"; reason: string }
   | { type: "CONTRIBUTION_CAPTURED"; contribution_hash: string; trims: number; generated_first_person_words: number }
-  | { type: "PLAYBACK_STARTED"; contribution_hash: string }
-  | { type: "ASSENT_RECORDED"; assent_id: string; decision: AssentDecision; contribution_hash: string; audience: string }
-  | { type: "PUBLISHED"; delivery_id: string; contribution_hash: string; destination: string }
-  | { type: "CONTENT_OR_AUDIENCE_CHANGED"; what: "content" | "audience" }
+  | { type: "STORE_CONFIRMATION_RECORDED"; confirmation_id: string; decision: StoreDecision; contribution_hash: string }
+  | { type: "SHARE_CONFIRMATION_RECORDED"; confirmation_id: string; decision: ShareDecision; contribution_hash: string }
+  | { type: "CONTRIBUTION_STORED"; claim_id: string; contribution_hash: string; shared: boolean }
+  | { type: "IDENTITY_ASKED"; prompt_id: string }
   | { type: "CLAIMS_CONFLICT"; claim_ids: string[] }
+  | { type: "STOP"; how: StopHow }
+  | { type: "SAFETY_MATCHED"; category: string }
   | { type: "GATE_MISSING"; gate: GateName; detail: string }
   | { type: "TOOL_TIMEOUT"; tool: string }
   | { type: "FIXED_RESTATEMENT_DELIVERED"; prompt_id: string }
-  | { type: "CALL_CLOSED" }
-  /** A live call could not be placed, or ended before Relay finished. Nothing is said to have happened that did not. */
-  | { type: "CALL_DROPPED"; detail: string };
+  | { type: "CALL_CLOSED" };
 
 export type RelayEventType = RelayEvent["type"];
 type EventOf<T extends RelayEventType> = Extract<RelayEvent, { type: T }>;
 
-/** Two lost-thread signals end the call gently (AGENTS.md section 5). */
-export const MAX_LOST_SIGNALS = 2;
-
 export interface RelayContext {
-  ask_id: string | null;
-  thread_id: string | null;
-  asker_id: string | null;
-  addressee_id: string | null;
+  person_id: string | null;
+  topic_id: string | null;
+  topic_label: string | null;
+  family_sourced: boolean;
   policy_token_id: string | null;
-  audience: string | null;
+  max_call_minutes: number | null;
   session_id: string | null;
-  lost_signals: number;
-  scaffolds_used: string[];
-  /** "current_ask_only" once claims conflict: Relay never picks a remembered fact. */
-  evidence_mode: "full" | "current_ask_only";
+  /** Set when the call connects: connect time plus the joint setup's max call length. Enforced below, in `enforceCallLength`. */
+  call_deadline: string | null;
+  /** True once the first line - the AI-assistant disclosure - has been said (rule 16). Nothing else can be said before it. */
+  greeted: boolean;
+  /** Every rung tried, in the order it was tried. */
+  rungs_fired: Rung[];
+  /** The cue each rung offered, where it offered one. */
+  cues_offered: Array<{ rung: Rung; cue_id: string }>;
+  silent_windows: number;
+  /** The rung after which she reached the memory - 1 is free recall, unaided - or null. */
+  reached_at_rung: Rung | null;
   answer_turn_id: string | null;
   contribution_hash: string | null;
-  assent_id: string | null;
-  delivery_id: string | null;
+  store_confirmed: boolean;
+  share_resolved: boolean;
+  shared: boolean;
+  claim_id: string | null;
+  /** A tool did not respond mid-call: the fixed script is running (restate once, then close). */
+  fallback_active: boolean;
   restated_once: boolean;
-  /** Why the run ended somewhere other than `delivered`. For the judge console; never sent to the family. */
+  conflicting_claim_ids: string[];
+  safety_category: string | null;
+  stop_how: StopHow | null;
+  /** Why the run ended where it did, as an observable fact. For the judge console and the receipt; never a reason inferred about her. */
   ending_reason: string | null;
-  /**
-   * Which fixed notice the family's thread gets when nothing was delivered. `clarify` when identity,
-   * audience, or evidence was missing ("stop safely, ask family to clarify"); `not_this_time` otherwise.
-   * Decided here so the thread, the receipt, and the trace can never disagree about it.
-   */
-  family_notice: "clarify" | "not_this_time" | null;
 }
 
 export const INITIAL_CONTEXT: RelayContext = {
-  ask_id: null,
-  thread_id: null,
-  asker_id: null,
-  addressee_id: null,
+  person_id: null,
+  topic_id: null,
+  topic_label: null,
+  family_sourced: false,
   policy_token_id: null,
-  audience: null,
+  max_call_minutes: null,
   session_id: null,
-  lost_signals: 0,
-  scaffolds_used: [],
-  evidence_mode: "full",
+  call_deadline: null,
+  greeted: false,
+  rungs_fired: [],
+  cues_offered: [],
+  silent_windows: 0,
+  reached_at_rung: null,
   answer_turn_id: null,
   contribution_hash: null,
-  assent_id: null,
-  delivery_id: null,
+  store_confirmed: false,
+  share_resolved: false,
+  shared: false,
+  claim_id: null,
+  fallback_active: false,
   restated_once: false,
+  conflicting_claim_ids: [],
+  safety_category: null,
+  stop_how: null,
   ending_reason: null,
-  family_notice: null,
 };
 
 export interface Accept {
@@ -157,179 +185,185 @@ export interface Reject {
 }
 export type Outcome = Accept | Reject;
 
-type Handler<T extends RelayEventType> = (ctx: RelayContext, event: EventOf<T>, state: RelayState) => Outcome;
+type Handler<T extends RelayEventType> = (ctx: RelayContext, event: EventOf<T>, state: RelayState, at: string) => Outcome;
 type StateTable = { [T in RelayEventType]?: Handler<T> };
 
-const IN_CALL: readonly RelayState[] = ["connected", "following", "lost", "reanchored"];
-const AFTER_CAPTURE: readonly RelayState[] = ["contributed", "playback", "assented"];
+const highest = (ctx: RelayContext): number => Math.max(0, ...ctx.rungs_fired);
 
-/** How the machine reacts to an assessed turn, shared by every in-call state that can receive one. */
-const onTurn: Handler<"TURN_ASSESSED"> = (ctx, e, state) => {
-  switch (e.turn_state) {
-    case "followed":
-      return { to: "following", label: "Following along" };
-    case "answer_present":
-      // No top-level move: the documented line is reanchored -> contributed, and
-      // `contributed` is only entered once her exact words have been captured.
-      return { to: state, label: "Answer heard", patch: { answer_turn_id: e.turn_id }, note: "capturing exact words" };
-    case "asked_repeat":
-    case "no_answer": {
-      const lost = ctx.lost_signals + 1;
-      if (lost >= MAX_LOST_SIGNALS) {
-        return {
-          to: "wrapped_up",
-          label: "Wrapped up gently",
-          patch: { lost_signals: lost, ending_reason: "no answer today", family_notice: "not_this_time" },
-          note: "second lost-thread signal; the asker gets a neutral not-this-time",
-        };
-      }
-      return { to: "lost", label: "Thread unclear", patch: { lost_signals: lost } };
-    }
+/** The ladder's order, enforced here as well as in `select_scaffold`: a forged or out-of-order rung cannot advance the call. */
+function rungProblem(ctx: RelayContext, rung: Rung): string | null {
+  if (ctx.rungs_fired.includes(rung)) return `rung ${rung} has already fired on this topic; each rung fires at most once per call`;
+  if (rung <= highest(ctx)) return `rung ${rung} is below rung ${highest(ctx)}, which has already been tried`;
+  if (ctx.family_sourced && rung > FAMILY_SOURCED_MAX_RUNG) return `rung ${rung} is disabled for a family-sourced, unconfirmed topic (rule 13)`;
+  if (rung === 5 && !([1, 2, 3, 4] as Rung[]).every((r) => ctx.rungs_fired.includes(r))) return "reorientation is never reached before rungs 1-4 have each been tried in order";
+  return null;
+}
+
+const onRung =
+  (to: RelayState, label: string, firstOnly: boolean): Handler<"RUNG_DELIVERED"> =>
+  (ctx, e) => {
+    if (ctx.fallback_active) return { reject: "the fixed script is running; no further rung may fire" };
+    if (firstOnly && e.rung !== 1) return { reject: "a call opens with free recall: Relay never starts above rung 1" };
+    if (!firstOnly && ctx.rungs_fired.length === 0) return { reject: "free recall has not been tried yet" };
+    const problem = rungProblem(ctx, e.rung);
+    if (problem) return { reject: problem };
+    return {
+      to,
+      label,
+      patch: { rungs_fired: [...ctx.rungs_fired, e.rung], cues_offered: e.cue_id ? [...ctx.cues_offered, { rung: e.rung, cue_id: e.cue_id }] : ctx.cues_offered },
+      citations: e.citations,
+    };
+  };
+
+/** How the machine reacts to an assessed turn while the ladder is in play. */
+const onLadderTurn: Handler<"TURN_ASSESSED"> = (ctx, e) => {
+  if (ctx.fallback_active) return { reject: "the fixed script is running; no turn is classified" };
+  if (e.turn_state === "recalled" || e.turn_state === "new_detail_offered") {
+    const rung = highest(ctx) as Rung;
+    return {
+      to: "recalled",
+      label: rung === 1 ? "Recalled" : "Recalled, with a little help",
+      patch: { reached_at_rung: rung, answer_turn_id: e.turn_state === "new_detail_offered" ? e.turn_id : null },
+      note: e.turn_state === "new_detail_offered" ? "she offered a detail of her own; it can be captured as it is" : undefined,
+    };
   }
+  const silent = ctx.silent_windows + (e.silent ? 1 : 0);
+  if (silent >= MAX_SILENT_WINDOWS) {
+    return { to: "no_answer_today", label: "Wrapped up gently", patch: { silent_windows: silent, ending_reason: "two quiet windows on this topic" }, note: "second lost-thread signal; a kind close" };
+  }
+  return { to: "lost", label: "More help needed", patch: { silent_windows: silent } };
 };
 
-const onCapture: Handler<"CONTRIBUTION_CAPTURED"> = (ctx, e) => {
-  if (ctx.answer_turn_id === null) return { reject: "no answer turn has been assessed" };
-  if (e.generated_first_person_words !== 0) {
-    return { reject: `contribution contains ${e.generated_first_person_words} generated first-person word(s)` };
-  }
-  return { to: "contributed", label: "Her exact words captured", patch: { contribution_hash: e.contribution_hash } };
+const onElaboration: Handler<"TURN_ASSESSED"> = (ctx, e) => {
+  if (ctx.fallback_active) return { reject: "the fixed script is running; no turn is classified" };
+  if (ctx.answer_turn_id !== null) return { reject: "a turn of hers is already waiting to be captured" };
+  if (e.turn_state === "recalled" || e.turn_state === "new_detail_offered") return { to: "recalled", label: "In her own words", patch: { answer_turn_id: e.turn_id } };
+  return { to: "not_stored", label: "Closed kindly", patch: { ending_reason: "she reached it, and offered nothing to remember this time" } };
 };
 
 export const TRANSITIONS: Record<RelayState, StateTable> = {
   idle: {
-    ASK_FORWARDED: (_ctx, e) => ({
-      to: "ask_received",
-      label: "Ask received",
-      patch: { ask_id: e.ask_id, thread_id: e.thread_id, asker_id: e.asker_id, addressee_id: e.addressee_id },
+    CALL_SCHEDULED: (_ctx, e) => ({
+      to: "scheduled",
+      label: "Call scheduled",
+      patch: { person_id: e.person_id, topic_id: e.topic_id, topic_label: e.topic_label, family_sourced: e.family_sourced },
     }),
   },
-  ask_received: {
-    POLICY_GRANTED: (_ctx, e) => ({
-      to: "policy_passed",
-      label: "Ask verified",
-      patch: { policy_token_id: e.policy_token_id, audience: e.audience },
-    }),
-    POLICY_DENIED: (_ctx, e) => ({
-      to: "blocked",
-      label: "Not placed",
-      patch: { ending_reason: e.reason, family_notice: "not_this_time" },
-      note: "the call is never placed",
-    }),
+  scheduled: {
+    POLICY_GRANTED: (_ctx, e) => ({ to: "policy_passed", label: "Within what was agreed", patch: { policy_token_id: e.policy_token_id, max_call_minutes: e.max_call_minutes } }),
+    POLICY_DENIED: (_ctx, e) => ({ to: "blocked", label: "Not placed", patch: { ending_reason: e.reason }, note: "the call is never placed" }),
   },
   policy_passed: {
-    CALL_CONNECTED: (_ctx, e) => ({ to: "connected", label: "Call connected", patch: { session_id: e.session_id } }),
+    CALL_CONNECTED: (ctx, e, _state, at) => ({
+      to: "connected",
+      label: "She answered",
+      patch: { session_id: e.session_id, call_deadline: new Date(Date.parse(at) + (ctx.max_call_minutes ?? 0) * 60_000).toISOString() },
+    }),
+    CALL_NOT_ANSWERED: (_ctx, e) => ({ to: "no_answer_today", label: "No answer today", patch: { ending_reason: e.detail }, note: "no follow-up call is placed" }),
   },
   connected: {
-    BRIEF_DELIVERED: (_ctx, e) => ({ to: "following", label: "Ask shared", citations: e.citations }),
+    GREETING_DELIVERED: (ctx) => (ctx.greeted ? { reject: "the greeting is said once" } : { to: "connected", label: "Relay said what it is", patch: { greeted: true } }),
+    TOPIC_SELECTED: (ctx, e) => {
+      if (!ctx.greeted) return { reject: "the first line of every call is the AI-assistant disclosure (rule 16)" };
+      if (e.topic_id !== ctx.topic_id) return { reject: "the topic is not the one the policy granted this call for" };
+      return { to: "topic_selected", label: "Topic selected", citations: e.citations };
+    },
   },
-  following: { TURN_ASSESSED: onTurn, CONTRIBUTION_CAPTURED: onCapture },
+  topic_selected: { RUNG_DELIVERED: onRung("asking", "Invited her to talk", true) },
+  asking: { TURN_ASSESSED: onLadderTurn },
   lost: {
-    SCAFFOLD_DELIVERED: (ctx, e) => ({
-      to: "reanchored",
-      label: "Re-anchored",
-      patch: { scaffolds_used: [...ctx.scaffolds_used, e.scaffold_id] },
-      citations: e.citations,
-    }),
+    RUNG_DELIVERED: onRung("reanchored", "Cue given", false),
+    LADDER_EXHAUSTED: (_ctx, e) => ({ to: "no_answer_today", label: "Wrapped up gently", patch: { ending_reason: e.reason }, note: "the ladder has nothing more to offer; a kind close" }),
   },
-  reanchored: { TURN_ASSESSED: onTurn, CONTRIBUTION_CAPTURED: onCapture },
-  contributed: {
-    PLAYBACK_STARTED: (ctx, e) =>
-      e.contribution_hash === ctx.contribution_hash
-        ? { to: "playback", label: "Played back for approval" }
-        : { reject: "playback hash does not match the captured contribution" },
-  },
-  playback: {
-    ASSENT_RECORDED: (ctx, e) => {
-      if (e.contribution_hash !== ctx.contribution_hash) return { reject: "assent is for a different contribution" };
-      if (e.audience !== ctx.audience) return { reject: "assent is for a different audience" };
-      if (e.decision === "yes") return { to: "assented", label: "Voice approval received", patch: { assent_id: e.assent_id } };
-      return {
-        to: "not_sent",
-        label: "Not sent",
-        patch: { ending_reason: e.decision === "no" ? "she said no" : "approval was unclear", family_notice: "not_this_time" },
-        note: "nothing sends; unapproved audio is discarded",
-      };
+  reanchored: { TURN_ASSESSED: onLadderTurn },
+  recalled: {
+    TURN_ASSESSED: onElaboration,
+    CONTRIBUTION_CAPTURED: (ctx, e) => {
+      if (ctx.answer_turn_id === null) return { reject: "no turn of hers has been assessed as something to capture" };
+      if (e.generated_first_person_words !== 0) return { reject: `contribution contains ${e.generated_first_person_words} generated first-person word(s)` };
+      return { to: "confirming", label: "Her exact words captured", patch: { contribution_hash: e.contribution_hash } };
     },
   },
-  assented: {
-    PUBLISHED: (ctx, e) => {
-      if (ctx.assent_id === null) return { reject: "no assent on record" };
-      if (e.contribution_hash !== ctx.contribution_hash) return { reject: "published hash does not match the approved contribution" };
-      if (e.destination !== ctx.audience) return { reject: "destination does not match the approved audience" };
-      return { to: "delivered", label: "Delivered to the family thread", patch: { delivery_id: e.delivery_id } };
+  confirming: {
+    STORE_CONFIRMATION_RECORDED: (ctx, e) => {
+      if (e.contribution_hash !== ctx.contribution_hash) return { reject: "the confirmation is for a different contribution" };
+      if (e.decision === "yes") return { to: "confirmed", label: "She said to remember it", patch: { store_confirmed: true } };
+      return { to: "not_stored", label: "Not kept", patch: { ending_reason: e.decision === "no" ? "she said no" : "her answer was unclear" }, note: "nothing is stored; unconfirmed audio is deleted at call end" };
     },
   },
-  fallback: {
-    FIXED_RESTATEMENT_DELIVERED: (ctx) =>
-      ctx.restated_once
-        ? { reject: "the fixed script restates the question once only" }
-        : { to: "fallback", label: "Question restated", patch: { restated_once: true } },
-    CALL_CLOSED: (ctx) =>
-      ctx.restated_once
-        ? { to: "closed_kindly", label: "Closed kindly", patch: { ending_reason: "a tool did not respond in time", family_notice: "not_this_time" } }
-        : { reject: "the question has not been restated yet" },
+  confirmed: {
+    SHARE_CONFIRMATION_RECORDED: (ctx, e) => {
+      if (e.contribution_hash !== ctx.contribution_hash) return { reject: "the share confirmation is for a different contribution" };
+      if (ctx.share_resolved) return { reject: "the share question is asked once" };
+      return { to: "confirmed", label: e.decision === "yes" ? "She chose to share it" : "Kept, not shared", patch: { share_resolved: true, shared: e.decision === "yes" } };
+    },
+    CONTRIBUTION_STORED: (ctx, e) => {
+      if (!ctx.store_confirmed) return { reject: "she has not confirmed it" };
+      if (!ctx.share_resolved) return { reject: "commit comes last: the share question has not resolved (section 5)" };
+      if (e.contribution_hash !== ctx.contribution_hash) return { reject: "the stored hash does not match the confirmed contribution" };
+      if (e.shared !== ctx.shared) return { reject: "the stored share flag does not match what she said" };
+      return { to: "stored", label: "Remembered - added to the graph", patch: { claim_id: e.claim_id } };
+    },
   },
-  delivered: {},
+  stored: {},
   blocked: {},
-  narrowed: {},
-  wrapped_up: {},
-  not_sent: {},
-  closed_kindly: {},
+  no_answer_today: {},
+  not_stored: {},
+  stopped: {},
+  safety_handoff: {},
 };
 
 /**
- * Cross-cutting events: they mean the same thing in every state they apply
- * to, so they are declared once rather than repeated per state.
+ * Cross-cutting events: they mean the same thing in every state they apply to, so they are declared once.
+ * Order matters and is fixed: a safety match outranks a stop in the same turn (rule 15), and both outrank
+ * everything else.
  */
 export function crossCutting(state: RelayState, ctx: RelayContext, event: RelayEvent): Outcome | null {
   if (TERMINAL.has(state)) return null;
+  const inCall = IN_CALL.includes(state);
   switch (event.type) {
+    case "SAFETY_MATCHED":
+      if (!inCall) return { reject: "a safety match comes from a final turn of hers, so only during a call" };
+      return { to: "safety_handoff", label: "Safety handoff", patch: { safety_category: event.category, ending_reason: "a phrase on the safety list" }, note: "the recall flow is dropped; her designated caregiver is told" };
+    case "STOP":
+      return { to: "stopped", label: "Stopped", patch: { stop_how: event.how, ending_reason: event.how.replace("_", " ") }, note: "nothing is stored beyond metadata; no follow-up call" };
+    case "IDENTITY_ASKED":
+      return inCall ? { to: state, label: "Relay said what it is", note: "the fixed identity line; the flow continues" } : { reject: "nobody is on the line to ask" };
+    case "CLAIMS_CONFLICT":
+      return { to: state, label: "Two accounts differ; neither is spoken", patch: { conflicting_claim_ids: [...new Set([...ctx.conflicting_claim_ids, ...event.claim_ids])] }, citations: event.claim_ids };
     case "GATE_MISSING": {
       const reason = `${event.gate} gate: ${event.detail}`;
-      // Before or during the call, a missing gate means Relay lacks something the family can supply: ask them to clarify.
-      const clarify = { ending_reason: reason, family_notice: "clarify" as const };
-      if (IN_CALL.includes(state)) {
-        return { to: "narrowed", label: "Narrowed safely", patch: clarify, note: "Relay offers to ask the asker to clarify" };
-      }
-      if (AFTER_CAPTURE.includes(state)) {
-        return { to: "not_sent", label: "Not sent", patch: { ending_reason: reason, family_notice: "not_this_time" } };
-      }
-      if (state === "fallback") return null;
-      return { to: "blocked", label: "Stopped safely", patch: clarify, note: "the call is never placed; the family is asked to clarify" };
+      if (AFTER_CAPTURE.includes(state)) return { to: "not_stored", label: "Not kept", patch: { ending_reason: reason } };
+      if (inCall) return { to: "no_answer_today", label: "Narrowed safely", patch: { ending_reason: reason }, note: "Relay says the narrowing line and closes kindly" };
+      return { to: "blocked", label: "Stopped safely", patch: { ending_reason: reason }, note: "the call is never placed" };
     }
     case "TOOL_TIMEOUT": {
-      const patch = { ending_reason: `${event.tool} did not respond in time`, family_notice: "not_this_time" as const };
-      if (IN_CALL.includes(state)) return { to: "fallback", label: "Keeping it simple", note: "fixed script: restate once, then close" };
-      if (AFTER_CAPTURE.includes(state)) return { to: "not_sent", label: "Not sent", patch };
-      if (state === "fallback") return null;
-      return { to: "blocked", label: "Not placed", patch, note: "the call is never placed" };
+      const reason = `${event.tool} did not respond in time`;
+      // Her answer to the share question never blocks storing: no answer in time is simply "not shared".
+      if (state === "confirmed" && event.tool === "confirm_share" && !ctx.share_resolved) return { to: "confirmed", label: "Kept, not shared", patch: { share_resolved: true, shared: false }, note: "the share question timed out" };
+      if (AFTER_CAPTURE.includes(state)) return { to: "not_stored", label: "Not kept", patch: { ending_reason: reason } };
+      if (inCall) return ctx.fallback_active ? null : { to: state, label: "Keeping it simple", patch: { fallback_active: true, ending_reason: reason }, note: "fixed script: restate the current question once, then close kindly" };
+      return { to: "blocked", label: "Not placed", patch: { ending_reason: reason }, note: "the call is never placed" };
     }
-    case "CALL_DROPPED": {
-      const patch = { ending_reason: event.detail, family_notice: "not_this_time" as const };
-      if (AFTER_CAPTURE.includes(state)) return { to: "not_sent", label: "Not sent", patch, note: "the call ended before she could approve it" };
-      if (IN_CALL.includes(state) || state === "fallback") return { to: "wrapped_up", label: "Call ended early", patch };
-      return { to: "blocked", label: "Not placed", patch, note: "the call could not be placed" };
-    }
-    case "CONTENT_OR_AUDIENCE_CHANGED":
-      // Rule 3: any change to the artifact or its audience invalidates approval,
-      // given or pending. Nothing sends; a fresh ask starts a fresh call.
-      if (!AFTER_CAPTURE.includes(state)) return null;
-      return {
-        to: "not_sent",
-        label: "Not sent",
-        patch: { assent_id: null, ending_reason: `${event.what} changed after capture`, family_notice: "not_this_time" },
-        note: "approval no longer matches the artifact; nothing sends",
-      };
-    case "CLAIMS_CONFLICT":
-      return {
-        to: state,
-        label: "Using the current ask only",
-        patch: { evidence_mode: "current_ask_only" },
-        citations: event.claim_ids,
-        note: "remembered facts disagree, so none of them is used",
-      };
+    case "FIXED_RESTATEMENT_DELIVERED":
+      if (!ctx.fallback_active) return null;
+      return ctx.restated_once ? { reject: "the fixed script restates the question once only" } : { to: state, label: "Question restated", patch: { restated_once: true } };
+    case "CALL_CLOSED":
+      if (!ctx.fallback_active) return null;
+      return { to: "no_answer_today", label: "Closed kindly" };
     default:
       return null;
   }
+}
+
+/**
+ * The joint setup's max call length, enforced by the reducer (section 5). Once the deadline has passed,
+ * whatever would have carried the conversation on becomes the kind close instead. A stop and a safety
+ * match still take priority, and a confirmation already under way is allowed to finish: it is two short
+ * questions, and cutting it off would throw away something she is in the middle of saying yes to.
+ */
+export function enforceCallLength(state: RelayState, ctx: RelayContext, event: RelayEvent, at: string): Outcome | null {
+  if (ctx.call_deadline === null || at < ctx.call_deadline || !BEFORE_CAPTURE.includes(state)) return null;
+  if (event.type === "STOP" || event.type === "SAFETY_MATCHED") return null;
+  return { to: "no_answer_today", label: "Time to rest", patch: { ending_reason: "the agreed call length was reached" }, note: "a kind close" };
 }

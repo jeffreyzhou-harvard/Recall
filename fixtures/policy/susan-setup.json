@@ -1,0 +1,105 @@
+{
+  "policy_id": "policy:susan-setup",
+  "version": 2,
+  "description": "What Susan and Maya agreed together, once, before Relay's first call. Every call and every family view is checked against this, and it is read fresh each time, so a change or a revocation takes effect before the next call or the next dashboard load.",
+  "person_id": "person:susan",
+  "established_by": [
+    "person:susan",
+    "person:maya"
+  ],
+  "established_at": "2026-10-12T15:00:00.000Z",
+  "relay_set_up_by": "person:maya",
+  "approved_people": [
+    "person:maya"
+  ],
+  "approved_audiences": [
+    "person:susan"
+  ],
+  "timezone": "America/New_York",
+  "call_windows": [
+    {
+      "days": [
+        "mon",
+        "tue",
+        "wed",
+        "thu",
+        "fri",
+        "sat",
+        "sun"
+      ],
+      "start": "10:00",
+      "end": "19:00"
+    }
+  ],
+  "call_frequency": {
+    "max_calls_per_week": 7,
+    "min_hours_between_calls": 20
+  },
+  "calls_paused": false,
+  "topics": {
+    "allow": [
+      "event:cape-may-summers",
+      "place:lincoln-elementary",
+      "place:princeton",
+      "event:mayas-wedding"
+    ],
+    "block": [],
+    "person_topics_enabled": false
+  },
+  "allowed_source_classes": [
+    "prior_claim_with_source",
+    "recall_call",
+    "family_contribution",
+    "joint_setup",
+    "discovery_answer"
+  ],
+  "blocked_terms": [],
+  "speech": {
+    "pace": "slow",
+    "max_call_minutes": 12
+  },
+  "review": {
+    "store_confirmation_required": true,
+    "share_confirmation_required": true
+  },
+  "safety": {
+    "designated_caregivers": [
+      {
+        "person_id": "person:maya",
+        "alert_channel": "dashboard"
+      }
+    ],
+    "emergency_number": "911"
+  },
+  "attestations": {
+    "number_saved_in_her_phone": true,
+    "saved_contact_name": "Relay (from Maya)",
+    "saved_contact_photo": true,
+    "relay_introduced_to_her": true,
+    "introduced_by": "person:maya"
+  },
+  "dashboard": {
+    "grants": [
+      {
+        "member_id": "person:maya",
+        "detail_level": "weekly_note_and_record",
+        "granted_at": "2026-10-12T15:00:00.000Z",
+        "revoked_at": null
+      }
+    ],
+    "reconfirm_every_days": 90,
+    "last_reconfirmed_at": "2026-10-12T15:00:00.000Z"
+  },
+  "token_ttl_minutes": 30,
+  "discovery": {
+    "enabled": false,
+    "photo_access_granted_by": [],
+    "observe": {
+      "faces": false,
+      "places": false,
+      "times": false,
+      "themes": false
+    },
+    "invite_her_confirmation": false
+  }
+}

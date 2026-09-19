@@ -1,0 +1,380 @@
+{
+  "version": 1,
+  "description": "Every line Relay can say that carries no factual claim, each with a stable script id (AGENTS.md section 6.2). Slots in braces are filled only from graph node values and the joint setup. Any other line Relay says must carry citations. Changes need a second reviewer (section 13).",
+  "lines": {
+    "greeting": {
+      "id": "GREETING",
+      "text": "Hi {name}, I'm Relay, an AI assistant {set_up_by} set up to keep you company."
+    },
+    "identity": {
+      "id": "IDENTITY",
+      "text": "I'm Relay, a computer assistant, not a person. {set_up_by} set me up to keep you company."
+    },
+    "store_question": {
+      "id": "CONFIRM-STORE",
+      "text": "Want me to remember that?"
+    },
+    "share_question": {
+      "id": "CONFIRM-SHARE",
+      "text": "Would you like me to share it with your family?"
+    },
+    "close_warm": {
+      "id": "CLOSE-WARM",
+      "text": "Thank you, {name}. It was lovely talking with you. Goodbye for now."
+    },
+    "close_kind": {
+      "id": "CLOSE-KIND",
+      "text": "That's alright. We can talk about it another time. It was lovely talking with you."
+    },
+    "close_not_stored": {
+      "id": "CLOSE-NOT-STORED",
+      "text": "That's alright. I won't keep that. It was lovely talking with you."
+    },
+    "narrowing": {
+      "id": "NARROWING",
+      "text": "I don't have enough to go on there - let's try something else."
+    },
+    "stop_ack": {
+      "id": "STOP-ACK",
+      "text": "Of course. Goodbye for now."
+    },
+    "safety": {
+      "id": "SAFETY",
+      "text": "I'm going to let {caregiver} know, so they can call you. If you need help now, please call {emergency_number}."
+    },
+    "family_redirect": {
+      "id": "FAMILY-REDIRECT",
+      "text": "{name}'s talked about this before. Want to give her a call?"
+    },
+    "family_nothing_yet": {
+      "id": "FAMILY-NOTHING-YET",
+      "text": "There's nothing to point you to yet. Want to give her a call?"
+    }
+  },
+  "ladder": {
+    "free_recall": {
+      "id": "LADDER-1",
+      "text": "I'd love to hear about {topic}. What comes to mind?"
+    },
+    "family_sourced_association": {
+      "id": "LADDER-3-FAMILY-SOURCED",
+      "text": "{author} mentioned {topic}. What do you remember about that?"
+    },
+    "elaborate_default": {
+      "id": "ELABORATE",
+      "text": "What do you remember about that?"
+    },
+    "categories": {
+      "family_summers": {
+        "context": {
+          "id": "LADDER-2-FAMILY-SUMMERS",
+          "text": "It's a place your family went together."
+        },
+        "association": {
+          "person": {
+            "id": "LADDER-3-PERSON-FAMILY-SUMMERS",
+            "text": "You and {cue} used to go there together."
+          },
+          "photo": {
+            "id": "LADDER-3-PHOTO-FAMILY-SUMMERS",
+            "text": "{author} shared a photograph from there. What do you remember about that?"
+          }
+        },
+        "recognition": {
+          "id": "LADDER-4-FAMILY-SUMMERS",
+          "text": "Did you go to {place} with your {option_a} or your {option_b}?"
+        },
+        "reorientation": {
+          "id": "LADDER-5-FAMILY-SUMMERS",
+          "text": "You and your {relation} {person} spent summers together at {place}. You told me about them. What do you remember about those?"
+        },
+        "elaborate": {
+          "id": "ELABORATE-FAMILY-SUMMERS",
+          "text": "What do you remember about those summers?"
+        }
+      },
+      "workplace": {
+        "context": {
+          "id": "LADDER-2-WORKPLACE",
+          "text": "It's a place where you used to work."
+        }
+      },
+      "hometown": {
+        "context": {
+          "id": "LADDER-2-HOMETOWN",
+          "text": "It's a town where you used to live."
+        }
+      },
+      "family_event": {
+        "context": {
+          "id": "LADDER-2-FAMILY-EVENT",
+          "text": "It's a day your family celebrated together."
+        }
+      }
+    }
+  },
+  "stop_phrases": [
+    "stop",
+    "i want to stop",
+    "i'm done",
+    "i am done",
+    "no more",
+    "hang up",
+    "goodbye",
+    "good bye",
+    "i have to go",
+    "i need to go",
+    "leave me alone"
+  ],
+  "identity_phrases": [
+    "who are you",
+    "who is this",
+    "who's this",
+    "who is calling",
+    "who's calling",
+    "what are you",
+    "are you a person",
+    "are you a real person",
+    "are you real",
+    "are you a robot",
+    "are you a computer",
+    "are you a machine",
+    "am i talking to a person",
+    "is this a person"
+  ],
+  "unsure_phrases": [
+    "i don't know",
+    "i dont know",
+    "not sure",
+    "i can't remember",
+    "i cant remember",
+    "i don't remember",
+    "i dont remember",
+    "no idea"
+  ],
+  "banned": [
+    {
+      "phrase": "wrong",
+      "rule": 11
+    },
+    {
+      "phrase": "incorrect",
+      "rule": 11
+    },
+    {
+      "phrase": "correct",
+      "rule": 11
+    },
+    {
+      "phrase": "you forgot",
+      "rule": 11
+    },
+    {
+      "phrase": "try again",
+      "rule": 11
+    },
+    {
+      "phrase": "that's right",
+      "rule": 11
+    },
+    {
+      "phrase": "you're right",
+      "rule": 11
+    },
+    {
+      "phrase": "good job",
+      "rule": 11
+    },
+    {
+      "phrase": "well done",
+      "rule": 11
+    },
+    {
+      "phrase": "no, actually",
+      "rule": 11
+    },
+    {
+      "phrase": "diagnosis",
+      "rule": 4,
+      "allowed_in": [
+        "FAM-EXPORT-NOTE"
+      ]
+    },
+    {
+      "phrase": "diagnose",
+      "rule": 4
+    },
+    {
+      "phrase": "dementia",
+      "rule": 4
+    },
+    {
+      "phrase": "alzheimer",
+      "rule": 4
+    },
+    {
+      "phrase": "cognitive",
+      "rule": 4
+    },
+    {
+      "phrase": "cognition",
+      "rule": 4
+    },
+    {
+      "phrase": "impairment",
+      "rule": 4
+    },
+    {
+      "phrase": "symptom",
+      "rule": 4
+    },
+    {
+      "phrase": "score",
+      "rule": 4
+    },
+    {
+      "phrase": "confused",
+      "rule": 4
+    },
+    {
+      "phrase": "confusion",
+      "rule": 4
+    },
+    {
+      "phrase": "agitated",
+      "rule": 4
+    },
+    {
+      "phrase": "anxious",
+      "rule": 4
+    },
+    {
+      "phrase": "depressed",
+      "rule": 4
+    },
+    {
+      "phrase": "upset",
+      "rule": 4
+    },
+    {
+      "phrase": "mood",
+      "rule": 4
+    },
+    {
+      "phrase": "thinking of you",
+      "rule": 4
+    },
+    {
+      "phrase": "decline",
+      "rule": 9
+    },
+    {
+      "phrase": "deterioration",
+      "rule": 9
+    },
+    {
+      "phrase": "improvement",
+      "rule": 9
+    },
+    {
+      "phrase": "progress",
+      "rule": 9
+    },
+    {
+      "phrase": "retention",
+      "rule": 9
+    },
+    {
+      "phrase": "severity",
+      "rule": 9
+    },
+    {
+      "phrase": "stage",
+      "rule": 9
+    },
+    {
+      "phrase": "worse",
+      "rule": 9
+    },
+    {
+      "phrase": "worsening",
+      "rule": 9
+    },
+    {
+      "phrase": "better",
+      "rule": 9
+    },
+    {
+      "phrase": "clinical assessment",
+      "rule": 9,
+      "allowed_in": [
+        "FAM-CHG-01",
+        "FAM-EXPORT-NOTE"
+      ]
+    },
+    {
+      "phrase": "monitor",
+      "rule": 9
+    },
+    {
+      "phrase": "money",
+      "rule": 16,
+      "scope": "call"
+    },
+    {
+      "phrase": "account number",
+      "rule": 16,
+      "scope": "call"
+    },
+    {
+      "phrase": "password",
+      "rule": 16,
+      "scope": "call"
+    },
+    {
+      "phrase": "your address",
+      "rule": 16,
+      "scope": "call"
+    },
+    {
+      "phrase": "social security",
+      "rule": 16,
+      "scope": "call"
+    },
+    {
+      "phrase": "credit card",
+      "rule": 16,
+      "scope": "call"
+    },
+    {
+      "phrase": "bank",
+      "rule": 16,
+      "scope": "call"
+    },
+    {
+      "phrase": "who is",
+      "rule": 6,
+      "only_at_start": true,
+      "scope": "call"
+    },
+    {
+      "phrase": "do you remember",
+      "rule": 6,
+      "scope": "call",
+      "only_at_start": true
+    },
+    {
+      "phrase": "can you remember",
+      "rule": 6,
+      "scope": "call",
+      "only_at_start": true
+    }
+  ],
+  "affirm_phrases": [
+    "yes",
+    "oh yes",
+    "i remember",
+    "i do remember",
+    "of course"
+  ]
+}

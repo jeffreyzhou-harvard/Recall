@@ -17,12 +17,12 @@
     "assets:placeholder": "tsx scripts/placeholder-assets.ts",
     "assets:hash": "tsx scripts/hash-assets.ts",
     "graph:seed": "tsx scripts/seed-graph.ts",
-    "telegram": "tsx scripts/telegram.ts",
     "e2e:call": "node scripts/e2e-call.mjs",
     "e2e:live": "node scripts/e2e-live.mjs",
+    "lint:language": "tsx scripts/language-lint.ts",
     "verify": "tsx scripts/verify.ts",
     "verify:strict": "tsx scripts/verify.ts --strict",
-    "check": "npm run typecheck && npm run test && npm run verify"
+    "check": "npm run typecheck && npm run test && npm run lint:language && npm run verify"
   },
   "dependencies": {
     "@ladybugdb/core": "^0.20.4",

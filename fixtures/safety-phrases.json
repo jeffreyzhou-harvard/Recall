@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "description": "The fixed safety list (AGENTS.md rule 15). A plain lexical match on her literal words: it will miss things, and it will sometimes fire on harmless phrases - a neutral note to her caregiver is the accepted cost. Relay is not an emergency service. It can be changed only here, through the joint setup with a second reviewer, never by anything said on a call.",
+  "categories": {
+    "fall": {
+      "label": "a fall",
+      "phrases": [
+        "i fell",
+        "i've fallen",
+        "i have fallen",
+        "fell down",
+        "on the floor"
+      ]
+    },
+    "medical": {
+      "label": "feeling unwell",
+      "phrases": [
+        "can't breathe",
+        "cant breathe",
+        "chest pain",
+        "chest hurts",
+        "i'm bleeding",
+        "im bleeding",
+        "call an ambulance",
+        "need a doctor",
+        "need an ambulance"
+      ]
+    },
+    "unsafe": {
+      "label": "not feeling safe",
+      "phrases": [
+        "someone is in my house",
+        "someone's in my house",
+        "i don't feel safe",
+        "i dont feel safe",
+        "i'm scared",
+        "im scared",
+        "help me"
+      ]
+    },
+    "lost": {
+      "label": "not knowing where she is",
+      "phrases": [
+        "i don't know where i am",
+        "i dont know where i am",
+        "i'm lost",
+        "im lost"
+      ]
+    },
+    "self_harm": {
+      "label": "wanting to hurt herself",
+      "phrases": [
+        "want to die",
+        "hurt myself",
+        "kill myself",
+        "end my life"
+      ]
+    }
+  },
+  "alert": {
+    "id": "SAFETY-ALERT",
+    "text": "Relay safety note, {time}: during a Relay call, {name} said something on Relay's safety list ({category}). Relay is not an emergency service and cannot tell what is happening. Please call {name}."
+  }
+}

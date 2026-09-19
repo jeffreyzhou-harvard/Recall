@@ -1,102 +1,66 @@
-/** The twelve tool contracts, and the rule-4 guarantee that no contract can carry a judgment of the person. */
+/** AGENTS.md section 6: nineteen tools, strict contracts, and a family side that cannot express a leak. */
 import { describe, expect, it } from "vitest";
-import { MANIFEST, POLICY } from "@/fixtures";
-import { ENFORCED_SEQUENCE, TOOL_IMPLS, TOOL_NAMES, ToolContractError, contracts, evaluatePolicy, policySchema, toolDefinitions } from "@/lib/tools";
-import { THREAD } from "./fixtures";
+import { runJudgedPath } from "@/fixtures/harness";
+import { ENFORCED_SEQUENCE, FAMILY_TOOLS, TOOL_IMPLS, TOOL_NAMES, ToolContractError, ToolRuntime, contracts, toolDefinitions } from "@/lib/tools";
 import { bench } from "./helpers";
 
-const policy = policySchema.parse(POLICY);
-const request = {
-  person_id: "person:mom",
-  asker_id: "person:anika",
-  purpose: "answer_current_ask",
-  audience: THREAD,
-  topic_ids: ["topic:kheer", "topic:halwa"],
-  ask_expires_at: "2026-11-07T17:25:00.000Z",
-  now_iso: "2026-11-05T17:30:00.000Z", // Thursday 12:30 in New York
-};
+const BRIEF_ORDER = ["get_next_recall_topic", "place_recall_call", "query_context_graph", "verify_claim_support", "assess_conversation_state", "select_scaffold", "render_prompt", "capture_contribution", "confirm_and_store", "record_retrieval_outcome", "receive_family_contribution", "handle_family_query", "build_caregiver_receipt", "build_weekly_note", "get_topic_record", "export_record_for_clinician", "confirm_share", "check_safety_phrases", "send_safety_alert"];
 
-describe("tool contracts", () => {
-  it("are exactly the twelve tools, implemented, in the enforced order", () => {
-    expect(TOOL_NAMES).toHaveLength(12);
-    expect([...ENFORCED_SEQUENCE]).toEqual(TOOL_NAMES);
-    expect(Object.keys(TOOL_IMPLS)).toEqual(TOOL_NAMES);
-  });
-
-  it("export JSON Schema for a model's tool interface", () => {
+describe("the nineteen tools", () => {
+  it("are exactly the brief's, in the brief's numbering, each with an implementation and a JSON schema", () => {
+    expect(TOOL_NAMES).toEqual(BRIEF_ORDER);
+    expect(Object.keys(TOOL_IMPLS)).toEqual(BRIEF_ORDER);
     const defs = toolDefinitions();
-    expect(defs.map((d) => d.name)).toEqual(TOOL_NAMES);
-    for (const def of defs) {
-      expect(def.description.length).toBeGreaterThan(40);
-      expect(def.input_schema).toMatchObject({ type: "object", additionalProperties: false });
-      expect(JSON.stringify(def.output_schema).length).toBeGreaterThan(20);
+    expect(defs).toHaveLength(19);
+    for (const d of defs) {
+      expect(d.description.length, d.name).toBeGreaterThan(40);
+      // An object, or - for confirm_and_store, whose two steps take different inputs - a choice between objects.
+      expect("type" in (d.input_schema as object) || "oneOf" in (d.input_schema as object), d.name).toBe(true);
+      expect(JSON.stringify(d.output_schema).length, d.name).toBeGreaterThan(20);
     }
-    expect((defs[0]!.input_schema as { required: string[] }).required).toEqual(["thread_id"]);
   });
 
-  it("have no field anywhere that could hold a clinical or emotional judgment", () => {
-    const banned = /diagnos|dementia|cognit|competen|mood|emotion_|sentiment|severity|stage|decline|risk|score|rating|grade/i;
-    const names = new Set<string>();
-    const walk = (node: unknown): void => {
-      if (Array.isArray(node)) node.forEach(walk);
-      else if (node && typeof node === "object") {
-        for (const [k, v] of Object.entries(node)) {
-          if (k === "properties" && v && typeof v === "object") Object.keys(v).forEach((n) => names.add(n));
-          walk(v);
-        }
-      }
-    };
-    for (const def of toolDefinitions()) walk([def.input_schema, def.output_schema]);
-    expect(names.size).toBeGreaterThan(60);
-    expect([...names].filter((n) => banned.test(n))).toEqual([]);
+  it("the family flows never enter the call sequence, and every other tool is in it", () => {
+    expect([...FAMILY_TOOLS].sort()).toEqual(["build_weekly_note", "export_record_for_clinician", "get_topic_record", "handle_family_query", "receive_family_contribution"]);
+    for (const t of FAMILY_TOOLS) expect(ENFORCED_SEQUENCE as readonly string[]).not.toContain(t);
+    expect([...ENFORCED_SEQUENCE, ...FAMILY_TOOLS].sort()).toEqual([...TOOL_NAMES].sort());
   });
 
-  it("limit assess_conversation_state to the four observable turn states", () => {
-    const schema = JSON.stringify(toolDefinitions().find((d) => d.name === "assess_conversation_state")!.output_schema);
-    expect(schema).toContain('"followed","asked_repeat","no_answer","answer_present"');
-    expect(contracts.assess_conversation_state.output.shape.state.options).toEqual(["followed", "asked_repeat", "no_answer", "answer_present"]);
-  });
-
-  it("reject unknown input fields rather than ignoring them", async () => {
+  it("are strict: an unknown field is an error on the way in, and nothing unvalidated comes out", async () => {
     const b = await bench();
-    await expect(b.runtime.call("inspect_request", { thread_id: THREAD, also: "this" } as never)).rejects.toBeInstanceOf(ToolContractError);
-    expect(b.runtime.log.at(-1)!.error!.name).toBe("ToolContractError");
+    await expect(b.runtime.call("check_safety_phrases", { audio_window: { asset_id: "call-golden", start_ms: 0, end_ms: 1000 }, her_words: "anything" } as never)).rejects.toBeInstanceOf(ToolContractError);
+    await expect(b.runtime.call("send_safety_alert", { category: "fall", caregiver_ids: [] })).rejects.toBeInstanceOf(ToolContractError);
+    expect(b.runtime.log.at(-1)).toMatchObject({ tool: "send_safety_alert", error: { name: "ToolContractError" } }); // refused calls are logged too
   });
 
-  it("cap graph traversal at two hops", () => {
-    const parse = (max_hops: number) =>
-      contracts.query_context_graph.input.safeParse({ ask_id: "a", question: "q", allowed_sources: ["ask_artifact"], max_hops, policy_token_id: "t" });
-    expect(parse(2).success).toBe(true);
-    expect(parse(3).success).toBe(false);
-  });
-});
-
-describe("access policy", () => {
-  it("grants the judged ask", () => {
-    expect(evaluatePolicy(policy, request)).toEqual({ decision: "granted" });
-  });
-
-  it.each([
-    ["an unapproved asker", { asker_id: "person:stranger" }, "asker_not_approved"],
-    ["an unapproved audience", { audience: "person:anika" }, "audience_not_approved"],
-    ["a purpose nobody agreed to", { purpose: "daily_check_in" }, "purpose_not_permitted"],
-    ["a blocked topic", { topic_ids: ["topic:kheer", "topic:finances"] }, "topic_blocked"],
-    ["a topic not on the allow list", { topic_ids: ["topic:travel"] }, "topic_not_allowed"],
-    ["an expired ask", { now_iso: "2026-11-07T18:00:00.000Z" }, "ask_expired"],
-    ["a time outside the call window", { now_iso: "2026-11-06T03:30:00.000Z" }, "outside_call_window"],
-    ["someone the policy does not cover", { person_id: "person:anika" }, "person_not_covered"],
-  ])("denies %s", (_label, change, reason) => {
-    expect(evaluatePolicy(policy, { ...request, ...change })).toMatchObject({ decision: "denied", reason });
+  it("no family-side output, and no confirm_share output, has a field that could hold a claim id, a citation, or a transcript", () => {
+    const fieldsOf = (schema: unknown, out = new Set<string>()): Set<string> => {
+      if (Array.isArray(schema)) schema.forEach((s) => fieldsOf(s, out));
+      else if (schema && typeof schema === "object") for (const [k, v] of Object.entries(schema)) (k === "properties" ? Object.keys(v as object).forEach((f) => out.add(f)) : undefined, fieldsOf(v, out));
+      return out;
+    };
+    const defs = new Map(toolDefinitions().map((d) => [d.name, d.output_schema]));
+    for (const tool of [...FAMILY_TOOLS, "confirm_share"] as const) {
+      const fields = [...fieldsOf(defs.get(tool))];
+      expect(fields.filter((f) => /claim|citation|transcript|node_id|source_id|words|evidence|cue/.test(f)), tool).toEqual([]);
+    }
+    expect([...fieldsOf(defs.get("send_safety_alert"))].filter((f) => /text|words|transcript|audio/.test(f))).toEqual([]);
+    expect([...fieldsOf(defs.get("check_safety_phrases"))].sort()).toEqual(["category", "turn_id"]); // a category or none - not her words
+    expect(contracts.assess_conversation_state.output.shape.state.options).toEqual(["recalled", "asked_repeat", "no_answer", "new_detail_offered"]); // observable turn states only
   });
 
-  it("always requires voice assent: a policy that waives it does not parse", () => {
-    const waived = { ...(POLICY as object), review: { voice_assent_required: false, caregiver_review_before_send: false } };
-    expect(policySchema.safeParse(waived).success).toBe(false);
+  it("a family tool cannot run without a family context, and a call tool cannot run in one", async () => {
+    const b = await bench();
+    await expect(b.runtime.call("handle_family_query", { question: "?", requester_id: "person:maya" })).rejects.toThrow(/no family context/);
+    await expect(b.service.familyRuntime.call("render_prompt", { topic_id: b.topicId, scaffold_id: "GREETING", slot_ids: {}, citations: [] })).rejects.toThrow(/no call context/);
+    expect(new ToolRuntime({ clock: b.clock }, TOOL_IMPLS)).toBeDefined();
   });
-});
 
-describe("fixtures", () => {
-  it("label every stand-in asset, so a placeholder can never pass for real media", () => {
-    for (const asset of MANIFEST.assets) expect(["placeholder", "final"]).toContain(asset.status);
+  it("every call is logged: input, output, latency, source ids, policy decision, and the transition it caused", async () => {
+    const { recording } = await runJudgedPath();
+    for (const c of recording.tool_log) expect(c).toMatchObject({ seq: expect.any(Number), started_at: expect.any(String), latency_ms: expect.any(Number), error: null });
+    expect(recording.tool_log.find((c) => c.tool === "place_recall_call")).toMatchObject({ policy_decision: "granted", state_transition: { from: "scheduled", to: "policy_passed" } });
+    expect(recording.tool_log.find((c) => c.tool === "verify_claim_support")!.source_ids).toContain("artifact:onboarding-voice");
+    expect(recording.tool_log.find((c) => c.tool === "get_next_recall_topic")!.output).toMatchObject({ decided_by: "deterministic_ranking", topic: { topic_id: "event:cape-may-summers", family_sourced: false } });
   });
 });

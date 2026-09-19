@@ -6,9 +6,9 @@
  * The log is for the judge console. None of it is ever shown to the
  * participant.
  */
-import type { FixtureClock } from "@/lib/clock";
-import { ENFORCED_SEQUENCE, contracts, type ToolInput, type ToolName, type ToolOutput, type ToolParsedInput } from "./contracts";
-import type { ToolContext } from "./context";
+import type { Clock, FixtureClock } from "@/lib/clock";
+import { ENFORCED_SEQUENCE, contracts, isFamilyTool, type CallToolName, type FamilyToolName, type ToolInput, type ToolName, type ToolOutput, type ToolParsedInput } from "./contracts";
+import type { FamilyToolContext, ToolContext } from "./context";
 import { GateError } from "./gates";
 
 export class ToolTimeoutError extends Error {
@@ -29,8 +29,20 @@ export class ToolContractError extends Error {
   }
 }
 
-export type ToolImpl<T extends ToolName> = (input: ToolParsedInput<T>, ctx: ToolContext) => Promise<ToolOutput<T>>;
+/**
+ * A family tool is handed the family context and cannot be handed the other one: the whitelist projection
+ * is enforced by this type, so there is no family tool that "could" read the graph and merely does not.
+ */
+export type ContextFor<T extends ToolName> = T extends FamilyToolName ? FamilyToolContext : ToolContext;
+export type ToolImpl<T extends ToolName> = (input: ToolParsedInput<T>, ctx: ContextFor<T>) => Promise<ToolOutput<T>>;
 export type ToolImpls = { [T in ToolName]: ToolImpl<T> };
+
+/** A runtime serves a call, the family side, or both. A tool whose context is absent cannot run. */
+export interface RuntimeContexts {
+  clock: Clock;
+  call?: ToolContext;
+  family?: FamilyToolContext;
+}
 
 /** Data-driven fault injection for branch tests. `on_call` counts calls to that tool, from 1. */
 export interface Fault {
@@ -81,20 +93,26 @@ export class ToolRuntime {
   private readonly callCounts = new Map<ToolName, number>();
 
   constructor(
-    private readonly ctx: ToolContext,
+    private readonly contexts: RuntimeContexts,
     private readonly impls: ToolImpls,
     private readonly options: RuntimeOptions = {},
   ) {}
 
+  private contextFor<T extends ToolName>(tool: T): ContextFor<T> {
+    const ctx = isFamilyTool(tool) ? this.contexts.family : this.contexts.call;
+    if (!ctx) throw new Error(`${tool} cannot run here: this runtime has no ${isFamilyTool(tool) ? "family" : "call"} context`);
+    return ctx as ContextFor<T>;
+  }
+
   async call<T extends ToolName>(tool: T, rawInput: ToolInput<T>): Promise<ToolOutput<T>> {
     const count = (this.callCounts.get(tool) ?? 0) + 1;
     this.callCounts.set(tool, count);
-    const startedAt = this.ctx.clock.iso();
-    const startedMs = this.ctx.clock.now();
+    const startedAt = this.contexts.clock.iso();
+    const startedMs = this.contexts.clock.now();
     const record: ToolCallRecord = {
       seq: this.log.length + 1,
       tool,
-      step: ENFORCED_SEQUENCE.indexOf(tool) + 1,
+      step: ENFORCED_SEQUENCE.indexOf(tool as CallToolName) + 1,
       started_at: startedAt,
       latency_ms: 0,
       input: rawInput,
@@ -114,7 +132,7 @@ export class ToolRuntime {
       if (!input.success) throw new ToolContractError(tool, "input", input.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
 
       const impl = this.impls[tool] as ToolImpl<T>;
-      const raw = await this.withTimeout(tool, impl(input.data as ToolParsedInput<T>, this.ctx));
+      const raw = await this.withTimeout(tool, impl(input.data as ToolParsedInput<T>, this.contextFor(tool)));
 
       const output = contracts[tool].output.safeParse(raw);
       if (!output.success) throw new ToolContractError(tool, "output", output.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
@@ -131,7 +149,7 @@ export class ToolRuntime {
     } finally {
       const fx = this.options.fixtureLatency;
       if (fx) fx.clock.advance(fx.ms[tool] ?? fx.default_ms);
-      record.latency_ms = this.ctx.clock.now() - startedMs;
+      record.latency_ms = this.contexts.clock.now() - startedMs;
     }
   }
 
@@ -146,13 +164,13 @@ export class ToolRuntime {
   }
 
   private describePolicy(tool: ToolName, output: unknown): string | null {
-    if (tool === "get_access_policy") {
-      const o = output as ToolOutput<"get_access_policy">;
+    if (tool === "place_recall_call") {
+      const o = output as ToolOutput<"place_recall_call">;
       return o.decision === "granted" ? "granted" : `denied:${o.reason}`;
     }
-    if (tool === "query_context_graph" || tool === "verify_claim_support" || tool === "publish_contribution") {
-      return "token_valid";
-    }
+    if (tool === "query_context_graph" || tool === "verify_claim_support" || tool === "render_prompt") return "token_valid";
+    if (tool === "build_weekly_note" || tool === "get_topic_record") return (output as { status: string }).status === "no_access" ? "denied:no_dashboard_access" : "access_granted";
+    if (tool === "export_record_for_clinician") return (output as { status: string }).status === "refused" ? "denied:not_an_approved_member" : "access_granted";
     return null;
   }
 

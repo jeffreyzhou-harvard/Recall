@@ -1,196 +1,181 @@
-/** The reducer on its own: no tools, no fixtures. It must hold the line even if everything around it is wrong. */
+/** AGENTS.md section 5: the reducer's invariants, tested on the reducer alone. */
 import { describe, expect, it } from "vitest";
-import { CALL_PHASE, MAIN_LINE, SAFE_ENDINGS, TERMINAL, TRANSITIONS, type RelayEvent, type RelayState } from "@/lib/state/machine";
-import { initialState, reduce, replay, visitedStates, type MachineState } from "@/lib/state/reducer";
+import { SAFETY_PHRASES } from "@/fixtures";
+import { matchSafetyPhrase } from "@/lib/safety/phrases";
+import { IN_CALL, MAIN_LINE, NON_TERMINAL, SAFE_ENDINGS, TERMINAL, TRANSITIONS, type RelayEvent, type RelayState } from "@/lib/state/machine";
+import { InvalidTransitionError, initialState, reduce, reduceStrict, replay, type MachineState } from "@/lib/state/reducer";
 import { createRelayStore } from "@/lib/state/store";
 
-const AT = "2026-11-05T17:30:00.000Z";
-const HASH = "a".repeat(64);
-const THREAD = "artifact:thread-family";
-
-const play = (events: RelayEvent[], from: MachineState = initialState()): MachineState =>
-  events.reduce((m, e) => reduce(m, e, { at: AT }), from);
-
-const TO_FOLLOWING: RelayEvent[] = [
-  { type: "ASK_FORWARDED", ask_id: "ask:1", thread_id: THREAD, asker_id: "person:anika", addressee_id: "person:mom" },
-  { type: "POLICY_GRANTED", policy_token_id: "token:1", audience: THREAD },
+const H = "a".repeat(64);
+const at = (s: number): { at: string } => ({ at: new Date(Date.parse("2026-11-05T17:30:00.000Z") + s * 1000).toISOString() });
+const GOLDEN: RelayEvent[] = [
+  { type: "CALL_SCHEDULED", person_id: "person:susan", topic_id: "event:x", topic_label: "X", family_sourced: false },
+  { type: "POLICY_GRANTED", policy_token_id: "token:1", max_call_minutes: 12 },
   { type: "CALL_CONNECTED", session_id: "session:1" },
-  { type: "BRIEF_DELIVERED", prompt_id: "prompt:1", citations: ["person:anika"] },
+  { type: "GREETING_DELIVERED", prompt_id: "p1", discloses_ai: true },
+  { type: "TOPIC_SELECTED", topic_id: "event:x", citations: ["event:x"] },
+  { type: "RUNG_DELIVERED", rung: 1, prompt_id: "p2", citations: ["event:x"], cue_id: null },
+  { type: "TURN_ASSESSED", turn_id: "t1", turn_state: "no_answer", silent: false },
+  { type: "RUNG_DELIVERED", rung: 2, prompt_id: "p3", citations: ["event:x"], cue_id: null },
+  { type: "TURN_ASSESSED", turn_id: "t2", turn_state: "recalled", silent: false },
+  { type: "TURN_ASSESSED", turn_id: "t3", turn_state: "new_detail_offered", silent: false },
+  { type: "CONTRIBUTION_CAPTURED", contribution_hash: H, trims: 2, generated_first_person_words: 0 },
+  { type: "STORE_CONFIRMATION_RECORDED", confirmation_id: "c1", decision: "yes", contribution_hash: H },
+  { type: "SHARE_CONFIRMATION_RECORDED", confirmation_id: "c2", decision: "yes", contribution_hash: H },
+  { type: "CONTRIBUTION_STORED", claim_id: "claim:1", contribution_hash: H, shared: true },
 ];
-const TO_PLAYBACK: RelayEvent[] = [
-  ...TO_FOLLOWING,
-  { type: "TURN_ASSESSED", turn_id: "p2", turn_state: "answer_present" },
-  { type: "CONTRIBUTION_CAPTURED", contribution_hash: HASH, trims: 3, generated_first_person_words: 0 },
-  { type: "PLAYBACK_STARTED", contribution_hash: HASH },
-];
-const YES: RelayEvent = { type: "ASSENT_RECORDED", assent_id: "assent:1", decision: "yes", contribution_hash: HASH, audience: THREAD };
-const PUBLISH: RelayEvent = { type: "PUBLISHED", delivery_id: "delivery:1", contribution_hash: HASH, destination: THREAD };
+/** The machine after the first `n` golden events. */
+const upTo = (n: number): MachineState => GOLDEN.slice(0, n).reduce((m, e, i) => reduceStrict(m, e, at(i)), initialState());
+/** One machine parked in each non-terminal state. */
+const parkedIn = (state: RelayState): MachineState => {
+  for (let n = 0; n <= GOLDEN.length; n++) if (upTo(n).state === state) return upTo(n);
+  throw new Error(`the golden walk never rests in ${state}`);
+};
+const lost = (): MachineState => parkedIn("lost");
 
-describe("transition table", () => {
-  it("covers every state, and no terminal state has a way out", () => {
-    const all: RelayState[] = [...MAIN_LINE, ...SAFE_ENDINGS, "fallback"];
-    expect(Object.keys(TRANSITIONS).sort()).toEqual([...all].sort());
-    for (const state of TERMINAL) expect(Object.keys(TRANSITIONS[state])).toEqual([]);
+describe("the transition table", () => {
+  it("has one row per state, and the terminal states are absorbing", () => {
+    expect(Object.keys(TRANSITIONS).sort()).toEqual([...MAIN_LINE, ...SAFE_ENDINGS].sort());
+    expect([...TERMINAL].sort()).toEqual(["blocked", "no_answer_today", "not_stored", "safety_handoff", "stopped", "stored"]);
+    for (const state of TERMINAL) expect(TRANSITIONS[state]).toEqual({});
+    const done = upTo(GOLDEN.length);
+    expect(done.state).toBe("stored");
+    for (const e of [...GOLDEN, { type: "STOP", how: "hang_up" } as RelayEvent, { type: "SAFETY_MATCHED", category: "fall" } as RelayEvent]) expect(reduce(done, e, at(99)).state).toBe("stored");
   });
 
-  it("nests the call session: brief -> ask -> support -> capture -> confirm", () => {
-    expect(CALL_PHASE).toMatchObject({ connected: "brief", following: "ask", lost: "support", reanchored: "support", contributed: "capture", playback: "confirm", assented: "confirm" });
-    expect(CALL_PHASE.idle).toBeUndefined();
-    expect(CALL_PHASE.delivered).toBeUndefined();
-  });
-});
-
-describe("reducer", () => {
-  it("is pure: the input state is never mutated", () => {
-    const before = initialState();
-    const frozen = JSON.stringify(before);
-    reduce(before, TO_FOLLOWING[0]!, { at: AT });
-    expect(JSON.stringify(before)).toBe(frozen);
+  it("walks the golden line, and a replay of the trace rebuilds every state exactly", () => {
+    const done = upTo(GOLDEN.length);
+    expect(done.trace.every((t) => t.accepted)).toBe(true);
+    expect(replay(done.trace)).toEqual(done);
+    expect(replay(done.trace, at(5).at).state).toBe("asking");
   });
 
-  it("rejects an out-of-order event, changes nothing, and records the attempt", () => {
-    const m = play([TO_FOLLOWING[0]!, PUBLISH]);
-    expect(m.state).toBe("ask_received");
-    expect(m.context.delivery_id).toBeNull();
-    expect(m.trace.at(-1)).toMatchObject({ accepted: false, from: "ask_received", to: "ask_received", event: "PUBLISHED" });
-  });
-
-  it("cannot be walked to delivered by skipping assent", () => {
-    const m = play([...TO_PLAYBACK, PUBLISH]);
-    expect(m.state).toBe("playback");
-    expect(visitedStates(m)).not.toContain("delivered");
-  });
-
-  it("refuses assent for a different hash or a different audience", () => {
-    expect(play([...TO_PLAYBACK, { ...YES, contribution_hash: "b".repeat(64) } as RelayEvent]).state).toBe("playback");
-    expect(play([...TO_PLAYBACK, { ...YES, audience: "person:anika" } as RelayEvent]).state).toBe("playback");
-  });
-
-  it("refuses to publish a different hash or to a different destination, even after a yes", () => {
-    expect(play([...TO_PLAYBACK, YES, { ...PUBLISH, contribution_hash: "b".repeat(64) } as RelayEvent]).state).toBe("assented");
-    expect(play([...TO_PLAYBACK, YES, { ...PUBLISH, destination: "person:anika" } as RelayEvent]).state).toBe("assented");
-    expect(play([...TO_PLAYBACK, YES, PUBLISH]).state).toBe("delivered");
-  });
-
-  it("treats no and unclear the same way: nothing sends", () => {
-    for (const decision of ["no", "unclear"] as const) {
-      const m = play([...TO_PLAYBACK, { ...YES, decision } as RelayEvent, PUBLISH]);
-      expect(m.state).toBe("not_sent");
-      expect(m.context.assent_id).toBeNull();
-    }
-  });
-
-  it("invalidates approval when content or audience changes after it", () => {
-    for (const what of ["content", "audience"] as const) {
-      const m = play([...TO_PLAYBACK, YES, { type: "CONTENT_OR_AUDIENCE_CHANGED", what }, PUBLISH]);
-      expect(m.state).toBe("not_sent");
-      expect(m.context.assent_id).toBeNull();
-    }
-  });
-
-  it("refuses a contribution that carries any generated first-person word", () => {
-    const m = play([
-      ...TO_FOLLOWING,
-      { type: "TURN_ASSESSED", turn_id: "p2", turn_state: "answer_present" },
-      { type: "CONTRIBUTION_CAPTURED", contribution_hash: HASH, trims: 0, generated_first_person_words: 1 },
-    ]);
-    expect(m.state).toBe("following");
-    expect(m.trace.at(-1)!.accepted).toBe(false);
-  });
-
-  it("will not capture before an answer has been assessed", () => {
-    const m = play([...TO_FOLLOWING, { type: "CONTRIBUTION_CAPTURED", contribution_hash: HASH, trims: 0, generated_first_person_words: 0 }]);
-    expect(m.state).toBe("following");
-  });
-
-  it("wraps up on the second lost-thread signal, whichever kind it is", () => {
-    const lost = (s: "asked_repeat" | "no_answer"): RelayEvent => ({ type: "TURN_ASSESSED", turn_id: "t", turn_state: s });
-    const scaffold: RelayEvent = { type: "SCAFFOLD_DELIVERED", scaffold_id: "restate_options", prompt_id: "prompt:2", citations: [] };
-    expect(play([...TO_FOLLOWING, lost("asked_repeat")]).state).toBe("lost");
-    const m = play([...TO_FOLLOWING, lost("asked_repeat"), scaffold, lost("no_answer")]);
-    expect(m.state).toBe("wrapped_up");
-    expect(m.context.ending_reason).toBe("no answer today");
-  });
-
-  it("sends a missing gate to the right safe ending for where the flow is", () => {
-    const gate: RelayEvent = { type: "GATE_MISSING", gate: "evidence", detail: "x" };
-    expect(play([TO_FOLLOWING[0]!, gate]).state).toBe("blocked");
-    expect(play([...TO_FOLLOWING, gate]).state).toBe("narrowed");
-    expect(play([...TO_PLAYBACK, gate]).state).toBe("not_sent");
-  });
-
-  it("decides what the family is told: clarify when something they can supply is missing, otherwise not this time", () => {
-    const gate: RelayEvent = { type: "GATE_MISSING", gate: "identity", detail: "x" };
-    const notice = (events: RelayEvent[]) => play(events).context.family_notice;
-    expect(notice([gate])).toBe("clarify"); // intake could not even record the ask
-    expect(notice([TO_FOLLOWING[0]!, gate])).toBe("clarify"); // spec X: stop safely, ask family to clarify
-    expect(notice([...TO_FOLLOWING, gate])).toBe("clarify"); // Relay told her it would ask Anika to clarify
-    expect(notice([TO_FOLLOWING[0]!, { type: "POLICY_DENIED", reason: "topic_blocked" }])).toBe("not_this_time"); // spec Y
-    expect(notice([...TO_PLAYBACK, { ...YES, decision: "unclear" } as RelayEvent])).toBe("not_this_time"); // spec W
-    expect(notice([...TO_PLAYBACK, YES, PUBLISH])).toBeNull();
-  });
-
-  it("gives every safe ending a notice, so the family is never left without a reply", () => {
-    const lost: RelayEvent = { type: "TURN_ASSESSED", turn_id: "t", turn_state: "no_answer" };
-    const scaffold: RelayEvent = { type: "SCAFFOLD_DELIVERED", scaffold_id: "repeat", prompt_id: "p", citations: [] };
-    const timeout: RelayEvent = { type: "TOOL_TIMEOUT", tool: "select_scaffold" };
-    const endings: RelayEvent[][] = [
-      [TO_FOLLOWING[0]!, { type: "POLICY_DENIED", reason: "x" }],
-      [...TO_FOLLOWING, { type: "GATE_MISSING", gate: "evidence", detail: "x" }],
-      [...TO_FOLLOWING, lost, scaffold, lost],
-      [...TO_PLAYBACK, { ...YES, decision: "no" } as RelayEvent],
-      [...TO_FOLLOWING, timeout, { type: "FIXED_RESTATEMENT_DELIVERED", prompt_id: "p" }, { type: "CALL_CLOSED" }],
-    ];
-    expect(endings.map((e) => play(e).state).sort()).toEqual([...SAFE_ENDINGS].sort());
-    for (const events of endings) expect(play(events).context.family_notice).not.toBeNull();
-  });
-
-  it("replays: a trace carries its events, so re-reducing it rebuilds every state, or any moment in between", () => {
-    const stamped = [...TO_PLAYBACK, YES, PUBLISH].reduce(
-      (m, e, i) => reduce(m, e, { at: `2026-11-05T17:30:${String(i).padStart(2, "0")}.000Z` }),
-      initialState(),
-    );
-    expect(replay(stamped.trace)).toEqual(stamped);
-    expect(replay(stamped.trace, "2026-11-05T17:30:03.000Z").state).toBe("following");
-    expect(replay(stamped.trace, "2026-11-05T17:29:00.000Z")).toEqual(initialState());
-  });
-
-  it("sends a tool timeout to the right place: not placed, fixed script, or not sent", () => {
-    const timeout: RelayEvent = { type: "TOOL_TIMEOUT", tool: "select_scaffold" };
-    expect(play([TO_FOLLOWING[0]!, timeout]).state).toBe("blocked");
-    expect(play([...TO_PLAYBACK, timeout]).state).toBe("not_sent");
-    const inCall = play([...TO_FOLLOWING, timeout]);
-    expect(inCall.state).toBe("fallback");
-    // The fixed script restates once only, and cannot close before it has.
-    expect(play([{ type: "CALL_CLOSED" }], inCall).state).toBe("fallback");
-    const restated = play([{ type: "FIXED_RESTATEMENT_DELIVERED", prompt_id: "prompt:1" }], inCall);
-    expect(play([{ type: "FIXED_RESTATEMENT_DELIVERED", prompt_id: "prompt:1" }], restated).trace.at(-1)!.accepted).toBe(false);
-    expect(play([{ type: "CALL_CLOSED" }], restated).state).toBe("closed_kindly");
-  });
-
-  it("narrows evidence on conflicting claims without moving the flow", () => {
-    const m = play([TO_FOLLOWING[0]!, TO_FOLLOWING[1]!, { type: "CLAIMS_CONFLICT", claim_ids: ["claim:a", "claim:b"] }]);
-    expect(m.state).toBe("policy_passed");
-    expect(m.context.evidence_mode).toBe("current_ask_only");
-  });
-
-  it("absorbs every event once terminal", () => {
-    const done = play([...TO_PLAYBACK, YES, PUBLISH]);
-    const after = play([TO_FOLLOWING[0]!, { type: "GATE_MISSING", gate: "policy", detail: "x" }, PUBLISH], done);
-    expect(after.state).toBe("delivered");
-    expect(after.trace.slice(-3).every((t) => !t.accepted)).toBe(true);
-  });
-});
-
-describe("store", () => {
-  it("is the reducer plus subscription, nothing more", () => {
+  it("an unknown (state, event) pair throws AND logs, and changes nothing", () => {
     const store = createRelayStore();
-    const seen: RelayState[] = [];
-    store.subscribe((s) => seen.push(s.machine.state));
-    for (const e of TO_FOLLOWING) store.getState().dispatch(e, { at: AT });
-    expect(seen).toEqual(["ask_received", "policy_passed", "connected", "following"]);
-    expect(store.getState().machine).toEqual(play(TO_FOLLOWING));
-    store.getState().reset();
-    expect(store.getState().machine).toEqual(initialState());
+    expect(() => store.getState().dispatch(GOLDEN[5]!, at(0))).toThrow(InvalidTransitionError);
+    const { machine } = store.getState();
+    expect(machine.state).toBe("idle");
+    expect(machine.trace).toHaveLength(1);
+    expect(machine.trace[0]).toMatchObject({ accepted: false, event: "RUNG_DELIVERED", from: "idle", to: "idle" });
+  });
+});
+
+describe("she can always stop it", () => {
+  it.each(NON_TERMINAL)("from %s", (state) => {
+    for (const how of ["hang_up", "explicit_stop", "caregiver_pause"] as const) {
+      const next = reduceStrict(parkedIn(state), { type: "STOP", how }, at(60));
+      expect(next.state).toBe("stopped");
+      expect(next.context).toMatchObject({ stop_how: how, claim_id: null });
+    }
+  });
+});
+
+describe("the safety handoff", () => {
+  const phrases = Object.entries(SAFETY_PHRASES.categories).flatMap(([category, c]) => c.phrases.map((p) => [category, p] as const));
+
+  it.each(IN_CALL)("every phrase on the list, as a final turn of hers in %s, reaches safety_handoff", (state) => {
+    for (const [category, phrase] of phrases) {
+      const match = matchSafetyPhrase(SAFETY_PHRASES, `Well, ${phrase}, you know.`);
+      expect(match, phrase).toEqual({ category, list_phrase: phrase });
+      const next = reduceStrict(parkedIn(state), { type: "SAFETY_MATCHED", category: match!.category }, at(60));
+      expect(next.state).toBe("safety_handoff");
+      expect(next.context).toMatchObject({ safety_category: category, claim_id: null });
+    }
+  });
+
+  it("comes only from a turn of hers: before anyone is on the line it is refused", () => {
+    for (const state of ["idle", "scheduled", "policy_passed"] as const) expect(() => reduceStrict(parkedIn(state), { type: "SAFETY_MATCHED", category: "fall" }, at(1))).toThrow(/only during a call/);
+  });
+
+  it("is a whole-phrase match on her words: 'I fell' fires, 'fellow' does not", () => {
+    expect(matchSafetyPhrase(SAFETY_PHRASES, "I fell in love with Maya")?.category).toBe("fall"); // the accepted false positive
+    expect(matchSafetyPhrase(SAFETY_PHRASES, "A fellow teacher from Lincoln")).toBeNull();
+    expect(matchSafetyPhrase(SAFETY_PHRASES, "We went to Cape May every summer")).toBeNull();
+  });
+});
+
+describe("the ladder's order, enforced here as well as in select_scaffold", () => {
+  const rung = (n: 1 | 2 | 3 | 4 | 5): RelayEvent => ({ type: "RUNG_DELIVERED", rung: n, prompt_id: `p${n}`, citations: [], cue_id: null });
+
+  it("a call never opens above rung 1", () => {
+    for (const n of [2, 3, 4, 5] as const) expect(() => reduceStrict(parkedIn("topic_selected"), rung(n), at(9))).toThrow(/never starts above rung 1/);
+  });
+
+  it("never jumps to reorientation, never repeats a rung, never goes back down", () => {
+    expect(() => reduceStrict(lost(), rung(5), at(9))).toThrow(/rungs 1-4 have each been tried/);
+    expect(() => reduceStrict(lost(), rung(1), at(9))).toThrow(/at most once/);
+    const afterThree = reduceStrict(reduceStrict(reduceStrict(lost(), rung(2), at(9)), { type: "TURN_ASSESSED", turn_id: "t", turn_state: "no_answer", silent: false }, at(10)), rung(4), at(11));
+    expect(afterThree.context.rungs_fired).toEqual([1, 2, 4]);
+    const back = reduceStrict(afterThree, { type: "TURN_ASSESSED", turn_id: "u", turn_state: "no_answer", silent: false }, at(12));
+    expect(() => reduceStrict(back, rung(3), at(13))).toThrow(/below rung 4/);
+    expect(() => reduceStrict(back, rung(5), at(13))).toThrow(/rungs 1-4 have each been tried/); // rung 3 never fired
+  });
+
+  it("stops at rung 3 for a family-sourced, unconfirmed topic", () => {
+    const family = [{ ...GOLDEN[0]!, family_sourced: true } as RelayEvent, ...GOLDEN.slice(1, 7)].reduce((m, e, i) => reduceStrict(m, e, at(i)), initialState());
+    const atThree = reduceStrict(reduceStrict(reduceStrict(family, rung(2), at(9)), { type: "TURN_ASSESSED", turn_id: "t", turn_state: "no_answer", silent: false }, at(10)), rung(3), at(11));
+    const stillLost = reduceStrict(atThree, { type: "TURN_ASSESSED", turn_id: "u", turn_state: "no_answer", silent: false }, at(12));
+    for (const n of [4, 5] as const) expect(() => reduceStrict(stillLost, rung(n), at(13))).toThrow(/rule 13/);
+    expect(reduceStrict(stillLost, { type: "LADDER_EXHAUSTED", reason: "nothing more" }, at(13)).state).toBe("no_answer_today");
+  });
+
+  it("two quiet windows end the topic gently; spoken misses keep climbing", () => {
+    const quiet: RelayEvent = { type: "TURN_ASSESSED", turn_id: "s", turn_state: "no_answer", silent: true };
+    const once = reduceStrict(parkedIn("asking"), quiet, at(9));
+    expect(once.state).toBe("lost");
+    expect(reduceStrict(reduceStrict(once, rung(2), at(10)), quiet, at(11)).state).toBe("no_answer_today");
+  });
+});
+
+describe("the greeting comes first, and commit comes last", () => {
+  it("nothing can be said before Relay has said what it is", () => {
+    expect(() => reduceStrict(upTo(3), GOLDEN[4]!, at(3))).toThrow(/AI-assistant disclosure/); // connected, not yet greeted
+    expect(reduceStrict(upTo(4), GOLDEN[4]!, at(3)).state).toBe("topic_selected");
+    expect(() => reduceStrict(upTo(4), GOLDEN[3]!, at(3))).toThrow(/said once/);
+  });
+
+  it("refuses to store before the share question resolves, for a different hash, or with a different share flag", () => {
+    const confirmed = upTo(12);
+    expect(() => reduceStrict(confirmed, GOLDEN[13]!, at(20))).toThrow(/commit comes last/);
+    const resolved = reduceStrict(confirmed, { type: "SHARE_CONFIRMATION_RECORDED", confirmation_id: "c2", decision: "no", contribution_hash: H }, at(20));
+    expect(() => reduceStrict(resolved, { ...GOLDEN[13]!, contribution_hash: "b".repeat(64) } as RelayEvent, at(21))).toThrow(/does not match the confirmed/);
+    expect(() => reduceStrict(resolved, GOLDEN[13]!, at(21))).toThrow(/share flag/); // she said no; "shared: true" is refused
+    expect(reduceStrict(resolved, { ...GOLDEN[13]!, shared: false } as RelayEvent, at(21)).state).toBe("stored");
+  });
+
+  it("a no, or an unclear answer, to the store question keeps nothing; no answer to the share question never blocks storing", () => {
+    for (const decision of ["no", "unclear"] as const) expect(reduceStrict(upTo(11), { type: "STORE_CONFIRMATION_RECORDED", confirmation_id: "c", decision, contribution_hash: H }, at(20)).state).toBe("not_stored");
+    const timedOut = reduceStrict(upTo(12), { type: "TOOL_TIMEOUT", tool: "confirm_share" }, at(20));
+    expect(timedOut).toMatchObject({ state: "confirmed", context: { share_resolved: true, shared: false } });
+  });
+
+  it("generated first-person words can never enter: a capture that reports any is refused", () => {
+    expect(() => reduceStrict(upTo(10), { type: "CONTRIBUTION_CAPTURED", contribution_hash: H, trims: 0, generated_first_person_words: 1 }, at(20))).toThrow(/generated first-person/);
+  });
+});
+
+describe("failure transitions are deterministic", () => {
+  it("a missing gate: never placed before the call, narrowed during it, nothing kept after capture", () => {
+    const gate: RelayEvent = { type: "GATE_MISSING", gate: "evidence", detail: "x" };
+    expect(reduceStrict(parkedIn("policy_passed"), gate, at(1)).state).toBe("blocked");
+    expect(reduceStrict(parkedIn("reanchored"), gate, at(30)).state).toBe("no_answer_today");
+    expect(reduceStrict(parkedIn("confirming"), gate, at(30)).state).toBe("not_stored");
+  });
+
+  it("a tool timeout mid-call: the fixed script restates once, then closes", () => {
+    const fallback = reduceStrict(lost(), { type: "TOOL_TIMEOUT", tool: "select_scaffold" }, at(30));
+    expect(fallback).toMatchObject({ state: "lost", context: { fallback_active: true } });
+    expect(() => reduceStrict(fallback, { type: "RUNG_DELIVERED", rung: 2, prompt_id: "p", citations: [], cue_id: null }, at(31))).toThrow(/fixed script is running/);
+    const restated = reduceStrict(fallback, { type: "FIXED_RESTATEMENT_DELIVERED", prompt_id: "p2" }, at(31));
+    expect(() => reduceStrict(restated, { type: "FIXED_RESTATEMENT_DELIVERED", prompt_id: "p2" }, at(32))).toThrow(/once only/);
+    expect(reduceStrict(restated, { type: "CALL_CLOSED" }, at(33)).state).toBe("no_answer_today");
+  });
+
+  it("the agreed call length: past it the conversation becomes the kind close - but a stop, a safety match, and a confirmation under way are untouched", () => {
+    const late = at(12 * 60 + 30);
+    expect(reduce(parkedIn("asking"), GOLDEN[6]!, late)).toMatchObject({ state: "no_answer_today", context: { ending_reason: "the agreed call length was reached" } });
+    expect(reduce(parkedIn("asking"), { type: "STOP", how: "hang_up" }, late).state).toBe("stopped");
+    expect(reduce(parkedIn("asking"), { type: "SAFETY_MATCHED", category: "fall" }, late).state).toBe("safety_handoff");
+    expect(reduce(parkedIn("confirming"), GOLDEN[11]!, late).state).toBe("confirmed");
   });
 });

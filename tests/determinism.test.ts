@@ -32,15 +32,22 @@ describe("judged path with the network disabled", () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it("delivers end to end without attempting any network access", async () => {
+  it("runs end to end - the call, then the whole family side - without attempting any network access", async () => {
     const run = await runJudgedPath();
-    expect(run.recording.final_state).toBe("delivered");
+    expect(run.recording.final_state).toBe("stored");
+    await run.service.askAboutHer("What did Mom say about her wedding?", "person:maya");
+    await run.service.weeklyNote("person:maya");
+    await run.service.topicRecord("person:maya");
+    await run.service.exportRecord("person:maya");
     expect(touched).toEqual([]);
   });
 
   it("replays byte-for-byte: same trace, same tool log, same hashes, same timestamps", async () => {
-    // The recording is everything a run produced: trace, tool log, messages, receipts, and the sealed PROV chain.
-    const snapshot = async (): Promise<string> => JSON.stringify((await runJudgedPath()).recording);
+    // The recording is everything a run produced - trace, tool log, receipts, the sealed PROV chain - and then the family side's view of it.
+    const snapshot = async (): Promise<string> => {
+      const run = await runJudgedPath();
+      return JSON.stringify([run.recording, await run.service.weeklyNote("person:maya"), await run.service.topicRecord("person:maya"), await run.graph.snapshot()]);
+    };
     const [first, second] = [await snapshot(), await snapshot()];
     expect(second).toBe(first);
     expect(first).toContain("2026-11-05T17:3");
@@ -75,18 +82,18 @@ describe("static determinism guard", () => {
 
   // Live-only code: the one place each external system is touched. Everything else under /lib is
   // judged-path safe, and must not reach these even indirectly.
-  const LIVE_ONLY = [join("lib", "graph", "ladybug-store.ts"), join("lib", "bridge", "telegram") + "/", join("lib", "call") + "/", join("lib", "providers", "muse") + "/", join("lib", "providers", "deepgram.ts")];
+  const LIVE_ONLY = [join("lib", "graph", "ladybug-store.ts"), join("lib", "call") + "/", join("lib", "providers", "muse") + "/", join("lib", "providers", "deepgram.ts")];
   const isLiveOnly = (rel: string): boolean => LIVE_ONLY.some((p) => rel === p || rel.startsWith(p));
   const NETWORK = /\bfetch\s*\(|new WebSocket\s*\(|new XMLHttpRequest\s*\(|new EventSource\s*\(/;
   // The service composes both loops, so it names the discovery and call modules by type; it opens no connection itself.
-  const LIVE_IMPORT = /@ladybugdb\/core|ladybug-store|bridge\/telegram|@\/lib\/call\/|providers\/muse|providers\/deepgram|@\/server\//;
+  const LIVE_IMPORT = /@ladybugdb\/core|ladybug-store|@\/lib\/call\/|providers\/muse|providers\/deepgram|@\/server\//;
 
-  it("only four named files under /lib touch the network: Telegram, the call's signaling client, Deepgram, and Muse Spark", () => {
+  it("only three named files under /lib touch the network: the call's signaling client, Deepgram, and Muse Spark - and none of them can reach family", () => {
     const callers = filesUnder(join(ROOT, "lib"))
       .filter((f) => NETWORK.test(readFileSync(f, "utf8")))
       .map((f) => f.slice(ROOT.length + 1))
       .sort();
-    expect(callers).toEqual([join("lib", "bridge", "telegram", "api.ts"), join("lib", "call", "signaling-client.ts"), join("lib", "providers", "deepgram.ts"), join("lib", "providers", "muse", "spark.ts")]);
+    expect(callers).toEqual([join("lib", "call", "signaling-client.ts"), join("lib", "providers", "deepgram.ts"), join("lib", "providers", "muse", "spark.ts")]);
   });
 
   it("nothing judged-path safe imports live-only code: not the rest of /lib, not the harness, not /present", () => {

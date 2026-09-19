@@ -7,11 +7,12 @@
  *                     closed relation list, and stated-versus-inferred. A fluent model gets no more
  *                     trust than the lexical matcher it replaces: an ungrounded name is rejected.
  *
- *   scaffold choice   pick the least support that fits what was observed (ScaffoldAdvisor).
- *                     Relay first works out which rungs are ELIGIBLE - which have verified evidence
- *                     and address what she asked for. Spark chooses only among those and must cite
- *                     verified node ids. Anything else, or any failure, falls back to the
- *                     deterministic ladder. The model can never widen what Relay may say.
+ *   cue choice        which cue to offer, once Relay's ladder has ALREADY decided a rung is warranted and
+ *                     the retrieval layer has no preference between the front-runners (ScaffoldAdvisor).
+ *                     Spark never decides whether to climb, or to which rung - section 6.1 does. It picks
+ *                     among the cues on offer and must cite verified node ids from that cue. Anything
+ *                     else, or any failure, falls back to the deterministic choice. The model can never
+ *                     widen what Relay may say.
  *
  * LIVE ONLY, SERVER ONLY. The judged path uses the deterministic implementations of both.
  */
@@ -75,20 +76,20 @@ export class MuseAnswerInterpreter implements AnswerInterpreter {
 
 // --- scaffold choice ---------------------------------------------------------------------------------------
 
-const SCAFFOLD_RULES = `You help someone stay in a conversation by choosing the LEAST support that addresses what was just observed.
+const SCAFFOLD_RULES = `You help someone reach a memory of her own by choosing which ONE cue to offer her.
 
-You are given what was observed and the only options available, least support first. Choose exactly one "scaffold_id" from "eligible", and cite node ids taken only from that option's "citations". Prefer the first option that actually supplies what she asked for. Never choose more support than needed. You are not assessing her; you are choosing what to say next.`;
+The kind of support has already been decided; you are only choosing between the cues in "eligible". Choose exactly one "cue_id" from "eligible", and cite node ids taken only from that cue's "citations". Prefer the cue most closely tied to what she just said. You are not assessing her; you are choosing what to say next.`;
 
 /**
  * She is on the line, waiting, while this runs. Measured live, Spark answers in 3-4 s at "minimal"; past this
- * budget the ladder's own choice is spoken instead. A slower, cleverer pick is worth less than not leaving her in silence.
+ * budget the deterministic choice is spoken instead. A slower, cleverer pick is worth less than not leaving her in silence.
  */
 export const SCAFFOLD_ADVICE_BUDGET_MS = 6_000;
 
-/** Spark picks among eligible rungs. The caller re-checks the pick and falls back to the ladder if it is not one that was offered. */
+/** Spark picks among the cues on offer. The caller re-checks the pick and keeps its own choice if it is not one that was offered. */
 export function museScaffoldAdvisor(spark: MuseSpark, budgetMs = SCAFFOLD_ADVICE_BUDGET_MS): ScaffoldAdvisor {
   return async (advice) => {
-    const schema = z.strictObject({ scaffold_id: z.enum(advice.eligible.map((e) => e.scaffold_id) as [string, ...string[]]), citations: z.array(z.string()) });
-    return spark.structured("select_scaffold", schema, [{ role: "system", content: SCAFFOLD_RULES }, { role: "user", content: JSON.stringify(advice) }], { reasoning_effort: "minimal", max_completion_tokens: 2000, timeout_ms: budgetMs });
+    const schema = z.strictObject({ cue_id: z.enum(advice.eligible.map((e) => e.cue_id) as [string, ...string[]]), citations: z.array(z.string()) });
+    return spark.structured("select_cue", schema, [{ role: "system", content: SCAFFOLD_RULES }, { role: "user", content: JSON.stringify(advice) }], { reasoning_effort: "minimal", max_completion_tokens: 2000, timeout_ms: budgetMs });
   };
 }

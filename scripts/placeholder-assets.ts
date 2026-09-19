@@ -63,30 +63,41 @@ interface Spec {
   path: string;
   kind: AssetEntry["kind"];
   description: string;
+  /** Audio only: how long the stand-in has to be for the transcript's timings to fit inside it. */
+  duration_ms?: number;
   make: () => Buffer | string;
 }
 
 const SPECS: Spec[] = [
   {
-    id: "photo-desserts",
-    path: "assets/images/photo-desserts.svg",
+    id: "photo-maya",
+    path: "assets/images/photo-maya.svg",
     kind: "image",
-    description: "Anika's one forwarded photo, showing kheer and halwa.",
-    make: () => placeholderSvg("Anika's photo of kheer and halwa"),
+    description: "The photo of Maya shown to Susan during onboarding (\"Who is this?\").",
+    make: () => placeholderSvg("Photo of Maya, shown during onboarding"),
   },
   {
-    id: "clip-cardamom",
-    path: "assets/audio/clip-cardamom.wav",
+    id: "photo-cape-may",
+    path: "assets/images/photo-cape-may.svg",
+    kind: "image",
+    description: "The family photograph at Cape May that Maya shared. A rung-3 cue, attributed to her.",
+    make: () => placeholderSvg("Family photograph at Cape May, shared by Maya"),
+  },
+  {
+    id: "clip-onboarding",
+    path: "assets/audio/clip-onboarding.wav",
     kind: "audio",
-    description: 'Original voice clip in which Mom says "cardamom goes in last". Evidence for the prior claim.',
-    make: () => placeholderWav(6_000),
+    description: "Susan's onboarding voice recording: her own answers about her photos. Evidence for her seeded claims.",
+    duration_ms: 13_000,
+    make: () => placeholderWav(13_000),
   },
   {
     id: "call-golden",
     path: "assets/audio/call-golden.wav",
     kind: "audio",
-    description: "The prerecorded phone call for the judged path, from the brief through Mom's spoken yes.",
-    make: () => placeholderWav(40_000),
+    description: "The prerecorded phone call for the judged path, from Relay's greeting through Susan's two spoken yeses and the warm close.",
+    duration_ms: 60_000,
+    make: () => placeholderWav(60_000),
   },
 ];
 
@@ -99,7 +110,9 @@ for (const spec of SPECS) {
     console.log(`skip  ${spec.id}: already final (${known.path})`);
     continue;
   }
-  if (!existsSync(abs)) {
+  // A stand-in whose length no longer fits the script is regenerated. A real (`final`) file is never touched: see above.
+  const stale = existsSync(abs) && spec.duration_ms !== undefined && wavDurationMs(abs) !== spec.duration_ms;
+  if (!existsSync(abs) || stale) {
     mkdirSync(dirname(abs), { recursive: true });
     writeFileSync(abs, spec.make());
     created++;
