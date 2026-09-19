@@ -1,7 +1,8 @@
 /**
  * Relay context graph - compact, private, and not a clinical record
- * (AGENTS.md section 7). Twelve node types, sixteen edge types, and one
- * provenance shape that every claim and every edge must carry.
+ * (AGENTS.md section 7). The brief's eighteen node types, plus the three the
+ * discovery loop adds (Activity, Story, Cluster), and one provenance shape that
+ * every claim and every edge must carry.
  *
  * Vocabulary attribution: provenance concepts follow W3C PROV-O; general
  * entity naming follows Schema.org where useful (CC BY-SA 3.0). Relay-specific
@@ -13,18 +14,28 @@
 export const NODE_TYPES = [
   "Person",
   "Relationship",
-  "CurrentAsk",
-  "Artifact",
-  "Topic",
+  "Place",
+  "Event",
   "EpisodicClaim",
   "PreferenceExpertise",
-  "Event",
+  "Artifact",
   "AccessPolicy",
   "Session",
   "Contribution",
-  "Assent",
-  // Discovery loop: what the photo library and conversation add to a person's context.
-  "Place",
+  /** One use of one cue on one topic, and whether she reached the memory after it (section 6.3). Never shown to anyone. */
+  "RetrievalRecord",
+  /** A family question arrived. Topic category and time only - never the question (rule 8). */
+  "FamilyQueryEvent",
+  "WeeklyNote",
+  "ShareConfirmation",
+  /** What happened on one topic in one call: observable, per topic, never aggregated (section 6.4.3). */
+  "TopicOutcome",
+  "ExportEvent",
+  /** A dashboard access event: granted, revoked, viewed, refused (rule 14: access is logged). */
+  "DashboardAccessGrant",
+  /** Category, time, and who was alerted. Never her words (rules 8 and 15). */
+  "SafetyEvent",
+  // Discovery loop: what conversation adds to a person's context.
   "Activity",
   "Story",
   /** A recurring face, place, time, or theme across photos. An observation, never an identity. */
@@ -33,9 +44,6 @@ export const NODE_TYPES = [
 export type NodeType = (typeof NODE_TYPES)[number];
 
 export const EDGE_TYPES = [
-  "ASKED_BY",
-  "ADDRESSED_TO",
-  "MEMBER_OF_THREAD",
   "DEPICTS",
   "ABOUT",
   "EVIDENCE_FOR",
@@ -43,12 +51,17 @@ export const EDGE_TYPES = [
   "RELATED_TO",
   "OCCURRED_AT",
   "PERMITTED_IN",
-  "RELEVANT_TO",
   "CONTRADICTS",
   "DERIVED_FROM",
   "INCLUDED_SPAN",
-  "APPROVED_BY",
-  "DELIVERED_TO",
+  /** A family member told Relay this. It stays their claim on every read (rule 13). */
+  "CONTRIBUTED_BY",
+  "RECALLED_IN",
+  "CUE_EFFECTIVE_FOR",
+  "CUE_INEFFECTIVE_FOR",
+  "SHARE_CONFIRMED_BY",
+  "POSTED_IN",
+  "OUTCOME_OF",
   /** A person said what a cluster is. The cluster stays an observation; the identity is a claim with a source. */
   "IDENTIFIED_AS",
 ] as const;
@@ -64,21 +77,26 @@ export const LAYER_NAMES: Record<Layer, string> = {
   1: "immutable raw evidence",
   2: "extracted claims with citations",
   3: "ephemeral session state",
-  4: "contribution, assent, and delivery audit",
+  4: "contribution, confirmation, and retrieval-outcome audit",
 };
 export const NODE_LAYER: Record<NodeType, Layer> = {
   Artifact: 1,
   Person: 2,
   Relationship: 2,
-  Topic: 2,
   EpisodicClaim: 2,
   PreferenceExpertise: 2,
   Event: 2,
   AccessPolicy: 2,
-  CurrentAsk: 3,
   Session: 3,
   Contribution: 4,
-  Assent: 4,
+  RetrievalRecord: 4,
+  FamilyQueryEvent: 4,
+  WeeklyNote: 4,
+  ShareConfirmation: 4,
+  TopicOutcome: 4,
+  ExportEvent: 4,
+  DashboardAccessGrant: 4,
+  SafetyEvent: 4,
   Place: 2,
   Activity: 2,
   Story: 2,
@@ -90,9 +108,9 @@ export const NODE_LAYER: Record<NodeType, Layer> = {
  * returns the classes a call may draw on; retrieval drops everything else.
  */
 export const SOURCE_CLASSES = [
-  "current_ask", // the forwarded ask itself: text, asker, requested audience
-  "ask_artifact", // the photo(s) forwarded with the ask
-  "prior_claim_with_source", // an earlier claim backed by an original clip
+  "prior_claim_with_source", // something she said earlier, backed by the original recording
+  "recall_call", // something she said on a Relay call, played back to her and confirmed (rule 3)
+  "family_contribution", // something a family member told Relay. Theirs, not hers (rule 13)
   "joint_setup", // the one-time setup the family did together
   "public_reference", // general entities: dishes, holidays, ingredients
   "session_audit", // layers 3-4, written by Relay during a call
@@ -102,8 +120,7 @@ export const SOURCE_CLASSES = [
 export type SourceClass = (typeof SOURCE_CLASSES)[number];
 
 export const EXTRACTION_METHODS = [
-  "forwarded_message", // taken verbatim from the forwarded ask
-  "lexical_match", // an exact match of the asker's own words against a known topic or event name
+  "family_form", // typed by a family member into the contribution form, kept exactly as typed
   "literal_transcript", // exact words from a recording, no paraphrase
   "manual_curation", // hand-entered by the family during setup or seeding
   "joint_setup", // agreed in the one-time joint setup
@@ -183,9 +200,17 @@ export interface Provenance {
   supersedes: string[];
   contradicts: string[];
   status: EpistemicStatus;
+  /**
+   * Has SHE said so herself? Never set by hand: it is `patientConfirmed(status)` wherever provenance is
+   * built or changed, so it cannot drift from how the fact is actually known. A family contribution is
+   * `false` until her own words, played back and confirmed, say otherwise (rules 3 and 13).
+   */
+  patient_confirmed: boolean;
   /** Every person who has confirmed or disputed this, with their source. Grows; never shrinks. */
   confirmations: Confirmation[];
 }
+
+export const patientConfirmed = (status: EpistemicStatus): boolean => status === "participant_confirmed";
 
 /** How a fact starts out, from where it came from. Anything from the photo library starts as an observation. */
 export function initialStatus(sourceClass: SourceClass, authoredByParticipant = false): EpistemicStatus {
@@ -196,17 +221,28 @@ export function initialStatus(sourceClass: SourceClass, authoredByParticipant = 
     case "photo_library":
       return "observed";
     case "prior_claim_with_source":
+    case "recall_call":
       return "participant_confirmed";
     case "discovery_answer":
       return authoredByParticipant ? "participant_confirmed" : "family_confirmed";
-    case "current_ask":
-    case "ask_artifact":
+    case "family_contribution":
     case "joint_setup":
       return "family_confirmed";
   }
 }
 
-export type ArtifactKind = "photo" | "audio" | "message" | "thread" | "setup_record" | "answer";
+export type ArtifactKind = "photo" | "audio" | "setup_record" | "answer" | "family_story" | "call" | "audit_log";
+
+/**
+ * What makes a node something Relay can invite her to talk about (section 6.1). Written by a person at
+ * setup, never generated: how to name it aloud, and which set of ladder lines in the call script fits it.
+ */
+export interface TopicFacet {
+  /** As it is said in the invitation: "the summers at Cape May". */
+  spoken_as: string;
+  /** Key into the call script's ladder lines: "family_summers", "workplace"... */
+  category: string;
+}
 
 interface NodeBase<T extends NodeType, P> {
   id: string;
@@ -220,45 +256,49 @@ export type PersonNode = NodeBase<
   "Person",
   {
     display_name: string;
-    /** `known` is someone who came up in discovery. Being known grants nothing: only the policy approves an asker. */
-    role: "participant" | "asker" | "known";
+    /** `known` is someone who came up in conversation. Being known grants nothing: only the joint setup approves a contributor. */
+    role: "participant" | "family" | "known";
     /** As the person stated it in the joint setup. Absent means use their name; never guessed from a name. */
     subject_pronoun?: string;
   }
 >;
 export type RelationshipNode = NodeBase<"Relationship", { kind: string; verified: boolean }>;
-export type CurrentAskNode = NodeBase<
-  "CurrentAsk",
-  {
-    /** The bridge's id for the forwarded message. Every outbound message is a reply to one of these. */
-    forward_id: string;
-    thread_id: string;
-    text: string;
-    option_topic_ids: string[];
-    requested_audience: string;
-    received_at: string;
-  }
->;
 export type ArtifactNode = NodeBase<
   "Artifact",
   { kind: ArtifactKind; text: string | null; alt: string | null }
 >;
-export type TopicNode = NodeBase<"Topic", { wikidata_id: string | null; aliases: string[] }>;
-export type EpisodicClaimNode = NodeBase<"EpisodicClaim", { text: string }>;
+export type EpisodicClaimNode = NodeBase<"EpisodicClaim", { text: string; topic?: TopicFacet }>;
 export type PreferenceExpertiseNode = NodeBase<"PreferenceExpertise", { text: string }>;
-export type EventNode = NodeBase<"Event", { wikidata_id: string | null; date: string | null }>;
+export type EventNode = NodeBase<"Event", { wikidata_id: string | null; date: string | null; topic?: TopicFacet }>;
 export type AccessPolicyNode = NodeBase<"AccessPolicy", { policy_ref: string }>;
-export type SessionNode = NodeBase<"Session", { ask_id: string; started_at: string; ended_at: string | null }>;
+export type SessionNode = NodeBase<"Session", { topic_id: string; started_at: string; ended_at: string | null; outcome: string }>;
 export type ContributionNode = NodeBase<
   "Contribution",
-  { content_hash: string; literal_transcript: string; generated_first_person_words: 0 }
+  { content_hash: string; literal_transcript: string; generated_first_person_words: 0; shared: boolean }
 >;
-export type AssentNode = NodeBase<
-  "Assent",
-  { decision: "yes" | "no" | "unclear"; contribution_hash: string; audience: string }
+export type RetrievalRecordNode = NodeBase<"RetrievalRecord", { topic_id: string; cue_id: string; rung: number; effective: boolean; used_at: string }>;
+export type FamilyQueryEventNode = NodeBase<"FamilyQueryEvent", { category: string; at: string }>;
+export type WeeklyNoteNode = NodeBase<
+  "WeeklyNote",
+  { member_id: string; posted_at: string; lines: Array<{ script_id: string; text: string }>; shared_contribution_id: string | null }
 >;
+export type ShareConfirmationNode = NodeBase<"ShareConfirmation", { decision: "yes" | "no" | "unclear" | "timeout"; contribution_hash: string; recorded_at: string }>;
+export type TopicOutcomeNode = NodeBase<
+  "TopicOutcome",
+  {
+    session_id: string;
+    topic_id: string;
+    /** The rung at which she reached the memory - 1 is free recall, unaided - or null if she did not reach it in this call. */
+    first_rung_reached_unaided: number | null;
+    highest_rung_used: number;
+    timestamp: string;
+  }
+>;
+export type ExportEventNode = NodeBase<"ExportEvent", { requester_id: string; at: string }>;
+export type DashboardAccessGrantNode = NodeBase<"DashboardAccessGrant", { member_id: string; action: "viewed" | "refused" | "revoked"; surface: string; at: string }>;
+export type SafetyEventNode = NodeBase<"SafetyEvent", { category: string; at: string; recipients: string[] }>;
 
-export type PlaceNode = NodeBase<"Place", { aliases: string[] }>;
+export type PlaceNode = NodeBase<"Place", { aliases: string[]; topic?: TopicFacet }>;
 export type ActivityNode = NodeBase<"Activity", { aliases: string[] }>;
 /** Her own telling, verbatim. Relay never writes, polishes, or summarizes a story (rule 1). */
 export type StoryNode = NodeBase<"Story", { text: string }>;
@@ -279,16 +319,28 @@ export type GraphNode =
   | ClusterNode
   | PersonNode
   | RelationshipNode
-  | CurrentAskNode
   | ArtifactNode
-  | TopicNode
   | EpisodicClaimNode
   | PreferenceExpertiseNode
   | EventNode
   | AccessPolicyNode
   | SessionNode
   | ContributionNode
-  | AssentNode;
+  | RetrievalRecordNode
+  | FamilyQueryEventNode
+  | WeeklyNoteNode
+  | ShareConfirmationNode
+  | TopicOutcomeNode
+  | ExportEventNode
+  | DashboardAccessGrantNode
+  | SafetyEventNode;
+
+/** The kinds of node a recall call can be about. A Person only when the joint setup turns that on (section 6.1). */
+export const TOPIC_NODE_TYPES = ["Place", "Event", "EpisodicClaim", "Person"] as const;
+export type TopicNodeType = (typeof TOPIC_NODE_TYPES)[number];
+/** The two record layers a caregiver may delete, each on its own (section 6.3). Nothing else in the graph can be removed. */
+export const ERASABLE_NODE_TYPES = ["RetrievalRecord", "TopicOutcome"] as const;
+export type ErasableNodeType = (typeof ERASABLE_NODE_TYPES)[number];
 
 export type NodeOf<T extends NodeType> = Extract<GraphNode, { type: T }>;
 
@@ -307,30 +359,24 @@ export interface GraphEdge {
  * stores can never disagree about the shape of the graph.
  */
 export const EDGE_SIGNATURES: Record<EdgeType, ReadonlyArray<readonly [NodeType, NodeType]>> = {
-  ASKED_BY: [["CurrentAsk", "Person"]],
-  ADDRESSED_TO: [["CurrentAsk", "Person"]],
-  MEMBER_OF_THREAD: [["Person", "Artifact"]],
   DEPICTS: [
-    ["Artifact", "Topic"],
+    ["Artifact", "Person"],
+    ["Artifact", "Place"],
+    ["Artifact", "Event"],
     ["Artifact", "Cluster"],
   ],
   ABOUT: [
-    ["CurrentAsk", "Topic"],
-    ["CurrentAsk", "Event"],
-    ["EpisodicClaim", "Topic"],
-    ["PreferenceExpertise", "Topic"],
-    // A forwarded ask can be about anything she or the family has already told Relay about.
-    ["CurrentAsk", "Person"],
-    ["CurrentAsk", "Place"],
-    ["CurrentAsk", "Activity"],
-    ["CurrentAsk", "PreferenceExpertise"],
+    ["EpisodicClaim", "Person"],
+    ["EpisodicClaim", "Place"],
+    ["EpisodicClaim", "Event"],
+    ["PreferenceExpertise", "Place"],
+    ["PreferenceExpertise", "Event"],
     ["Story", "Person"],
     ["Story", "Place"],
     ["Story", "Event"],
     ["Story", "Activity"],
   ],
   EVIDENCE_FOR: [
-    ["Artifact", "CurrentAsk"],
     ["Artifact", "EpisodicClaim"],
     ["Artifact", "PreferenceExpertise"],
     ["Artifact", "Relationship"],
@@ -340,13 +386,13 @@ export const EDGE_SIGNATURES: Record<EdgeType, ReadonlyArray<readonly [NodeType,
     ["EpisodicClaim", "Person"],
     ["PreferenceExpertise", "Person"],
     ["Contribution", "Person"],
-    ["Assent", "Person"],
+    ["ShareConfirmation", "Person"],
     ["Story", "Person"],
   ],
   RELATED_TO: [
     ["Relationship", "Person"],
-    ["Topic", "Topic"],
-    // Knowledge relations. The meaning is `props.relation`, from the closed vocabulary in relations.ts.
+    // Knowledge relations. The meaning is `props.relation`, from the closed vocabulary in relations.ts
+    // (the brief's WORKED_AT and LOCATED_AT are `worked_at` and `took_place_at` here).
     ["Person", "Person"],
     ["Person", "Place"],
     ["Person", "Event"],
@@ -361,21 +407,40 @@ export const EDGE_SIGNATURES: Record<EdgeType, ReadonlyArray<readonly [NodeType,
   PERMITTED_IN: [
     ["Person", "AccessPolicy"],
     ["Artifact", "AccessPolicy"],
-    ["Topic", "AccessPolicy"],
-  ],
-  RELEVANT_TO: [
-    ["EpisodicClaim", "CurrentAsk"],
-    ["Artifact", "CurrentAsk"],
   ],
   CONTRADICTS: [["EpisodicClaim", "EpisodicClaim"]],
   DERIVED_FROM: [
     ["EpisodicClaim", "Artifact"],
+    ["EpisodicClaim", "Contribution"],
     ["Contribution", "Artifact"],
     ["Contribution", "Session"],
   ],
   INCLUDED_SPAN: [["Contribution", "Artifact"]],
-  APPROVED_BY: [["Contribution", "Assent"]],
-  DELIVERED_TO: [["Contribution", "Artifact"]],
+  CONTRIBUTED_BY: [
+    ["EpisodicClaim", "Person"],
+    ["Artifact", "Person"],
+  ],
+  RECALLED_IN: [
+    ["Place", "Session"],
+    ["Event", "Session"],
+    ["EpisodicClaim", "Session"],
+    ["Person", "Session"],
+  ],
+  CUE_EFFECTIVE_FOR: [
+    ["RetrievalRecord", "Place"],
+    ["RetrievalRecord", "Event"],
+    ["RetrievalRecord", "EpisodicClaim"],
+    ["RetrievalRecord", "Person"],
+  ],
+  CUE_INEFFECTIVE_FOR: [
+    ["RetrievalRecord", "Place"],
+    ["RetrievalRecord", "Event"],
+    ["RetrievalRecord", "EpisodicClaim"],
+    ["RetrievalRecord", "Person"],
+  ],
+  SHARE_CONFIRMED_BY: [["Contribution", "ShareConfirmation"]],
+  POSTED_IN: [["Contribution", "WeeklyNote"]],
+  OUTCOME_OF: [["TopicOutcome", "Session"]],
   IDENTIFIED_AS: [
     ["Cluster", "Person"],
     ["Cluster", "Place"],

@@ -1,8 +1,13 @@
 /**
  * The reducer. Pure: (state, event, timestamp) -> state. It never reads a
- * clock, never calls a tool, never throws on a bad event. An event that does
- * not fit the current state is recorded as a rejected trace entry and changes
- * nothing, so an out-of-order or forged event can never advance the flow.
+ * clock and never calls a tool. An event that does not fit the current state
+ * is recorded as a rejected trace entry and changes nothing, so an out-of-order
+ * or forged event can never advance the flow.
+ *
+ * "An unknown (state, event) pair throws and logs" (AGENTS.md section 5):
+ * `reduce` does the logging and stays total, so a trace can always be replayed;
+ * `reduceStrict` is what the running system dispatches through, and it throws
+ * once the rejection is on the record.
  */
 import {
   CALL_PHASE,
@@ -10,6 +15,7 @@ import {
   TERMINAL,
   TRANSITIONS,
   crossCutting,
+  enforceCallLength,
   type CallPhase,
   type Outcome,
   type RelayContext,
@@ -43,7 +49,7 @@ export interface MachineState {
 }
 
 export function initialState(): MachineState {
-  return { state: "idle", context: { ...INITIAL_CONTEXT, scaffolds_used: [] }, trace: [] };
+  return { state: "idle", context: structuredClone(INITIAL_CONTEXT), trace: [] };
 }
 
 export interface DispatchMeta {
@@ -51,20 +57,22 @@ export interface DispatchMeta {
   tool_call_seq?: number | null;
 }
 
-function decide(current: MachineState, event: RelayEvent): Outcome {
+function decide(current: MachineState, event: RelayEvent, at: string): Outcome {
   if (TERMINAL.has(current.state)) return { reject: `"${current.state}" is terminal` };
+  const expired = enforceCallLength(current.state, current.context, event, at);
+  if (expired) return expired;
   const cross = crossCutting(current.state, current.context, event);
   if (cross) return cross;
   // The table is keyed by event type, so the handler always matches the event.
   const handler = TRANSITIONS[current.state][event.type] as
-    | ((ctx: RelayContext, e: RelayEvent, s: RelayState) => Outcome)
+    | ((ctx: RelayContext, e: RelayEvent, s: RelayState, at: string) => Outcome)
     | undefined;
   if (!handler) return { reject: `"${event.type}" is not valid in "${current.state}"` };
-  return handler(current.context, event, current.state);
+  return handler(current.context, event, current.state, at);
 }
 
 export function reduce(current: MachineState, event: RelayEvent, meta: DispatchMeta): MachineState {
-  const outcome = decide(current, event);
+  const outcome = decide(current, event, meta.at);
   const seq = current.trace.length + 1;
   if ("reject" in outcome) {
     const entry: TraceEntry = {
@@ -102,6 +110,24 @@ export function reduce(current: MachineState, event: RelayEvent, meta: DispatchM
     context: { ...current.context, ...outcome.patch },
     trace: [...current.trace, entry],
   };
+}
+
+export class InvalidTransitionError extends Error {
+  constructor(
+    public readonly machine: MachineState,
+    detail: string,
+  ) {
+    super(`invalid transition: ${detail}`);
+    this.name = "InvalidTransitionError";
+  }
+}
+
+/** Reduce, and throw if the event was refused. The refusal is already in the trace the error carries: thrown AND logged. */
+export function reduceStrict(current: MachineState, event: RelayEvent, meta: DispatchMeta): MachineState {
+  const next = reduce(current, event, meta);
+  const last = next.trace[next.trace.length - 1]!;
+  if (!last.accepted) throw new InvalidTransitionError(next, last.note ?? "refused");
+  return next;
 }
 
 /**

@@ -1,194 +1,175 @@
-/**
- * AGENTS.md section 12.2: every gate fails closed. These call the tools
- * directly, the way a model that ignored the intended order would, and check
- * that the service - not the prompt - is what refuses.
- */
+/** AGENTS.md section 12, test 2: every gate fails closed. */
 import { describe, expect, it } from "vitest";
-import { GateError } from "@/lib/tools";
-import { CALL, THREAD, diwaliForward, goldenTurn } from "./fixtures";
-import { assentWindow, bench, throughCapture, throughVerify } from "./helpers";
+import { runJudgedPath } from "@/fixtures/harness";
+import { GateError, GateKeeper } from "@/lib/tools";
+import { bench, overlay, policyWith, HER_LINE } from "./helpers";
 
-const gate = (name: string) => expect.objectContaining({ name: "GateError", gate: name });
+const H = "a".repeat(64);
+const gateOf = async (p: Promise<unknown>): Promise<string> => p.then(() => "no gate fired", (e) => (e instanceof GateError ? e.gate : `threw ${String(e)}`));
 
-describe("retrieval gate", () => {
-  it("refuses a graph query with no policy token", async () => {
+describe("confirmation gates the graph (rule 3)", () => {
+  it("storing without a confirmation fails; so does a no, an unclear, a different hash, and a commit before the share question", () => {
+    const gate = new GateKeeper();
+    expect(() => gate.requireCommittable(H)).toThrow(/no captured contribution/);
+    gate.setPendingContribution(H);
+    expect(() => gate.requireCommittable(H)).toThrow(/no confirmation has been recorded/);
+    expect(() => gate.requireCommittable("b".repeat(64))).toThrow(/does not match the captured/);
+    for (const decision of ["no", "unclear"] as const) {
+      gate.recordStoreConfirmation(H, decision);
+      expect(() => gate.requireCommittable(H)).toThrow(/not yes/);
+      expect(() => gate.recordShareConfirmation(H, "yes")).toThrow(/only after she has said yes/);
+    }
+    gate.recordStoreConfirmation(H, "yes");
+    expect(() => gate.requireCommittable(H)).toThrow(/commit comes last/);
+    gate.recordShareConfirmation(H, "no");
+    expect(gate.requireCommittable(H)).toEqual({ shared: false });
+    expect(() => gate.recordShareConfirmation(H, "yes")).toThrow(/already been answered/); // she is asked once
+  });
+
+  it("a new capture voids every earlier confirmation", () => {
+    const gate = new GateKeeper();
+    gate.setPendingContribution(H);
+    gate.recordStoreConfirmation(H, "yes");
+    gate.recordShareConfirmation(H, "yes");
+    gate.setPendingContribution("c".repeat(64));
+    expect(() => gate.requireCommittable("c".repeat(64))).toThrow(/no confirmation/);
+    expect(() => gate.requireCommittable(H)).toThrow(/does not match/);
+  });
+
+  it("the commit tool refuses a hash she never heard, and nothing reaches the graph", async () => {
     const b = await bench();
-    const ask = await b.runtime.call("inspect_request", { thread_id: THREAD });
-    await expect(
-      b.runtime.call("query_context_graph", { ask_id: ask.ask_id, question: ask.text, allowed_sources: ["ask_artifact"], max_hops: 2, policy_token_id: "token:made-up" }),
-    ).rejects.toEqual(gate("policy"));
-    expect(b.runtime.log.at(-1)!.policy_decision).toBe("gate_failed:policy");
+    expect(await gateOf(b.runtime.call("confirm_and_store", { step: "commit", contribution_hash: H, policy_token_id: b.tokenId }))).toBe("confirmation");
+    expect((await b.graph.nodesOfType("Contribution")).length).toBe(0);
   });
 
-  it("refuses to issue a policy before identities are verified", async () => {
+  it("a contribution changed after she confirmed it is not stored", async () => {
+    const run = await runJudgedPath();
+    // Re-open the same session state and tamper with the words after both yeses.
     const b = await bench();
-    const ask = await b.runtime.call("inspect_request", { thread_id: THREAD });
-    await expect(
-      b.runtime.call("get_access_policy", { ask_id: ask.ask_id, person: ask.addressee_id, purpose: "answer_current_ask", audience: THREAD }),
-    ).rejects.toEqual(gate("identity"));
-  });
-
-  it("refuses source classes the policy did not allow", async () => {
-    const p = await throughVerify();
-    await expect(
-      p.runtime.call("query_context_graph", { ask_id: p.ask.ask_id, question: p.ask.text, allowed_sources: ["joint_setup"], max_hops: 2, policy_token_id: p.tokenId }),
-    ).rejects.toEqual(gate("policy"));
-  });
-
-  it("refuses an expired token", async () => {
-    const p = await throughVerify();
-    p.clock.advance(31 * 60_000);
-    await expect(
-      p.runtime.call("query_context_graph", { ask_id: p.ask.ask_id, question: p.ask.text, allowed_sources: ["ask_artifact"], max_hops: 2, policy_token_id: p.tokenId }),
-    ).rejects.toEqual(gate("policy"));
-  });
-
-  it("does nothing at all when no ask was forwarded: Relay never initiates", async () => {
-    const b = await bench();
-    await expect(b.runtime.call("inspect_request", { thread_id: "artifact:some-other-thread" })).rejects.toEqual(gate("permission"));
-  });
-
-  it("permits the forwarded photo only once the policy has granted the ask", async () => {
-    const b = await bench();
-    const ask = await b.runtime.call("inspect_request", { thread_id: THREAD });
-    const photo = ask.artifacts[0]!.artifact_id;
-    const permitted = async (): Promise<boolean> => (await b.graph.edgesOf(photo)).some((e) => e.type === "PERMITTED_IN");
-    expect(await permitted()).toBe(false);
-    await b.runtime.call("resolve_identity_and_relationships", { ask_id: ask.ask_id, participants: ask.participants });
-    await b.runtime.call("get_access_policy", { ask_id: ask.ask_id, person: ask.addressee_id, purpose: "answer_current_ask", audience: THREAD });
-    expect(await permitted()).toBe(true);
+    Object.assign(b.ctx.session, { contribution: { ...run.ctx.session.contribution!, literal_transcript: "We went to Cape May every winter." } });
+    const hash = run.ctx.session.contribution!.content_hash;
+    b.ctx.gate.setPendingContribution(hash);
+    b.ctx.gate.recordStoreConfirmation(hash, "yes");
+    b.ctx.gate.recordShareConfirmation(hash, "yes");
+    Object.assign(b.ctx.session, { share_confirmation: run.ctx.session.share_confirmation });
+    await expect(b.runtime.call("confirm_and_store", { step: "commit", contribution_hash: hash, policy_token_id: b.tokenId })).rejects.toThrow(/changed after she confirmed it/);
   });
 });
 
-describe("identity and audience gate", () => {
-  it("verifies the people, their relationship, and that the answer goes back to the thread it came from", async () => {
+describe("evidence-bounded speech (rule 6)", () => {
+  it("a line that is not in the reviewed script is not said", async () => {
     const b = await bench();
-    const ask = await b.runtime.call("inspect_request", { thread_id: THREAD });
-    const out = await b.runtime.call("resolve_identity_and_relationships", { ask_id: ask.ask_id, participants: ask.participants });
-    expect(out).toMatchObject({ verified: true, mismatches: [] });
-    expect(out.relationships[0]).toMatchObject({ kind: "mother_daughter", verified_by: "artifact:setup-record" });
+    expect(await gateOf(b.runtime.call("render_prompt", { topic_id: b.topicId, scaffold_id: "LADDER-9-IMPROVISED", slot_ids: {}, citations: [] }))).toBe("evidence");
   });
 
-  it("stops when the requested audience is anything other than the originating thread", async () => {
-    const b = await bench({ forward: diwaliForward({ requested_audience: "person:anika" }) });
-    const ask = await b.runtime.call("inspect_request", { thread_id: THREAD });
-    const out = await b.runtime.call("resolve_identity_and_relationships", { ask_id: ask.ask_id, participants: ask.participants });
-    expect(out.verified).toBe(false);
-    expect(out.mismatches).toEqual([{ participant: "person:anika", reason: "requested audience is not the thread the ask came from" }]);
-    await expect(
-      b.runtime.call("get_access_policy", { ask_id: ask.ask_id, person: ask.addressee_id, purpose: "answer_current_ask", audience: "person:anika" }),
-    ).rejects.toEqual(gate("identity"));
-  });
-});
-
-describe("evidence gate", () => {
-  it("refuses to render a prompt from uncited content", async () => {
-    const p = await throughVerify();
-    await expect(
-      p.runtime.call("render_prompt", { ask_id: p.ask.ask_id, scaffold_id: "brief", citations: ["pref:mom-festival-desserts"] }),
-    ).rejects.toEqual(gate("evidence"));
+  it("uncited content fails: a slot with no citation, an unverified citation, a slot the line does not have", async () => {
+    const b = await bench();
+    const person = "LADDER-3-PERSON-FAMILY-SUMMERS";
+    expect(await gateOf(b.runtime.call("render_prompt", { topic_id: b.topicId, scaffold_id: person, slot_ids: {}, citations: [] }))).toBe("evidence");
+    expect(await gateOf(b.runtime.call("render_prompt", { topic_id: b.topicId, scaffold_id: person, slot_ids: { cue: "person:maya" }, citations: [] }))).toBe("evidence");
+    expect(await gateOf(b.runtime.call("render_prompt", { topic_id: b.topicId, scaffold_id: person, slot_ids: { cue: "person:nobody" }, citations: ["person:nobody"] }))).toBe("evidence");
+    expect(await gateOf(b.runtime.call("render_prompt", { topic_id: b.topicId, scaffold_id: "LADDER-2-FAMILY-SUMMERS", slot_ids: { cue: "person:maya" }, citations: [b.topicId, "person:maya"] }))).toBe("evidence");
+    expect(await gateOf(b.runtime.call("render_prompt", { topic_id: b.topicId, scaffold_id: "GREETING", slot_ids: { name: "person:maya" }, citations: ["person:maya"] }))).toBe("evidence"); // setup slots are never a caller's to fill
   });
 
-  it("refuses a prompt whose slots have no citation to fill them", async () => {
-    const p = await throughVerify();
-    await expect(p.runtime.call("render_prompt", { ask_id: p.ask.ask_id, scaffold_id: "brief", citations: [] })).rejects.toEqual(gate("evidence"));
+  it("an attribution that does not match the claim's speaker fails closed, both ways round", async () => {
+    const b = await bench();
+    const hers = "claim:cape-may-with-maya";
+    const mayas = "claim:maya-remembers-cape-may";
+    // Maya's account said as a plain fact ("You and Maya..."): refused.
+    expect(await gateOf(b.runtime.call("render_prompt", { topic_id: b.topicId, scaffold_id: "LADDER-3-PERSON-FAMILY-SUMMERS", slot_ids: { cue: "person:maya" }, citations: [b.topicId, mayas, "person:maya"] }))).toBe("evidence");
+    // Maya's account under "You told me": refused.
+    expect(await gateOf(b.runtime.call("render_prompt", { topic_id: b.topicId, scaffold_id: "LADDER-5-FAMILY-SUMMERS", slot_ids: { relation: "RELATED_TO:person:susan->person:maya", person: "person:maya", place: "place:cape-may" }, citations: [b.topicId, mayas, "person:maya", "place:cape-may", "RELATED_TO:person:susan->person:maya"] }))).toBe("evidence");
+    // Her own account attributed to Maya: refused.
+    expect(await gateOf(b.runtime.call("render_prompt", { topic_id: b.topicId, scaffold_id: "LADDER-3-FAMILY-SOURCED", slot_ids: { author: "person:maya", topic: b.topicId }, citations: [b.topicId, hers, "person:maya"] }))).toBe("evidence");
+    // The matching attribution is said.
+    const ok = await b.runtime.call("render_prompt", { topic_id: b.topicId, scaffold_id: "LADDER-3-FAMILY-SOURCED", slot_ids: { author: "person:maya", topic: b.topicId }, citations: [b.topicId, mayas, "person:maya"] });
+    expect(ok.text).toBe("Maya mentioned the summers at Cape May. What do you remember about that?");
   });
 
-  it("will not verify a node the policy-bounded retrieval never returned", async () => {
-    const p = await throughVerify();
-    const out = await p.runtime.call("verify_claim_support", { ask_id: p.ask.ask_id, claim_ids: ["pref:mom-festival-desserts"], policy_token_id: p.tokenId });
-    expect(out.verified).toEqual([]);
-    expect(out.rejected).toEqual([{ claim_id: "pref:mom-festival-desserts", reason: "not_retrieved_for_this_ask" }]);
-    expect(p.ctx.gate.isVerified("pref:mom-festival-desserts")).toBe(false);
-  });
-});
-
-describe("authorship gate", () => {
-  it("rejects any interval that contains Relay's own speech", async () => {
-    const p = await throughCapture();
-    await expect(
-      p.runtime.call("capture_exact_contribution", { ask_id: p.ask.ask_id, audio_intervals: [{ asset_id: CALL, start_ms: goldenTurn("r2").start_ms, end_ms: goldenTurn("p2").end_ms }] }),
-    ).rejects.toEqual(gate("authorship"));
+  it("verification cannot be used to launder something retrieval did not return", async () => {
+    const b = await bench();
+    const out = await b.runtime.call("verify_claim_support", { topic_id: b.topicId, claim_ids: ["claim:taught-at-lincoln", "claim:no-such-thing"], policy_token_id: b.tokenId });
+    expect(out.rejected).toEqual([{ claim_id: "claim:no-such-thing", reason: "not_in_graph" }, { claim_id: "claim:taught-at-lincoln", reason: "not_retrieved_for_this_topic" }]);
+    expect(b.ctx.gate.isVerified("claim:taught-at-lincoln")).toBe(false);
   });
 
-  it("rejects an interval that clips one of her words", async () => {
-    const p = await throughCapture();
-    const answer = goldenTurn("p2");
-    await expect(
-      p.runtime.call("capture_exact_contribution", { ask_id: p.ask.ask_id, audio_intervals: [{ asset_id: CALL, start_ms: answer.start_ms + 100, end_ms: answer.end_ms }] }),
-    ).rejects.toEqual(gate("authorship"));
-  });
-
-  it("will not capture before an answer has been heard", async () => {
-    const p = await throughVerify();
-    const answer = goldenTurn("p2");
-    await expect(
-      p.runtime.call("capture_exact_contribution", { ask_id: p.ask.ask_id, audio_intervals: [{ asset_id: CALL, start_ms: answer.start_ms, end_ms: answer.end_ms }] }),
-    ).rejects.toEqual(gate("authorship"));
+  it("an identity or relationship binding without an approved source fails closed", async () => {
+    // A neighbour - not an approved person - says who someone is. It is in the graph, and it cannot be spoken.
+    const neighbour = overlay(
+      "a binding from someone the joint setup never approved",
+      [
+        { id: "artifact:neighbour-note", type: "Artifact", label: "A note from a neighbour", props: { kind: "family_story", text: "Ravi is her son.", alt: null }, source: "artifact:neighbour-note" },
+        { id: "person:ravi", type: "Person", label: "Ravi", props: { display_name: "Ravi", role: "known" }, source: "artifact:neighbour-note" },
+      ],
+      [
+        { type: "RELATED_TO", from: "person:susan", to: "person:ravi", source: "artifact:neighbour-note", props: { relation: "child", said_as: "son" } },
+        { type: "RELATED_TO", from: "person:ravi", to: "event:cape-may-summers", source: "artifact:neighbour-note", props: { relation: "attended", said_as: null } },
+        { type: "PERMITTED_IN", from: "artifact:neighbour-note", to: "policy:susan-setup", source: "artifact:setup-record" },
+      ],
+      { "artifact:neighbour-note": { source_class: "family_contribution", asset_id: null, observed_at: "2026-10-30T12:00:00.000Z", author: "person:neighbour", extraction_method: "family_form", confidence: 1, audience_scope: ["person:susan"], expires_at: null } },
+    );
+    const b = await bench({ overlays: [neighbour] });
+    expect(b.verified).not.toContain("person:ravi");
+    expect(b.verified).not.toContain("RELATED_TO:person:susan->person:ravi");
+    const rejected = b.runtime.log.find((c) => c.tool === "verify_claim_support")!.output as { rejected: Array<{ claim_id: string; reason: string }> };
+    expect(rejected.rejected.filter((r) => r.reason === "binding_without_approved_source").map((r) => r.claim_id).sort()).toEqual(["RELATED_TO:person:susan->person:ravi", "person:ravi"]);
   });
 });
 
-describe("publish gate", () => {
-  type Captured = Awaited<ReturnType<typeof throughCapture>>;
-  const publish = (p: Captured, over: Partial<{ hash: string; destination: string }> = {}) =>
-    p.runtime.call("publish_contribution", { ask_id: p.ask.ask_id, hash: over.hash ?? p.captured.content_hash, destination: over.destination ?? THREAD, policy_token_id: p.tokenId });
-  const sayYes = (p: Captured) =>
-    p.runtime.call("request_assent", { ask_id: p.ask.ask_id, contribution_hash: p.captured.content_hash, audience: THREAD, audio_window: assentWindow() });
-
-  it("fails without assent", async () => {
-    const p = await throughCapture();
-    await expect(publish(p)).rejects.toEqual(gate("assent"));
-    expect(p.bridge.posted()).toEqual([]);
+describe("the ladder cannot be talked up", () => {
+  it("select_scaffold refuses a caller's account of which rungs have fired", async () => {
+    const b = await bench();
+    // Claiming 1-4 are done, to reach reorientation: the reducer's record says none has fired.
+    expect(await gateOf(b.runtime.call("select_scaffold", { topic_id: b.topicId, state: "no_answer", verified_ids: b.verified, rungs_fired: [1, 2, 3, 4] }))).toBe("evidence");
+    const opening = await b.runtime.call("select_scaffold", { topic_id: b.topicId, state: "opening", verified_ids: b.verified, rungs_fired: [] });
+    expect(opening.rung).toBe(1); // never above rung 1, even though the retrieval layer already knows a good cue
+    expect(opening.cue).toBeNull();
   });
 
-  it("fails with a mismatched hash", async () => {
-    const p = await throughCapture();
-    expect((await sayYes(p)).decision).toBe("yes");
-    await expect(publish(p, { hash: "0".repeat(64) })).rejects.toEqual(gate("assent"));
-    expect(p.bridge.posted()).toEqual([]);
-  });
-
-  it("fails with a mismatched audience", async () => {
-    const p = await throughCapture();
-    await sayYes(p);
-    await expect(publish(p, { destination: "person:anika" })).rejects.toEqual(gate("permission"));
-    expect(p.bridge.posted()).toEqual([]);
-  });
-
-  it("fails if the content changed after she approved it, even by one character", async () => {
-    const p = await throughCapture();
-    await sayYes(p);
-    p.ctx.session.contribution!.literal_transcript += "!";
-    await expect(publish(p)).rejects.toEqual(gate("assent"));
-    expect(p.bridge.posted()).toEqual([]);
-  });
-
-  it("voids an earlier yes when the contribution is re-captured", async () => {
-    const p = await throughCapture();
-    await sayYes(p);
-    p.ctx.gate.setPendingContribution("f".repeat(64));
-    await expect(publish(p)).rejects.toEqual(gate("assent"));
-  });
-
-  it("will not ask for assent to an audience the policy did not approve", async () => {
-    const p = await throughCapture();
-    await expect(
-      p.runtime.call("request_assent", { ask_id: p.ask.ask_id, contribution_hash: p.captured.content_hash, audience: "person:anika", audio_window: assentWindow() }),
-    ).rejects.toEqual(gate("permission"));
-  });
-
-  it("succeeds only when hash, audience, assent, and token all line up", async () => {
-    const p = await throughCapture();
-    await sayYes(p);
-    expect((await publish(p)).delivered_to).toBe(THREAD);
-    expect(p.bridge.voiceCards()).toHaveLength(1);
+  it("never returns rung 4 or 5 for a patient_confirmed: false topic, whatever has fired", async () => {
+    const b = await bench({ policy: policyWith((p) => (p.topics.allow = ["event:mayas-wedding"])) });
+    expect(b.ctx.session.topic).toMatchObject({ family_sourced: true });
+    const first = await b.runtime.call("select_scaffold", { topic_id: b.topicId, state: "opening", verified_ids: b.verified, rungs_fired: [] });
+    expect(first.rung).toBe(1);
+    expect(first.family_sourced_limit).toBe(true);
+    expect(first.rejected.filter((r) => r.rung > 3).map((r) => r.reason)).toEqual([expect.stringMatching(/rule 13/), expect.stringMatching(/rule 13/)]);
+    expect((await b.graph.getNode("claim:wedding-in-new-jersey"))!.prov.patient_confirmed).toBe(false);
   });
 });
 
-describe("GateError", () => {
-  it("names the gate that failed, so the reducer can take the matching deterministic transition", () => {
-    const e = new GateError("assent", "nope");
-    expect(e.gate).toBe("assent");
-    expect(e.message).toBe("assent gate: nope");
+describe("the call gate", () => {
+  it("place_recall_call places a call only for the topic the ranking chose", async () => {
+    const b = await bench();
+    expect(await gateOf(b.runtime.call("place_recall_call", { person_id: "person:susan", topic_id: "event:mayas-wedding", window: { now: b.clock.iso() } }))).toBe("policy");
+  });
+
+  it("calls go only to her", async () => {
+    const b = await bench();
+    const pick = await b.runtime.call("get_next_recall_topic", { person_id: "person:maya", schedule_context: { now: b.clock.iso() } });
+    expect(pick.topic).toBeNull(); // there is no topic to call a family member about, so no call
+  });
+
+  it("a token is for one topic, and expires", async () => {
+    const b = await bench();
+    expect(await gateOf(b.runtime.call("query_context_graph", { topic_id: "place:princeton", max_hops: 2, policy_token_id: b.tokenId }))).toBe("policy");
+    b.clock.advance(31 * 60_000);
+    expect(await gateOf(b.runtime.call("query_context_graph", { topic_id: b.topicId, max_hops: 2, policy_token_id: b.tokenId }))).toBe("policy");
+  });
+});
+
+describe("capture", () => {
+  it("rejects any stretch of the call that holds Relay's speech", async () => {
+    const run = await runJudgedPath();
+    const b = await bench();
+    Object.assign(b.ctx.session, { assessments: run.ctx.session.assessments });
+    expect(await gateOf(b.runtime.call("capture_contribution", { topic_id: b.topicId, audio_intervals: [{ asset_id: "call-golden", start_ms: 33_000, end_ms: 42_000 }] }))).toBe("authorship");
+    const ok = await b.runtime.call("capture_contribution", { topic_id: b.topicId, audio_intervals: [{ asset_id: "call-golden", start_ms: 37_500, end_ms: 41_900 }] });
+    expect(ok.literal_transcript).toBe(HER_LINE);
+  });
+
+  it("captures nothing before she has said anything about it", async () => {
+    const b = await bench();
+    expect(await gateOf(b.runtime.call("capture_contribution", { topic_id: b.topicId, audio_intervals: [{ asset_id: "call-golden", start_ms: 37_500, end_ms: 41_900 }] }))).toBe("authorship");
   });
 });

@@ -1,35 +1,89 @@
 {
   "version": 1,
-  "description": "Family graph: the people, the one-time joint setup, the access policy, public topic entities, and one prior source-backed claim. Persists across asks.",
+  "description": "Susan's memory graph: what she and her family have told Relay, each with who said it and when. Plus Relay's record of earlier calls.",
   "sources": {
     "artifact:setup-record": {
       "source_class": "joint_setup",
       "asset_id": null,
       "observed_at": "2026-10-12T15:00:00.000Z",
-      "author": "person:mom",
+      "author": "person:maya",
       "extraction_method": "joint_setup",
       "confidence": 1,
-      "audience_scope": ["artifact:thread-family"],
+      "audience_scope": [
+        "person:susan"
+      ],
       "expires_at": null
     },
-    "artifact:clip-cardamom": {
+    "artifact:onboarding-voice": {
       "source_class": "prior_claim_with_source",
-      "asset_id": "clip-cardamom",
-      "observed_at": "2025-10-19T22:10:00.000Z",
-      "author": "person:mom",
+      "asset_id": "clip-onboarding",
+      "observed_at": "2026-10-14T16:20:00.000Z",
+      "author": "person:susan",
       "extraction_method": "literal_transcript",
       "confidence": 1,
-      "audience_scope": ["artifact:thread-family"],
+      "audience_scope": [
+        "person:susan"
+      ],
       "expires_at": null
     },
-    "ref:wikidata": {
-      "source_class": "public_reference",
-      "asset_id": null,
-      "observed_at": "2026-09-19T00:00:00.000Z",
-      "author": "ref:wikidata",
-      "extraction_method": "public_reference",
+    "artifact:photo-maya": {
+      "source_class": "joint_setup",
+      "asset_id": "photo-maya",
+      "observed_at": "2026-10-14T16:00:00.000Z",
+      "author": "person:maya",
+      "extraction_method": "manual_curation",
       "confidence": 1,
-      "audience_scope": ["artifact:thread-family"],
+      "audience_scope": [
+        "person:susan"
+      ],
+      "expires_at": null
+    },
+    "artifact:photo-cape-may": {
+      "source_class": "family_contribution",
+      "asset_id": "photo-cape-may",
+      "observed_at": "2026-10-20T19:05:00.000Z",
+      "author": "person:maya",
+      "extraction_method": "family_form",
+      "confidence": 1,
+      "audience_scope": [
+        "person:susan"
+      ],
+      "expires_at": null
+    },
+    "artifact:maya-story-cape-may": {
+      "source_class": "family_contribution",
+      "asset_id": null,
+      "observed_at": "2026-10-20T19:00:00.000Z",
+      "author": "person:maya",
+      "extraction_method": "family_form",
+      "confidence": 1,
+      "audience_scope": [
+        "person:susan"
+      ],
+      "expires_at": null
+    },
+    "artifact:maya-story-wedding": {
+      "source_class": "family_contribution",
+      "asset_id": null,
+      "observed_at": "2026-10-21T18:30:00.000Z",
+      "author": "person:maya",
+      "extraction_method": "family_form",
+      "confidence": 1,
+      "audience_scope": [
+        "person:susan"
+      ],
+      "expires_at": null
+    },
+    "artifact:call-history": {
+      "source_class": "session_audit",
+      "asset_id": null,
+      "observed_at": "2026-11-03T18:00:00.000Z",
+      "author": "system:relay",
+      "extraction_method": "system_event",
+      "confidence": 1,
+      "audience_scope": [
+        "person:susan"
+      ],
       "expires_at": null
     }
   },
@@ -37,133 +91,848 @@
     {
       "id": "artifact:setup-record",
       "type": "Artifact",
-      "label": "Joint setup (Mom with Anika)",
-      "props": { "kind": "setup_record", "text": null, "alt": null },
+      "label": "Joint setup (Susan with Maya)",
+      "props": {
+        "kind": "setup_record",
+        "text": null,
+        "alt": null
+      },
       "source": "artifact:setup-record"
     },
     {
-      "id": "artifact:thread-family",
+      "id": "artifact:onboarding-voice",
       "type": "Artifact",
-      "label": "Family thread",
-      "props": { "kind": "thread", "text": null, "alt": "The family's existing group thread" },
+      "label": "Susan's onboarding voice recording",
+      "props": {
+        "kind": "audio",
+        "text": null,
+        "alt": "Susan answering questions about her photos, in her own voice"
+      },
+      "source": "artifact:onboarding-voice"
+    },
+    {
+      "id": "artifact:photo-maya",
+      "type": "Artifact",
+      "label": "Photo of Maya",
+      "props": {
+        "kind": "photo",
+        "text": null,
+        "alt": "Maya, in the photo shown to Susan during onboarding"
+      },
+      "source": "artifact:photo-maya"
+    },
+    {
+      "id": "artifact:photo-cape-may",
+      "type": "Artifact",
+      "label": "Family photograph at Cape May",
+      "props": {
+        "kind": "photo",
+        "text": null,
+        "alt": "The family on the beach at Cape May"
+      },
+      "source": "artifact:photo-cape-may"
+    },
+    {
+      "id": "artifact:maya-story-cape-may",
+      "type": "Artifact",
+      "label": "Maya's memory of Cape May",
+      "props": {
+        "kind": "family_story",
+        "text": "We drove down to Cape May every summer when I was little.",
+        "alt": null
+      },
+      "source": "artifact:maya-story-cape-may"
+    },
+    {
+      "id": "artifact:maya-story-wedding",
+      "type": "Artifact",
+      "label": "Maya's memory of her wedding",
+      "props": {
+        "kind": "family_story",
+        "text": "This was at my wedding in New Jersey in 2008.",
+        "alt": null
+      },
+      "source": "artifact:maya-story-wedding"
+    },
+    {
+      "id": "artifact:call-history",
+      "type": "Artifact",
+      "label": "Relay's record of earlier calls",
+      "props": {
+        "kind": "call",
+        "text": null,
+        "alt": null
+      },
+      "source": "artifact:call-history"
+    },
+    {
+      "id": "person:susan",
+      "type": "Person",
+      "label": "Susan",
+      "props": {
+        "display_name": "Susan",
+        "role": "participant",
+        "subject_pronoun": "she"
+      },
       "source": "artifact:setup-record"
     },
     {
-      "id": "person:mom",
+      "id": "person:maya",
       "type": "Person",
-      "label": "Mom",
-      "props": { "display_name": "Mom", "role": "participant", "subject_pronoun": "she" },
+      "label": "Maya",
+      "props": {
+        "display_name": "Maya",
+        "role": "family"
+      },
       "source": "artifact:setup-record"
+    },
+    {
+      "id": "person:priya",
+      "type": "Person",
+      "label": "Priya",
+      "props": {
+        "display_name": "Priya",
+        "role": "known"
+      },
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 9000,
+        "end_ms": 11000
+      }
     },
     {
       "id": "person:anika",
       "type": "Person",
       "label": "Anika",
-      "props": { "display_name": "Anika", "role": "asker" },
+      "props": {
+        "display_name": "Anika",
+        "role": "known"
+      },
       "source": "artifact:setup-record"
     },
     {
-      "id": "rel:mom-anika",
-      "type": "Relationship",
-      "label": "Mom and Anika",
-      "props": { "kind": "mother_daughter", "verified": true },
-      "source": "artifact:setup-record"
-    },
-    {
-      "id": "policy:mom-default",
+      "id": "policy:susan-setup",
       "type": "AccessPolicy",
-      "label": "Mom's access policy",
-      "props": { "policy_ref": "fixtures/policy/mom-default.json" },
+      "label": "Susan's joint setup",
+      "props": {
+        "policy_ref": "fixtures/policy/susan-setup.json"
+      },
       "source": "artifact:setup-record"
     },
     {
-      "id": "pref:mom-festival-desserts",
-      "type": "PreferenceExpertise",
-      "label": "Festival desserts",
-      "props": { "text": "Mom asked to be consulted about festival desserts" },
-      "source": "artifact:setup-record"
+      "id": "place:cape-may",
+      "type": "Place",
+      "label": "Cape May",
+      "props": {
+        "aliases": []
+      },
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 3000,
+        "end_ms": 6000
+      }
     },
     {
-      "id": "artifact:clip-cardamom",
-      "type": "Artifact",
-      "label": "Mom's voice clip about kheer",
-      "props": { "kind": "audio", "text": null, "alt": "Original voice clip of Mom talking about making kheer" },
-      "source": "artifact:clip-cardamom"
-    },
-    {
-      "id": "claim:cardamom-last",
-      "type": "EpisodicClaim",
-      "label": "cardamom goes in last",
-      "props": { "text": "cardamom goes in last" },
-      "source": "artifact:clip-cardamom",
-      "span": { "start_ms": 2100, "end_ms": 4300 }
-    },
-    {
-      "id": "topic:kheer",
-      "type": "Topic",
-      "label": "kheer",
-      "props": { "wikidata_id": "Q59134", "aliases": [ "kheer" ] },
-      "source": "ref:wikidata"
-    },
-    {
-      "id": "topic:halwa",
-      "type": "Topic",
-      "label": "halwa",
-      "props": { "wikidata_id": "Q183599", "aliases": [ "halwa", "halva" ] },
-      "source": "ref:wikidata"
-    },
-    {
-      "id": "topic:cardamom",
-      "type": "Topic",
-      "label": "cardamom",
-      "props": { "wikidata_id": "Q14625808", "aliases": [ "cardamom" ] },
-      "source": "ref:wikidata"
-    },
-    {
-      "id": "topic:dessert",
-      "type": "Topic",
-      "label": "dessert",
-      "props": { "wikidata_id": null, "aliases": [ "dessert" ] },
-      "source": "ref:wikidata"
-    },
-    {
-      "id": "topic:finances",
-      "type": "Topic",
-      "label": "finances",
-      "props": { "wikidata_id": null, "aliases": [ "money", "finances" ] },
-      "source": "ref:wikidata"
-    },
-    {
-      "id": "event:diwali-2026",
+      "id": "event:cape-may-summers",
       "type": "Event",
-      "label": "Diwali",
-      "props": { "wikidata_id": "Q10244", "date": "2026-11-08" },
-      "source": "ref:wikidata"
+      "label": "Cape May summers",
+      "props": {
+        "wikidata_id": null,
+        "date": null,
+        "topic": {
+          "spoken_as": "the summers at Cape May",
+          "category": "family_summers"
+        }
+      },
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 3000,
+        "end_ms": 6000
+      }
+    },
+    {
+      "id": "place:lincoln-elementary",
+      "type": "Place",
+      "label": "Lincoln Elementary",
+      "props": {
+        "aliases": [
+          "Lincoln"
+        ],
+        "topic": {
+          "spoken_as": "Lincoln Elementary",
+          "category": "workplace"
+        }
+      },
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 6000,
+        "end_ms": 9000
+      }
+    },
+    {
+      "id": "place:princeton",
+      "type": "Place",
+      "label": "Princeton",
+      "props": {
+        "aliases": [],
+        "topic": {
+          "spoken_as": "Princeton",
+          "category": "hometown"
+        }
+      },
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 11000,
+        "end_ms": 13000
+      }
+    },
+    {
+      "id": "event:mayas-wedding",
+      "type": "Event",
+      "label": "Maya's wedding",
+      "props": {
+        "wikidata_id": null,
+        "date": null,
+        "topic": {
+          "spoken_as": "the wedding in New Jersey",
+          "category": "family_event"
+        }
+      },
+      "source": "artifact:maya-story-wedding"
+    },
+    {
+      "id": "claim:maya-is-my-daughter",
+      "type": "EpisodicClaim",
+      "label": "Who Maya is",
+      "props": {
+        "text": "That's Maya, my daughter."
+      },
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 0,
+        "end_ms": 3000
+      }
+    },
+    {
+      "id": "claim:cape-may-with-maya",
+      "type": "EpisodicClaim",
+      "label": "Summers at Cape May",
+      "props": {
+        "text": "Maya and I spent our summers at Cape May."
+      },
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 3000,
+        "end_ms": 6000
+      }
+    },
+    {
+      "id": "claim:taught-at-lincoln",
+      "type": "EpisodicClaim",
+      "label": "Teaching at Lincoln Elementary",
+      "props": {
+        "text": "I taught at Lincoln Elementary."
+      },
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 6000,
+        "end_ms": 9000
+      }
+    },
+    {
+      "id": "claim:priya-is-my-sister",
+      "type": "EpisodicClaim",
+      "label": "Who Priya is",
+      "props": {
+        "text": "Priya is my sister."
+      },
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 9000,
+        "end_ms": 11000
+      }
+    },
+    {
+      "id": "claim:lived-in-princeton",
+      "type": "EpisodicClaim",
+      "label": "Living in Princeton",
+      "props": {
+        "text": "We lived in Princeton."
+      },
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 11000,
+        "end_ms": 13000
+      }
+    },
+    {
+      "id": "claim:maya-remembers-cape-may",
+      "type": "EpisodicClaim",
+      "label": "Maya's memory of Cape May",
+      "props": {
+        "text": "We drove down to Cape May every summer when I was little."
+      },
+      "source": "artifact:maya-story-cape-may"
+    },
+    {
+      "id": "claim:wedding-in-new-jersey",
+      "type": "EpisodicClaim",
+      "label": "Maya's memory of her wedding",
+      "props": {
+        "text": "This was at my wedding in New Jersey in 2008."
+      },
+      "source": "artifact:maya-story-wedding"
     }
   ],
   "edges": [
-    { "type": "MEMBER_OF_THREAD", "from": "person:mom", "to": "artifact:thread-family", "source": "artifact:setup-record" },
-    { "type": "MEMBER_OF_THREAD", "from": "person:anika", "to": "artifact:thread-family", "source": "artifact:setup-record" },
-    { "type": "RELATED_TO", "from": "rel:mom-anika", "to": "person:mom", "source": "artifact:setup-record", "props": { "role": "mother" } },
-    { "type": "RELATED_TO", "from": "rel:mom-anika", "to": "person:anika", "source": "artifact:setup-record", "props": { "role": "daughter" } },
-    { "type": "EVIDENCE_FOR", "from": "artifact:setup-record", "to": "rel:mom-anika", "source": "artifact:setup-record" },
-    { "type": "PERMITTED_IN", "from": "person:anika", "to": "policy:mom-default", "source": "artifact:setup-record" },
-    { "type": "PERMITTED_IN", "from": "topic:kheer", "to": "policy:mom-default", "source": "artifact:setup-record" },
-    { "type": "PERMITTED_IN", "from": "topic:halwa", "to": "policy:mom-default", "source": "artifact:setup-record" },
-    { "type": "PERMITTED_IN", "from": "topic:cardamom", "to": "policy:mom-default", "source": "artifact:setup-record" },
-    { "type": "PERMITTED_IN", "from": "topic:dessert", "to": "policy:mom-default", "source": "artifact:setup-record" },
-    { "type": "PERMITTED_IN", "from": "artifact:clip-cardamom", "to": "policy:mom-default", "source": "artifact:setup-record" },
-    { "type": "EVIDENCE_FOR", "from": "artifact:setup-record", "to": "pref:mom-festival-desserts", "source": "artifact:setup-record" },
-    { "type": "SPOKEN_BY", "from": "pref:mom-festival-desserts", "to": "person:mom", "source": "artifact:setup-record" },
-    { "type": "ABOUT", "from": "pref:mom-festival-desserts", "to": "topic:dessert", "source": "artifact:setup-record" },
-    { "type": "SPOKEN_BY", "from": "artifact:clip-cardamom", "to": "person:mom", "source": "artifact:clip-cardamom" },
-    { "type": "SPOKEN_BY", "from": "claim:cardamom-last", "to": "person:mom", "source": "artifact:clip-cardamom", "span": { "start_ms": 2100, "end_ms": 4300 } },
-    { "type": "EVIDENCE_FOR", "from": "artifact:clip-cardamom", "to": "claim:cardamom-last", "source": "artifact:clip-cardamom", "span": { "start_ms": 2100, "end_ms": 4300 } },
-    { "type": "DERIVED_FROM", "from": "claim:cardamom-last", "to": "artifact:clip-cardamom", "source": "artifact:clip-cardamom", "span": { "start_ms": 2100, "end_ms": 4300 } },
-    { "type": "ABOUT", "from": "claim:cardamom-last", "to": "topic:cardamom", "source": "artifact:clip-cardamom" },
-    { "type": "ABOUT", "from": "claim:cardamom-last", "to": "topic:kheer", "source": "artifact:clip-cardamom" },
-    { "type": "RELATED_TO", "from": "topic:cardamom", "to": "topic:kheer", "source": "ref:wikidata", "props": { "role": "ingredient_of" } },
-    { "type": "RELATED_TO", "from": "topic:kheer", "to": "topic:dessert", "source": "ref:wikidata", "props": { "role": "kind_of" } },
-    { "type": "RELATED_TO", "from": "topic:halwa", "to": "topic:dessert", "source": "ref:wikidata", "props": { "role": "kind_of" } }
-  ]
+    {
+      "type": "RELATED_TO",
+      "from": "person:susan",
+      "to": "person:maya",
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 0,
+        "end_ms": 3000
+      },
+      "props": {
+        "relation": "child",
+        "said_as": "daughter"
+      }
+    },
+    {
+      "type": "RELATED_TO",
+      "from": "person:susan",
+      "to": "person:priya",
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 9000,
+        "end_ms": 11000
+      },
+      "props": {
+        "relation": "sibling",
+        "said_as": "sister"
+      }
+    },
+    {
+      "type": "RELATED_TO",
+      "from": "person:maya",
+      "to": "person:anika",
+      "source": "artifact:setup-record",
+      "props": {
+        "relation": "child",
+        "said_as": "daughter"
+      }
+    },
+    {
+      "type": "RELATED_TO",
+      "from": "person:susan",
+      "to": "event:cape-may-summers",
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 3000,
+        "end_ms": 6000
+      },
+      "props": {
+        "relation": "attended",
+        "said_as": null
+      }
+    },
+    {
+      "type": "RELATED_TO",
+      "from": "person:maya",
+      "to": "event:cape-may-summers",
+      "source": "artifact:maya-story-cape-may",
+      "props": {
+        "relation": "attended",
+        "said_as": null
+      }
+    },
+    {
+      "type": "RELATED_TO",
+      "from": "event:cape-may-summers",
+      "to": "place:cape-may",
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 3000,
+        "end_ms": 6000
+      },
+      "props": {
+        "relation": "took_place_at",
+        "said_as": null
+      }
+    },
+    {
+      "type": "RELATED_TO",
+      "from": "person:susan",
+      "to": "place:lincoln-elementary",
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 6000,
+        "end_ms": 9000
+      },
+      "props": {
+        "relation": "worked_at",
+        "said_as": null
+      }
+    },
+    {
+      "type": "RELATED_TO",
+      "from": "person:susan",
+      "to": "place:princeton",
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 11000,
+        "end_ms": 13000
+      },
+      "props": {
+        "relation": "lived_in",
+        "said_as": null
+      }
+    },
+    {
+      "type": "RELATED_TO",
+      "from": "person:maya",
+      "to": "event:mayas-wedding",
+      "source": "artifact:maya-story-wedding",
+      "props": {
+        "relation": "attended",
+        "said_as": null
+      }
+    },
+    {
+      "type": "DEPICTS",
+      "from": "artifact:photo-maya",
+      "to": "person:maya",
+      "source": "artifact:photo-maya"
+    },
+    {
+      "type": "DEPICTS",
+      "from": "artifact:photo-cape-may",
+      "to": "event:cape-may-summers",
+      "source": "artifact:photo-cape-may"
+    },
+    {
+      "type": "CONTRIBUTED_BY",
+      "from": "artifact:photo-cape-may",
+      "to": "person:maya",
+      "source": "artifact:photo-cape-may"
+    },
+    {
+      "type": "EVIDENCE_FOR",
+      "from": "artifact:onboarding-voice",
+      "to": "claim:maya-is-my-daughter",
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 0,
+        "end_ms": 3000
+      }
+    },
+    {
+      "type": "SPOKEN_BY",
+      "from": "claim:maya-is-my-daughter",
+      "to": "person:susan",
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 0,
+        "end_ms": 3000
+      }
+    },
+    {
+      "type": "ABOUT",
+      "from": "claim:maya-is-my-daughter",
+      "to": "person:maya",
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 0,
+        "end_ms": 3000
+      }
+    },
+    {
+      "type": "EVIDENCE_FOR",
+      "from": "artifact:onboarding-voice",
+      "to": "claim:cape-may-with-maya",
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 3000,
+        "end_ms": 6000
+      }
+    },
+    {
+      "type": "SPOKEN_BY",
+      "from": "claim:cape-may-with-maya",
+      "to": "person:susan",
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 3000,
+        "end_ms": 6000
+      }
+    },
+    {
+      "type": "ABOUT",
+      "from": "claim:cape-may-with-maya",
+      "to": "event:cape-may-summers",
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 3000,
+        "end_ms": 6000
+      }
+    },
+    {
+      "type": "ABOUT",
+      "from": "claim:cape-may-with-maya",
+      "to": "person:maya",
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 3000,
+        "end_ms": 6000
+      }
+    },
+    {
+      "type": "ABOUT",
+      "from": "claim:cape-may-with-maya",
+      "to": "place:cape-may",
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 3000,
+        "end_ms": 6000
+      }
+    },
+    {
+      "type": "EVIDENCE_FOR",
+      "from": "artifact:onboarding-voice",
+      "to": "claim:taught-at-lincoln",
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 6000,
+        "end_ms": 9000
+      }
+    },
+    {
+      "type": "SPOKEN_BY",
+      "from": "claim:taught-at-lincoln",
+      "to": "person:susan",
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 6000,
+        "end_ms": 9000
+      }
+    },
+    {
+      "type": "ABOUT",
+      "from": "claim:taught-at-lincoln",
+      "to": "place:lincoln-elementary",
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 6000,
+        "end_ms": 9000
+      }
+    },
+    {
+      "type": "EVIDENCE_FOR",
+      "from": "artifact:onboarding-voice",
+      "to": "claim:priya-is-my-sister",
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 9000,
+        "end_ms": 11000
+      }
+    },
+    {
+      "type": "SPOKEN_BY",
+      "from": "claim:priya-is-my-sister",
+      "to": "person:susan",
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 9000,
+        "end_ms": 11000
+      }
+    },
+    {
+      "type": "ABOUT",
+      "from": "claim:priya-is-my-sister",
+      "to": "person:priya",
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 9000,
+        "end_ms": 11000
+      }
+    },
+    {
+      "type": "EVIDENCE_FOR",
+      "from": "artifact:onboarding-voice",
+      "to": "claim:lived-in-princeton",
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 11000,
+        "end_ms": 13000
+      }
+    },
+    {
+      "type": "SPOKEN_BY",
+      "from": "claim:lived-in-princeton",
+      "to": "person:susan",
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 11000,
+        "end_ms": 13000
+      }
+    },
+    {
+      "type": "ABOUT",
+      "from": "claim:lived-in-princeton",
+      "to": "place:princeton",
+      "source": "artifact:onboarding-voice",
+      "span": {
+        "start_ms": 11000,
+        "end_ms": 13000
+      }
+    },
+    {
+      "type": "EVIDENCE_FOR",
+      "from": "artifact:maya-story-cape-may",
+      "to": "claim:maya-remembers-cape-may",
+      "source": "artifact:maya-story-cape-may"
+    },
+    {
+      "type": "SPOKEN_BY",
+      "from": "claim:maya-remembers-cape-may",
+      "to": "person:maya",
+      "source": "artifact:maya-story-cape-may"
+    },
+    {
+      "type": "CONTRIBUTED_BY",
+      "from": "claim:maya-remembers-cape-may",
+      "to": "person:maya",
+      "source": "artifact:maya-story-cape-may"
+    },
+    {
+      "type": "ABOUT",
+      "from": "claim:maya-remembers-cape-may",
+      "to": "event:cape-may-summers",
+      "source": "artifact:maya-story-cape-may"
+    },
+    {
+      "type": "ABOUT",
+      "from": "claim:maya-remembers-cape-may",
+      "to": "place:cape-may",
+      "source": "artifact:maya-story-cape-may"
+    },
+    {
+      "type": "EVIDENCE_FOR",
+      "from": "artifact:maya-story-wedding",
+      "to": "claim:wedding-in-new-jersey",
+      "source": "artifact:maya-story-wedding"
+    },
+    {
+      "type": "SPOKEN_BY",
+      "from": "claim:wedding-in-new-jersey",
+      "to": "person:maya",
+      "source": "artifact:maya-story-wedding"
+    },
+    {
+      "type": "CONTRIBUTED_BY",
+      "from": "claim:wedding-in-new-jersey",
+      "to": "person:maya",
+      "source": "artifact:maya-story-wedding"
+    },
+    {
+      "type": "ABOUT",
+      "from": "claim:wedding-in-new-jersey",
+      "to": "event:mayas-wedding",
+      "source": "artifact:maya-story-wedding"
+    },
+    {
+      "type": "PERMITTED_IN",
+      "from": "person:maya",
+      "to": "policy:susan-setup",
+      "source": "artifact:setup-record"
+    },
+    {
+      "type": "PERMITTED_IN",
+      "from": "artifact:setup-record",
+      "to": "policy:susan-setup",
+      "source": "artifact:setup-record"
+    },
+    {
+      "type": "PERMITTED_IN",
+      "from": "artifact:onboarding-voice",
+      "to": "policy:susan-setup",
+      "source": "artifact:setup-record"
+    },
+    {
+      "type": "PERMITTED_IN",
+      "from": "artifact:photo-maya",
+      "to": "policy:susan-setup",
+      "source": "artifact:setup-record"
+    },
+    {
+      "type": "PERMITTED_IN",
+      "from": "artifact:photo-cape-may",
+      "to": "policy:susan-setup",
+      "source": "artifact:setup-record"
+    },
+    {
+      "type": "PERMITTED_IN",
+      "from": "artifact:maya-story-cape-may",
+      "to": "policy:susan-setup",
+      "source": "artifact:setup-record"
+    },
+    {
+      "type": "PERMITTED_IN",
+      "from": "artifact:maya-story-wedding",
+      "to": "policy:susan-setup",
+      "source": "artifact:setup-record"
+    }
+  ],
+  "call_history": {
+    "source": "artifact:call-history",
+    "calls": [
+      {
+        "topic": "event:cape-may-summers",
+        "at": "2026-08-18T18:00:00.000Z",
+        "first_rung_reached_unaided": 3,
+        "highest_rung_used": 3,
+        "cue": {
+          "cue_id": "person:maya",
+          "rung": 3,
+          "effective": true
+        }
+      },
+      {
+        "topic": "event:cape-may-summers",
+        "at": "2026-08-25T18:00:00.000Z",
+        "first_rung_reached_unaided": 3,
+        "highest_rung_used": 3,
+        "cue": {
+          "cue_id": "person:maya",
+          "rung": 3,
+          "effective": true
+        }
+      },
+      {
+        "topic": "event:cape-may-summers",
+        "at": "2026-09-08T18:00:00.000Z",
+        "first_rung_reached_unaided": 3,
+        "highest_rung_used": 3,
+        "cue": {
+          "cue_id": "person:maya",
+          "rung": 3,
+          "effective": true
+        }
+      },
+      {
+        "topic": "event:cape-may-summers",
+        "at": "2026-09-15T18:00:00.000Z",
+        "first_rung_reached_unaided": 1,
+        "highest_rung_used": 1
+      },
+      {
+        "topic": "event:cape-may-summers",
+        "at": "2026-09-22T18:00:00.000Z",
+        "first_rung_reached_unaided": 3,
+        "highest_rung_used": 3,
+        "cue": {
+          "cue_id": "artifact:photo-cape-may",
+          "rung": 3,
+          "effective": true
+        }
+      },
+      {
+        "topic": "event:cape-may-summers",
+        "at": "2026-09-29T18:00:00.000Z",
+        "first_rung_reached_unaided": 1,
+        "highest_rung_used": 1
+      },
+      {
+        "topic": "event:cape-may-summers",
+        "at": "2026-10-06T18:00:00.000Z",
+        "first_rung_reached_unaided": 1,
+        "highest_rung_used": 1
+      },
+      {
+        "topic": "event:cape-may-summers",
+        "at": "2026-10-13T18:00:00.000Z",
+        "first_rung_reached_unaided": 1,
+        "highest_rung_used": 1
+      },
+      {
+        "topic": "event:cape-may-summers",
+        "at": "2026-10-20T18:00:00.000Z",
+        "first_rung_reached_unaided": 1,
+        "highest_rung_used": 1
+      },
+      {
+        "topic": "event:cape-may-summers",
+        "at": "2026-10-27T18:00:00.000Z",
+        "first_rung_reached_unaided": 1,
+        "highest_rung_used": 1
+      },
+      {
+        "topic": "place:lincoln-elementary",
+        "at": "2026-09-10T18:00:00.000Z",
+        "first_rung_reached_unaided": 1,
+        "highest_rung_used": 1
+      },
+      {
+        "topic": "place:lincoln-elementary",
+        "at": "2026-09-17T18:00:00.000Z",
+        "first_rung_reached_unaided": 1,
+        "highest_rung_used": 1
+      },
+      {
+        "topic": "place:lincoln-elementary",
+        "at": "2026-09-24T18:00:00.000Z",
+        "first_rung_reached_unaided": 1,
+        "highest_rung_used": 1
+      },
+      {
+        "topic": "place:lincoln-elementary",
+        "at": "2026-10-01T18:00:00.000Z",
+        "first_rung_reached_unaided": 1,
+        "highest_rung_used": 1
+      },
+      {
+        "topic": "place:lincoln-elementary",
+        "at": "2026-10-08T18:00:00.000Z",
+        "first_rung_reached_unaided": 4,
+        "highest_rung_used": 4
+      },
+      {
+        "topic": "place:lincoln-elementary",
+        "at": "2026-10-15T18:00:00.000Z",
+        "first_rung_reached_unaided": 1,
+        "highest_rung_used": 1
+      },
+      {
+        "topic": "place:lincoln-elementary",
+        "at": "2026-10-22T18:00:00.000Z",
+        "first_rung_reached_unaided": 4,
+        "highest_rung_used": 4
+      },
+      {
+        "topic": "place:lincoln-elementary",
+        "at": "2026-11-01T18:00:00.000Z",
+        "first_rung_reached_unaided": 4,
+        "highest_rung_used": 4
+      },
+      {
+        "topic": "place:princeton",
+        "at": "2026-10-29T18:00:00.000Z",
+        "first_rung_reached_unaided": 1,
+        "highest_rung_used": 1
+      },
+      {
+        "topic": "place:princeton",
+        "at": "2026-11-02T18:00:00.000Z",
+        "first_rung_reached_unaided": 1,
+        "highest_rung_used": 1
+      },
+      {
+        "topic": "event:mayas-wedding",
+        "at": "2026-11-03T18:00:00.000Z",
+        "first_rung_reached_unaided": null,
+        "highest_rung_used": 3
+      }
+    ]
+  }
 }

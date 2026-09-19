@@ -1,0 +1,171 @@
+{
+  "version": 1,
+  "description": "Every fixed line the family side can show, each with a script id (AGENTS.md section 6.4). Covered by the banned-phrase lint. Slots in braces are filled only with her name, a topic name, a member's name, counts, and dates. Changes need a second reviewer (section 13).",
+  "lines": {
+    "note_warm": {
+      "id": "FAM-NOTE-WARM",
+      "text": "Relay talked with {name} about {topic} this week. Want to give her a call?"
+    },
+    "note_gap": {
+      "id": "FAM-NOTE-GAP",
+      "text": "{topic} has no year yet. Do you remember one?"
+    },
+    "note_difference": {
+      "id": "FAM-NOTE-DIFF",
+      "text": "{name} and {member} remember this differently. Want to call her about it?"
+    },
+    "note_pointer": {
+      "id": "FAM-NOTE-POINTER",
+      "text": "There's a new note on {name}'s record."
+    },
+    "note_empty": {
+      "id": "FAM-NOTE-EMPTY",
+      "text": "Nothing new this week"
+    },
+    "record_header": {
+      "id": "FAM-REC-HEADER",
+      "text": "This is a record of what happened in Relay calls, not a measure of {name}'s memory overall. Practice on a topic, call quality, and time of day all affect it."
+    },
+    "record_unaided": {
+      "id": "FAM-REC-UNAIDED",
+      "text": "{topic} - recalled unaided in {unaided} of {calls} recent calls."
+    },
+    "record_after_cue": {
+      "id": "FAM-REC-CUE",
+      "text": "{topic} - recalled after a cue in {after_cue} of {calls} recent calls."
+    },
+    "record_recognition": {
+      "id": "FAM-REC-RECOGNITION",
+      "text": "{topic} - needed a recognition prompt in {recognition} of {calls} recent calls."
+    },
+    "record_not_enough": {
+      "id": "FAM-REC-NOT-ENOUGH",
+      "text": "{topic} - not enough calls yet."
+    },
+    "change_topic": {
+      "id": "FAM-CHG-TOPIC",
+      "text": "{topic} - recalled unaided in {recent} of the last {window} calls, compared with {earlier} of the {window} before."
+    },
+    "change_summary": {
+      "id": "FAM-CHG-01",
+      "text": "In recent Relay calls, more prompting was needed across several topics than in earlier calls. This is a record of Relay calls, not a clinical assessment. If you have concerns, you can export the record to share with a doctor."
+    },
+    "export_note": {
+      "id": "FAM-EXPORT-NOTE",
+      "text": "This record is not a clinical assessment or diagnosis."
+    },
+    "contribution_prompt": {
+      "id": "FAM-CONTRIB-PROMPT",
+      "text": "Tell Relay about a memory you share with {name}."
+    },
+    "contribution_question_hint": {
+      "id": "FAM-CONTRIB-HINT",
+      "text": "This box is for telling Relay something you remember. To find out what {name} remembers, give her a call."
+    },
+    "contribution_thanks": {
+      "id": "FAM-CONTRIB-THANKS",
+      "text": "Thank you. Relay will gently ask {name} about it, in her own time."
+    },
+    "receipt_unaided": {
+      "id": "FAM-RCPT-1",
+      "text": "{topic} - recalled unaided in this call."
+    },
+    "receipt_context": {
+      "id": "FAM-RCPT-2",
+      "text": "{topic} - recalled after a little context in this call."
+    },
+    "receipt_cue": {
+      "id": "FAM-RCPT-3",
+      "text": "{topic} - recalled after one contextual cue ({cue}) in this call."
+    },
+    "receipt_recognition": {
+      "id": "FAM-RCPT-4",
+      "text": "{topic} - recalled with a recognition prompt in this call."
+    },
+    "receipt_reorientation": {
+      "id": "FAM-RCPT-5",
+      "text": "{topic} - Relay shared the memory in this call."
+    },
+    "receipt_not_reached": {
+      "id": "FAM-RCPT-NONE",
+      "text": "{topic} - not reached in this call."
+    },
+    "receipt_no_call": {
+      "id": "FAM-RCPT-NO-CALL",
+      "text": "No call was placed."
+    },
+    "receipt_stopped": {
+      "id": "FAM-RCPT-STOPPED",
+      "text": "The call was ended early. Nothing from it was kept."
+    },
+    "receipt_safety": {
+      "id": "FAM-RCPT-SAFETY",
+      "text": "Relay stopped the call and sent a safety note to the designated caregiver."
+    },
+    "receipt_conduct": {
+      "id": "FAM-RCPT-CONDUCT",
+      "text": "No correction, no distress."
+    },
+    "thesis": {
+      "id": "THESIS",
+      "text": "Cues, not answers - every memory stays in her own words."
+    }
+  },
+  "question_openers": [
+    "what did",
+    "what does",
+    "what do",
+    "what would",
+    "who is",
+    "who was",
+    "where did",
+    "where was",
+    "when did",
+    "why did",
+    "how did",
+    "how does",
+    "did she",
+    "does she",
+    "did mom",
+    "does mom",
+    "has she",
+    "can you tell",
+    "could you tell",
+    "tell me",
+    "do you know",
+    "is it true"
+  ],
+  "query_categories": {
+    "event": [
+      "wedding",
+      "birthday",
+      "anniversary",
+      "holiday",
+      "summer",
+      "trip",
+      "graduation",
+      "party"
+    ],
+    "place": [
+      "where",
+      "house",
+      "home",
+      "town",
+      "school",
+      "address",
+      "live",
+      "lived"
+    ],
+    "person": [
+      "who",
+      "sister",
+      "brother",
+      "daughter",
+      "son",
+      "husband",
+      "mother",
+      "father",
+      "friend"
+    ]
+  }
+}

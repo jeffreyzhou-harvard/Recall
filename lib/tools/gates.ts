@@ -1,7 +1,7 @@
 /**
- * Hard gates. Identity, policy, evidence, and assent are enforced here as
- * services - not as prompt instructions and not as decorative wrappers. The
- * model selects tool calls; it cannot reach past this object.
+ * Hard gates. Policy, evidence, and confirmation are enforced here as services -
+ * not as prompt instructions and not as decorative wrappers. The model selects
+ * tool calls; it cannot reach past this object.
  *
  * Every check fails closed: a missing record, a mismatch, or an expired token
  * throws GateError, and nothing downstream runs. There is no override flag.
@@ -10,7 +10,7 @@
  */
 import type { SourceClass } from "@/lib/graph/types";
 import { contentHash } from "@/lib/provenance/hash";
-import type { AssentDecision, GateName } from "@/lib/state/machine";
+import type { GateName, ShareDecision, StoreDecision } from "@/lib/state/machine";
 
 export class GateError extends Error {
   constructor(
@@ -22,145 +22,134 @@ export class GateError extends Error {
   }
 }
 
+/** Proof that the joint setup allowed THIS call: her, this topic, now. Everything after the grant must present it. */
 export interface PolicyToken {
   token_id: string;
   policy_id: string;
-  ask_id: string;
   person_id: string;
-  asker_id: string;
-  purpose: string;
-  audience: string;
+  topic_id: string;
   allowed_source_classes: SourceClass[];
-  forbidden_claims: string[];
   issued_at: string;
   expires_at: string;
   /** Hash of every field above. A token whose fields were edited no longer matches. */
   digest: string;
 }
 
-export interface AssentRecord {
-  assent_id: string;
-  decision: AssentDecision;
-  contribution_hash: string;
-  audience: string;
-  recorded_at: string;
+/** What `verify_claim_support` established about one id. `render_prompt` reads the speaker from here, not from its caller. */
+export interface VerifiedEvidence {
+  id: string;
+  speaker: string;
+  patient_confirmed: boolean;
 }
 
 const tokenBody = (t: Omit<PolicyToken, "digest">): Omit<PolicyToken, "digest"> => ({
   token_id: t.token_id,
   policy_id: t.policy_id,
-  ask_id: t.ask_id,
   person_id: t.person_id,
-  asker_id: t.asker_id,
-  purpose: t.purpose,
-  audience: t.audience,
+  topic_id: t.topic_id,
   allowed_source_classes: t.allowed_source_classes,
-  forbidden_claims: t.forbidden_claims,
   issued_at: t.issued_at,
   expires_at: t.expires_at,
 });
 
 export class GateKeeper {
-  private identityVerifiedFor: string | null = null;
   private readonly tokens = new Map<string, PolicyToken>();
-  private readonly verifiedEvidence = new Set<string>();
+  private readonly verified = new Map<string, VerifiedEvidence>();
   private pendingContributionHash: string | null = null;
-  private readonly assents = new Map<string, AssentRecord>();
-
-  // identity ---------------------------------------------------------------
-
-  recordIdentityVerified(askId: string): void {
-    this.identityVerifiedFor = askId;
-  }
-
-  requireIdentity(askId: string): void {
-    if (this.identityVerifiedFor !== askId) {
-      throw new GateError("identity", `identities for ask "${askId}" have not been verified`);
-    }
-  }
+  private storeDecision: { hash: string; decision: StoreDecision } | null = null;
+  private shareDecision: { hash: string; decision: ShareDecision } | null = null;
+  private readonly alerted = new Set<string>();
 
   // policy -----------------------------------------------------------------
 
   async issueToken(body: Omit<PolicyToken, "digest">): Promise<PolicyToken> {
-    this.requireIdentity(body.ask_id);
     const token: PolicyToken = { ...tokenBody(body), digest: await contentHash(tokenBody(body)) };
     this.tokens.set(token.token_id, token);
     return token;
   }
 
-  /** The token must be one this keeper issued, unaltered, unexpired, and for this ask. */
-  async requireToken(tokenId: string | null | undefined, askId: string, nowIso: string): Promise<PolicyToken> {
+  /** The token must be one this keeper issued, unaltered, unexpired, and for this topic. */
+  async requireToken(tokenId: string | null | undefined, topicId: string, nowIso: string): Promise<PolicyToken> {
     if (!tokenId) throw new GateError("policy", "no policy token was presented");
     const token = this.tokens.get(tokenId);
     if (!token) throw new GateError("policy", `policy token "${tokenId}" was not issued by this session`);
-    if ((await contentHash(tokenBody(token))) !== token.digest) {
-      throw new GateError("policy", "policy token has been altered");
-    }
-    if (token.ask_id !== askId) throw new GateError("policy", "policy token is for a different ask");
+    if ((await contentHash(tokenBody(token))) !== token.digest) throw new GateError("policy", "policy token has been altered");
+    if (token.topic_id !== topicId) throw new GateError("policy", "policy token is for a different topic");
     if (token.expires_at <= nowIso) throw new GateError("policy", "policy token has expired");
     return token;
   }
 
   // evidence ---------------------------------------------------------------
 
-  recordVerifiedEvidence(ids: Iterable<string>): void {
-    for (const id of ids) this.verifiedEvidence.add(id);
+  recordVerifiedEvidence(entries: Iterable<VerifiedEvidence>): void {
+    for (const e of entries) this.verified.set(e.id, { ...e });
   }
 
   /** Rule 6: no citations, no speech. */
-  requireVerifiedEvidence(ids: readonly string[]): void {
-    const missing = ids.filter((id) => !this.verifiedEvidence.has(id));
-    if (missing.length > 0) {
-      throw new GateError("evidence", `not verified by verify_claim_support: ${missing.join(", ")}`);
-    }
+  requireVerifiedEvidence(ids: readonly string[]): VerifiedEvidence[] {
+    const missing = ids.filter((id) => !this.verified.has(id));
+    if (missing.length > 0) throw new GateError("evidence", `not verified by verify_claim_support: ${missing.join(", ")}`);
+    return ids.map((id) => ({ ...this.verified.get(id)! }));
   }
 
   isVerified(id: string): boolean {
-    return this.verifiedEvidence.has(id);
+    return this.verified.has(id);
   }
 
   verifiedIds(): string[] {
-    return [...this.verifiedEvidence].sort();
+    return [...this.verified.keys()].sort();
   }
 
-  // contribution and assent -------------------------------------------------
+  // contribution, store-confirmation, share-confirmation ----------------------
 
-  /** A new capture replaces the pending artifact and voids every earlier approval (rule 3). */
+  /** A new capture replaces the pending artifact and voids every earlier confirmation (rule 3). */
   setPendingContribution(hash: string): void {
-    if (this.pendingContributionHash !== hash) this.assents.clear();
+    if (this.pendingContributionHash !== hash) {
+      this.storeDecision = null;
+      this.shareDecision = null;
+    }
     this.pendingContributionHash = hash;
   }
 
   requirePendingContribution(hash: string): void {
-    if (this.pendingContributionHash === null) throw new GateError("assent", "there is no captured contribution");
-    if (this.pendingContributionHash !== hash) {
-      throw new GateError("assent", "hash does not match the captured contribution");
-    }
+    if (this.pendingContributionHash === null) throw new GateError("confirmation", "there is no captured contribution");
+    if (this.pendingContributionHash !== hash) throw new GateError("confirmation", "hash does not match the captured contribution");
   }
 
-  recordAssent(record: AssentRecord): void {
-    this.requirePendingContribution(record.contribution_hash);
-    this.assents.set(record.assent_id, record);
+  recordStoreConfirmation(hash: string, decision: StoreDecision): void {
+    this.requirePendingContribution(hash);
+    this.storeDecision = { hash, decision };
+  }
+
+  /** The share question is asked only after a yes to the store question (section 5). */
+  recordShareConfirmation(hash: string, decision: ShareDecision): void {
+    this.requirePendingContribution(hash);
+    if (this.storeDecision?.hash !== hash || this.storeDecision.decision !== "yes") {
+      throw new GateError("confirmation", "the share question comes only after she has said yes to remembering it");
+    }
+    if (this.shareDecision?.hash === hash) throw new GateError("confirmation", "the share question has already been answered for this contribution");
+    this.shareDecision = { hash, decision };
   }
 
   /**
-   * The publish gate. Requires a recorded yes for exactly this hash and
-   * exactly this destination, with the contribution unchanged since.
+   * The commit gate. Requires her recorded yes for exactly this hash, the contribution unchanged since,
+   * and the share question resolved - because commit comes last. Returns whether she chose to share it.
    */
-  requirePublishable(hash: string, destination: string, token: PolicyToken): AssentRecord {
+  requireCommittable(hash: string): { shared: boolean } {
     this.requirePendingContribution(hash);
-    if (destination !== token.audience) {
-      throw new GateError("permission", `destination "${destination}" is not the audience the policy approved`);
-    }
-    const yes = [...this.assents.values()].find(
-      (a) => a.decision === "yes" && a.contribution_hash === hash && a.audience === destination,
-    );
-    if (!yes) {
-      const any = [...this.assents.values()].find((a) => a.contribution_hash === hash);
-      if (!any) throw new GateError("assent", "no assent has been recorded for this contribution");
-      if (any.decision !== "yes") throw new GateError("assent", `assent was "${any.decision}", not yes`);
-      throw new GateError("assent", "assent was given for a different audience");
-    }
-    return yes;
+    if (!this.storeDecision || this.storeDecision.hash !== hash) throw new GateError("confirmation", "no confirmation has been recorded for this contribution");
+    if (this.storeDecision.decision !== "yes") throw new GateError("confirmation", `her answer was "${this.storeDecision.decision}", not yes`);
+    if (!this.shareDecision || this.shareDecision.hash !== hash) throw new GateError("confirmation", "the share question has not resolved; commit comes last");
+    return { shared: this.shareDecision.decision === "yes" };
+  }
+
+  // safety -----------------------------------------------------------------
+
+  /** At most one alert per category per caregiver per call. Returns false if this one has already gone. */
+  claimAlert(category: string, caregiverId: string): boolean {
+    const key = JSON.stringify([category, caregiverId]);
+    if (this.alerted.has(key)) return false;
+    this.alerted.add(key);
+    return true;
   }
 }

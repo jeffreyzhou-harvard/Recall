@@ -1,47 +1,57 @@
 /**
- * The application seam. Two operations, matching the two things that can
- * happen to Relay from outside:
+ * Relay's service layer: the one place the call side and the family side meet.
  *
- *   forwardAsk(payload)   a relative forwarded one ask out of the family thread
- *   runSession(threadId)  act on that thread's current ask, start to finish
+ *   runScheduledCall   the scheduler's tick: pick the topic that is due, check
+ *                      the joint setup, call her, climb the ladder, capture,
+ *                      confirm, store. Always ends safely.
+ *   family flows       tell Relay a memory, the redirect-only ask box, the
+ *                      Weekly Note, the per-topic record, the export.
+ *   caregiver controls pause, revoke, clear a record layer.
  *
- * Everything is injected, so the judged path (fixtures, in-memory graph and
- * bridge, prerecorded call) and a live deployment (LadybugDB, a real bridge,
- * a live call driver) are the same code with different parts plugged in.
- * Nothing under /lib imports a fixture.
+ * There is no method here by which a family member can cause a call to her
+ * (rule 5). `runScheduledCall` takes no topic and no requester: what it does is
+ * decided by the graph, the joint setup, and the clock. Nothing here sends
+ * anything to family either, except the safety alert inside a call (rule 15):
+ * the family side is read when an approved member opens it.
  */
-import { NOTICE_TEXT, type ThreadBridge } from "@/lib/bridge/thread-bridge";
 import type { Clock, FixtureClock } from "@/lib/clock";
-import type { GraphStore } from "@/lib/graph/store";
 import { LexicalAnswerInterpreter, applyAnswer, type Answer, type AnswerInterpreter, type ApplyResult } from "@/lib/discovery/answers";
 import { findGaps } from "@/lib/discovery/gaps";
 import { ingestLibrary, type IngestResult } from "@/lib/discovery/ingest";
 import { assertSpeakable, questionFor, type Question } from "@/lib/discovery/questions";
-import { IntakeError, type IntakeRejection } from "@/lib/intake/contract";
-import { intakeForwardedAsk, type IntakeResult } from "@/lib/intake/intake";
-import { LexicalAskInterpreter, type AskInterpreter } from "@/lib/intake/interpret";
+import type { FamilyCopy, RecordThresholds } from "@/lib/family/copy";
+import { FamilyView } from "@/lib/family/projection";
+import { clearRetrievalLayer, clearTopicRecord } from "@/lib/graph/retrieval-layer";
+import type { GraphStore } from "@/lib/graph/store";
 import type { CallDriver } from "@/lib/orchestrator/call-driver";
-import { runAsk } from "@/lib/orchestrator/run";
+import { runRecallCall } from "@/lib/orchestrator/run";
 import type { AssetIndex } from "@/lib/provenance/assets";
 import { ProvLog } from "@/lib/provenance/prov-log";
 import type { TranscriptionProvider } from "@/lib/providers/transcription";
+import type { AlertChannel } from "@/lib/safety/alert";
+import type { SafetyPhrases } from "@/lib/safety/phrases";
+import type { CallScript } from "@/lib/script/call-script";
 import { buildRecording, type SessionRecording } from "@/lib/session/recording";
 import { createRelayStore } from "@/lib/state/store";
-import { GateKeeper, TOOL_IMPLS, ToolRuntime, newSession, type AccessPolicy, type Fault, type ScaffoldAdvisor, type ToolContext, type ToolName } from "@/lib/tools";
+import { GateKeeper, TOOL_IMPLS, ToolRuntime, newSession, type FamilyToolContext, type Fault, type ScaffoldAdvisor, type SetupStore, type ToolContext, type ToolInput, type ToolName, type ToolOutput } from "@/lib/tools";
 
 export interface RelayDeps {
   graph: GraphStore;
-  policy: AccessPolicy;
+  /** The live joint setup. Read fresh at every call and every dashboard load, so a revocation is in force before the next one. */
+  setup: SetupStore;
   assets: AssetIndex;
   clock: Clock;
-  bridge: ThreadBridge;
   transcription: TranscriptionProvider;
-  /** Places the call once the policy has been granted. Never invoked before that. Null means this deployment cannot call. */
+  script: CallScript;
+  copy: FamilyCopy;
+  thresholds: RecordThresholds;
+  safetyPhrases: SafetyPhrases;
+  alerts: AlertChannel;
+  /** Places the call once the policy has granted it. Never invoked before that. Null means this deployment cannot call. */
   callDriver: (() => CallDriver) | null;
-  interpreter?: AskInterpreter;
   /** Reads facts out of an answer. It only proposes: applyAnswer decides what is grounded enough to keep. */
   answerInterpreter?: AnswerInterpreter;
-  /** Live only (Muse Spark). May pick among the scaffold rungs the ladder found eligible; see select_scaffold. */
+  /** Live only (Muse Spark). May pick WHICH cue where the retrieval layer has no preference; see select_scaffold. */
   scaffoldAdvisor?: ScaffoldAdvisor;
   runtime?: {
     faults?: Fault[];
@@ -50,38 +60,121 @@ export interface RelayDeps {
   };
 }
 
-export type ForwardOutcome =
-  | ({ accepted: true } & IntakeResult)
-  | { accepted: false; code: IntakeRejection; detail: string; clarify_posted: boolean };
-
-/** A run in full: the recording for the views, plus the live objects for tests and the judge console. */
 export interface SessionRun {
   recording: SessionRecording;
   ctx: ToolContext;
   runtime: ToolRuntime;
 }
 
+type FamilyTool = "receive_family_contribution" | "handle_family_query" | "build_weekly_note" | "get_topic_record" | "export_record_for_clinician";
+
 export class RelayService {
-  private readonly interpreter: AskInterpreter;
   private readonly answerInterpreter: AnswerInterpreter;
+  /** The family side's tool log, for the judge console. Kept apart from any call's log. */
+  readonly familyRuntime: ToolRuntime;
 
   constructor(private readonly deps: RelayDeps) {
-    this.interpreter = deps.interpreter ?? new LexicalAskInterpreter();
     this.answerInterpreter = deps.answerInterpreter ?? new LexicalAnswerInterpreter();
+    const family: FamilyToolContext = {
+      view: new FamilyView(deps.graph, deps.setup.current().person_id),
+      assets: deps.assets,
+      setup: deps.setup,
+      clock: deps.clock,
+      script: deps.script,
+      copy: deps.copy,
+      thresholds: deps.thresholds,
+    };
+    // A runtime with a family context and no call context: a family flow cannot run a call tool even by mistake.
+    this.familyRuntime = new ToolRuntime({ clock: deps.clock, family }, TOOL_IMPLS);
   }
 
-  // --- discovery loop: photos -> questions -> answers -> richer graph --------------------------------------
-  // Pull-based on purpose. Relay never schedules a question or starts a conversation: someone opens a
-  // sitting and asks what Relay would like to know. No sitting, no questions.
+  // --- the recall call -----------------------------------------------------------------------------------------
 
-  /** Observations from a photo library the family shared. Refused unless the joint setup allows it, kind by kind. */
+  /**
+   * One tick of the schedule. Picks the topic that is due, and - only if the joint setup allows it, now -
+   * calls her. A blocked call is a finished, recorded run like any other. Returns null when nothing is due.
+   */
+  async runScheduledCall(sessionId: string): Promise<SessionRun | null> {
+    const { deps } = this;
+    const store = createRelayStore();
+    const personId = deps.setup.current().person_id;
+    const ctx: ToolContext = {
+      graph: deps.graph,
+      setup: deps.setup,
+      assets: deps.assets,
+      clock: deps.clock,
+      gate: new GateKeeper(),
+      transcription: deps.transcription,
+      session: newSession(sessionId),
+      prov: new ProvLog(),
+      script: deps.script,
+      copy: deps.copy,
+      safetyPhrases: deps.safetyPhrases,
+      alerts: deps.alerts,
+      machine: () => store.getState().machine,
+      scaffoldAdvisor: deps.scaffoldAdvisor,
+    };
+    const runtime = new ToolRuntime({ clock: deps.clock, call: ctx }, TOOL_IMPLS, deps.runtime ?? {});
+    const startedAt = deps.clock.iso();
+    const { machine, receipt } = await runRecallCall({ person_id: personId, ctx, runtime, store, callDriver: deps.callDriver });
+    if (machine.state === "idle") return null;
+    const recording = await buildRecording({ person_id: personId, started_at: startedAt, ended_at: deps.clock.iso(), machine, session: ctx.session, tool_log: runtime.log, receipt });
+    return { recording, ctx, runtime };
+  }
+
+  // --- the family side: read when an approved member opens it, never pushed ----------------------------------------
+
+  private family<T extends FamilyTool>(tool: T, input: ToolInput<T>): Promise<ToolOutput<T>> {
+    return this.familyRuntime.call(tool, input);
+  }
+
+  /** "Tell Relay about a memory you share with Susan." One-way: it returns a thank-you or a hint, never anything from the graph. */
+  tellRelayAMemory(input: ToolInput<"receive_family_contribution">): Promise<ToolOutput<"receive_family_contribution">> {
+    return this.family("receive_family_contribution", input);
+  }
+
+  /** The "Ask about Susan" box. Whatever is typed, the reply is the redirect line (rule 10). */
+  askAboutHer(question: string, requesterId: string): Promise<ToolOutput<"handle_family_query">> {
+    return this.family("handle_family_query", { question, requester_id: requesterId });
+  }
+
+  /** The Weekly Note for one member, posted if one is due and there is anything to say. At most one per 7 days. */
+  weeklyNote(memberId: string): Promise<ToolOutput<"build_weekly_note">> {
+    return this.family("build_weekly_note", { member_id: memberId, week: { now: this.deps.clock.iso() } });
+  }
+
+  topicRecord(memberId: string): Promise<ToolOutput<"get_topic_record">> {
+    return this.family("get_topic_record", { member_id: memberId });
+  }
+
+  exportRecord(requesterId: string): Promise<ToolOutput<"export_record_for_clinician">> {
+    return this.family("export_record_for_clinician", { requester_id: requesterId });
+  }
+
+  // --- caregiver controls (rule 12; section 6.3) ----------------------------------------------------------------
+
+  /** Each layer can be cleared on its own. Clearing one never touches the other. */
+  clearRetrievalLayer(): Promise<number> {
+    return clearRetrievalLayer(this.deps.graph);
+  }
+
+  clearTopicRecord(): Promise<number> {
+    return clearTopicRecord(this.deps.graph);
+  }
+
+  // --- ask, don't assert: questions about what Relay does not know yet (section 7) ------------------------------------
+  // Pull-based on purpose. Relay never schedules one of these: someone opens a sitting and asks what Relay
+  // would like to know. No sitting, no questions.
+
+  /** Observations about photos the family shared. Refused unless the joint setup allows it, kind by kind. */
   ingestLibrary(observations: unknown, grantedBy: string): Promise<IngestResult> {
-    return ingestLibrary(observations, { graph: this.deps.graph, assets: this.deps.assets, policy: this.deps.policy, granted_by: grantedBy });
+    return ingestLibrary(observations, { graph: this.deps.graph, assets: this.deps.assets, policy: this.deps.setup.current(), granted_by: grantedBy });
   }
 
   /** What Relay does not know yet, most useful first, each already worded and checked to cite only what it may. */
   async nextQuestions(limit = 3, askedThisSitting: ReadonlySet<string> = new Set()): Promise<Question[]> {
-    const { graph, policy } = this.deps;
+    const { graph } = this.deps;
+    const policy = this.deps.setup.current();
     if (!policy.discovery.enabled) return [];
     const gaps = await findGaps(graph, { participant_id: policy.person_id, invite_her_confirmation: policy.discovery.invite_her_confirmation, asked_this_session: askedThisSitting });
     const questions: Question[] = [];
@@ -95,75 +188,10 @@ export class RelayService {
 
   /** Someone answered. Only what they literally said is kept as fact; see lib/discovery/answers.ts. */
   async answerQuestion(question: Question, answer: Answer): Promise<ApplyResult> {
-    const { graph, policy } = this.deps;
+    const { graph } = this.deps;
+    const policy = this.deps.setup.current();
     const speaker = { id: answer.by, is_participant: answer.by === policy.person_id };
     const proposals = await this.answerInterpreter.interpret(question, answer, speaker, policy.person_id);
     return applyAnswer(question, answer, proposals, { graph, policy });
-  }
-
-  /**
-   * Request intake. A forward Relay cannot honestly write down is refused and leaves nothing in the
-   * graph. If it came from a thread the family set up, that thread is asked to clarify; if even the
-   * thread is unknown, Relay says nothing to anyone.
-   */
-  async forwardAsk(payload: unknown): Promise<ForwardOutcome> {
-    const { graph, assets, bridge, clock, policy } = this.deps;
-    try {
-      const result = await intakeForwardedAsk(payload, { graph, assets, interpreter: this.interpreter, ask_ttl_hours: policy.ask_ttl_hours });
-      bridge.registerForward(result.forward_id, result.thread_id);
-      return { accepted: true, ...result };
-    } catch (e) {
-      if (!(e instanceof IntakeError)) throw e;
-      const origin = payload as { forward_id?: unknown; thread_id?: unknown } | null;
-      const thread = typeof origin?.thread_id === "string" ? await graph.getNode(origin.thread_id) : null;
-      const knownThread = thread?.type === "Artifact" && thread.props.kind === "thread";
-      let posted = false;
-      if (knownThread && typeof origin?.forward_id === "string") {
-        bridge.registerForward(origin.forward_id, thread.id);
-        await bridge.post(
-          { kind: "family_notice", in_reply_to: origin.forward_id, to: { thread_id: thread.id }, notice: "clarify", text: NOTICE_TEXT.clarify, authored_by: "relay" },
-          clock.iso(),
-        );
-        posted = true;
-      }
-      return { accepted: false, code: e.code, detail: e.message, clarify_posted: posted };
-    }
-  }
-
-  /** Act on the thread's current ask: gates, call, capture, assent, delivery, receipts. Always ends safely. */
-  async runSession(threadId: string, sessionId: string): Promise<SessionRun> {
-    const { deps } = this;
-    const store = createRelayStore();
-    const ctx: ToolContext = {
-      graph: deps.graph,
-      policy: deps.policy,
-      assets: deps.assets,
-      clock: deps.clock,
-      gate: new GateKeeper(),
-      transcription: deps.transcription,
-      session: newSession(sessionId),
-      prov: new ProvLog(),
-      bridge: deps.bridge,
-      machine: () => store.getState().machine,
-      scaffoldAdvisor: deps.scaffoldAdvisor,
-    };
-    const runtime = new ToolRuntime(ctx, TOOL_IMPLS, deps.runtime ?? {});
-    const already = deps.bridge.posted().length;
-    const startedAt = deps.clock.iso();
-
-    const { machine, receipt } = await runAsk({ thread_id: threadId, ctx, runtime, store, callDriver: deps.callDriver });
-
-    const recording = await buildRecording({
-      thread_id: threadId,
-      started_at: startedAt,
-      ended_at: deps.clock.iso(),
-      machine,
-      session: ctx.session,
-      tool_log: runtime.log,
-      messages: deps.bridge.posted().slice(already),
-      receipt,
-      graph: deps.graph,
-    });
-    return { recording, ctx, runtime };
   }
 }

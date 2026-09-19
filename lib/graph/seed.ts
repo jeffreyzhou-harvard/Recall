@@ -19,6 +19,7 @@ import {
   NODE_TYPES,
   SOURCE_CLASSES,
   initialStatus,
+  patientConfirmed,
   type EdgeType,
   type GraphData,
   type GraphEdge,
@@ -44,43 +45,52 @@ const sourceSchema = z.object({
 export type SeedSource = z.infer<typeof sourceSchema>;
 
 /** Per-type `props` shapes. Unknown keys are rejected, so nothing rides along unvalidated. */
-const propsSchemas: Record<NodeType, z.ZodType> = {
+const topicFacet = z.strictObject({ spoken_as: z.string().min(1), category: z.string().min(1) });
+const rung = z.number().int().min(1).max(5);
+
+export const propsSchemas: Record<NodeType, z.ZodType> = {
   Person: z.strictObject({
     display_name: z.string().min(1),
-    role: z.enum(["participant", "asker", "known"]),
+    role: z.enum(["participant", "family", "known"]),
     subject_pronoun: z.string().min(1).optional(),
   }),
   Relationship: z.strictObject({ kind: z.string().min(1), verified: z.boolean() }),
-  CurrentAsk: z.strictObject({
-    forward_id: z.string().min(1),
-    thread_id: z.string().min(1),
-    text: z.string().min(1),
-    option_topic_ids: z.array(z.string()),
-    requested_audience: z.string().min(1),
-    received_at: z.iso.datetime(),
-  }),
   Artifact: z.strictObject({
-    kind: z.enum(["photo", "audio", "message", "thread", "setup_record", "answer"]),
+    kind: z.enum(["photo", "audio", "setup_record", "answer", "family_story", "call", "audit_log"]),
     text: z.string().nullable(),
     alt: z.string().nullable(),
   }),
-  Topic: z.strictObject({ wikidata_id: z.string().regex(/^Q\d+$/).nullable(), aliases: z.array(z.string()) }),
-  EpisodicClaim: z.strictObject({ text: z.string().min(1) }),
+  EpisodicClaim: z.strictObject({ text: z.string().min(1), topic: topicFacet.optional() }),
   PreferenceExpertise: z.strictObject({ text: z.string().min(1) }),
-  Event: z.strictObject({ wikidata_id: z.string().regex(/^Q\d+$/).nullable(), date: z.iso.date().nullable() }),
+  Event: z.strictObject({ wikidata_id: z.string().regex(/^Q\d+$/).nullable(), date: z.iso.date().nullable(), topic: topicFacet.optional() }),
   AccessPolicy: z.strictObject({ policy_ref: z.string().min(1) }),
-  Session: z.strictObject({ ask_id: z.string(), started_at: z.iso.datetime(), ended_at: z.iso.datetime().nullable() }),
+  Session: z.strictObject({ topic_id: z.string().min(1), started_at: z.iso.datetime(), ended_at: z.iso.datetime().nullable(), outcome: z.string().min(1) }),
   Contribution: z.strictObject({
     content_hash: z.string(),
     literal_transcript: z.string(),
     generated_first_person_words: z.literal(0),
+    shared: z.boolean(),
   }),
-  Assent: z.strictObject({
-    decision: z.enum(["yes", "no", "unclear"]),
-    contribution_hash: z.string(),
-    audience: z.string(),
+  RetrievalRecord: z.strictObject({ topic_id: z.string().min(1), cue_id: z.string().min(1), rung, effective: z.boolean(), used_at: z.iso.datetime() }),
+  FamilyQueryEvent: z.strictObject({ category: z.string().min(1), at: z.iso.datetime() }),
+  WeeklyNote: z.strictObject({
+    member_id: z.string().min(1),
+    posted_at: z.iso.datetime(),
+    lines: z.array(z.strictObject({ script_id: z.string().min(1), text: z.string().min(1) })),
+    shared_contribution_id: z.string().nullable(),
   }),
-  Place: z.strictObject({ aliases: z.array(z.string()) }),
+  ShareConfirmation: z.strictObject({ decision: z.enum(["yes", "no", "unclear", "timeout"]), contribution_hash: z.string(), recorded_at: z.iso.datetime() }),
+  TopicOutcome: z.strictObject({
+    session_id: z.string().min(1),
+    topic_id: z.string().min(1),
+    first_rung_reached_unaided: rung.nullable(),
+    highest_rung_used: rung,
+    timestamp: z.iso.datetime(),
+  }),
+  ExportEvent: z.strictObject({ requester_id: z.string().min(1), at: z.iso.datetime() }),
+  DashboardAccessGrant: z.strictObject({ member_id: z.string().min(1), action: z.enum(["viewed", "refused", "revoked"]), surface: z.string().min(1), at: z.iso.datetime() }),
+  SafetyEvent: z.strictObject({ category: z.string().min(1), at: z.iso.datetime(), recipients: z.array(z.string().min(1)) }),
+  Place: z.strictObject({ aliases: z.array(z.string()), topic: topicFacet.optional() }),
   Activity: z.strictObject({ aliases: z.array(z.string()) }),
   Story: z.strictObject({ text: z.string().min(1) }),
   Cluster: z.strictObject({ kind: z.enum(["face", "place", "time", "theme"]), cluster_key: z.string().min(1), photo_count: z.number().int().nonnegative() }),
@@ -106,12 +116,26 @@ const seedEdgeSchema = z.strictObject({
   props: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
 });
 
+/**
+ * Earlier recall calls, one row each. The loader expands a row into a Session, its TopicOutcome, and the
+ * OUTCOME_OF edge between them - three records that must always agree, so they are never typed by hand.
+ */
+const callHistoryRow = z.strictObject({
+  topic: z.string().min(1),
+  at: z.iso.datetime(),
+  first_rung_reached_unaided: rung.nullable(),
+  highest_rung_used: rung,
+  /** The one cue offered in that call, and whether she reached the memory after it: the retrieval layer (section 6.3). */
+  cue: z.strictObject({ cue_id: z.string().min(1), rung, effective: z.boolean() }).optional(),
+});
+
 export const seedFileSchema = z.strictObject({
   version: z.literal(1),
   description: z.string(),
   sources: z.record(z.string(), sourceSchema),
   nodes: z.array(seedNodeSchema),
   edges: z.array(seedEdgeSchema),
+  call_history: z.strictObject({ source: z.string().min(1), calls: z.array(callHistoryRow) }).optional(),
 });
 export type SeedFile = z.infer<typeof seedFileSchema>;
 
@@ -156,6 +180,7 @@ export function mergeSeeds(base: SeedFile, ...overlays: SeedFile[]): SeedFile {
     sources: { ...base.sources },
     nodes: [...base.nodes],
     edges: [...base.edges],
+    ...(base.call_history ? { call_history: { source: base.call_history.source, calls: [...base.call_history.calls] } } : {}),
   };
   for (const overlay of overlays) {
     for (const [key, source] of Object.entries(overlay.sources)) {
@@ -164,8 +189,40 @@ export function mergeSeeds(base: SeedFile, ...overlays: SeedFile[]): SeedFile {
     }
     merged.nodes.push(...overlay.nodes);
     merged.edges.push(...overlay.edges);
+    if (overlay.call_history) {
+      if (merged.call_history && merged.call_history.source !== overlay.call_history.source) throw new SeedValidationError(["overlay call history cites a different source than the base"]);
+      merged.call_history = { source: overlay.call_history.source, calls: [...(merged.call_history?.calls ?? []), ...overlay.call_history.calls] };
+    }
   }
   return merged;
+}
+
+export const sessionIdAt = (topicId: string, atIso: string): string => `session:seed:${topicId}:${atIso}`;
+
+function expandCallHistory(seed: SeedFile): SeedFile {
+  if (!seed.call_history) return seed;
+  const { source, calls } = seed.call_history;
+  const nodes = [...seed.nodes];
+  const edges = [...seed.edges];
+  for (const call of calls) {
+    const sessionId = sessionIdAt(call.topic, call.at);
+    const outcomeId = `outcome:${sessionId}`;
+    nodes.push({ id: sessionId, type: "Session", label: "Recall call", source, props: { topic_id: call.topic, started_at: call.at, ended_at: call.at, outcome: call.first_rung_reached_unaided === null ? "no_answer_today" : "stored" } });
+    nodes.push({
+      id: outcomeId,
+      type: "TopicOutcome",
+      label: "Topic outcome",
+      source,
+      props: { session_id: sessionId, topic_id: call.topic, first_rung_reached_unaided: call.first_rung_reached_unaided, highest_rung_used: call.highest_rung_used, timestamp: call.at },
+    });
+    edges.push({ type: "OUTCOME_OF", from: outcomeId, to: sessionId, source });
+    if (call.cue) {
+      const recordId = `retrieval:${sessionId}`;
+      nodes.push({ id: recordId, type: "RetrievalRecord", label: "Cue outcome", source, props: { topic_id: call.topic, cue_id: call.cue.cue_id, rung: call.cue.rung, effective: call.cue.effective, used_at: call.at } });
+      edges.push({ type: call.cue.effective ? "CUE_EFFECTIVE_FOR" : "CUE_INEFFECTIVE_FOR", from: recordId, to: call.topic, source });
+    }
+  }
+  return { ...seed, nodes, edges };
 }
 
 /**
@@ -178,7 +235,7 @@ export function buildGraph(raw: unknown, assets: AssetIndex): GraphData {
   if (!parsed.success) {
     throw new SeedValidationError(parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`));
   }
-  const seed = parsed.data;
+  const seed = expandCallHistory(parsed.data);
   const problems: string[] = [];
   clinicalHits(seed.nodes, "nodes", problems);
   clinicalHits(seed.edges, "edges", problems);
@@ -230,6 +287,7 @@ export function buildGraph(raw: unknown, assets: AssetIndex): GraphData {
       supersedes: extra.supersedes ?? [],
       contradicts: extra.contradicts ?? [],
       status: source.status ?? initialStatus(source.source_class),
+      patient_confirmed: patientConfirmed(source.status ?? initialStatus(source.source_class)),
       confirmations: [],
     };
   };

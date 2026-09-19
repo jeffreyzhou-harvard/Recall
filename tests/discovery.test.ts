@@ -1,9 +1,13 @@
 /**
- * The discovery loop: photos -> observations -> knowledge gaps -> questions ->
- * answers -> a richer graph that the participation loop can use.
+ * Ask, don't assert (AGENTS.md section 7): observations -> knowledge gaps -> questions -> answers -> a
+ * richer graph. Inference never becomes fact; only a named person's own words do.
  *
- * No photo fixtures: an analyzer's output is a few lines of inline data, and
- * the photos are synthetic manifest entries. Nothing here touches /fixtures.
+ * This runs on a small seed of its own - one person and one approved relative - so that what the graph
+ * learns here comes only from the answers given here. No photo fixtures: an analyzer's output is a few
+ * lines of inline data, and the photos are synthetic manifest entries.
+ *
+ * Note for the team: bulk photo-library ingestion and face grouping are non-goals in section 14. This
+ * module stays OFF unless the joint setup turns it on (`discovery.enabled`), and the judged setup does not.
  */
 import { describe, expect, it } from "vitest";
 import { MANIFEST, POLICY } from "@/fixtures";
@@ -14,11 +18,9 @@ import { DiscoveryError, type LibraryObservations } from "@/lib/discovery/ingest
 import { assertSpeakable, nextRung, questionFor } from "@/lib/discovery/questions";
 import { LadybugGraphStore } from "@/lib/graph/ladybug-store";
 import { RelationError, assertRelation } from "@/lib/graph/relations";
-import { retrieveCandidates } from "@/lib/graph/retrieval";
+import type { SeedFile } from "@/lib/graph/seed";
 import type { AssetManifest } from "@/lib/provenance/assets";
 import { policySchema } from "@/lib/tools";
-import { THREAD, diwaliForward } from "./fixtures";
-import { benchOn } from "./helpers";
 
 const MOM = "person:mom";
 const ANIKA = "person:anika";
@@ -40,13 +42,39 @@ const OBSERVED: LibraryObservations = {
     { cluster_key: "p1", kind: "place", photo_asset_ids: photoIds.slice(3, 6), confidence: 0.8 },
   ],
 };
+/** One person, one approved relative, and the joint setup between them. Everything else the graph learns, it learns from an answer. */
+const SEED: SeedFile = {
+  version: 1,
+  description: "a joint setup and nothing else",
+  sources: { "artifact:setup-record": { source_class: "joint_setup", asset_id: null, observed_at: "2026-10-12T15:00:00.000Z", author: ANIKA, extraction_method: "joint_setup", confidence: 1, audience_scope: [MOM], expires_at: null } },
+  nodes: [
+    { id: "artifact:setup-record", type: "Artifact", label: "Joint setup (Mom with Anika)", props: { kind: "setup_record", text: null, alt: null }, source: "artifact:setup-record" },
+    { id: MOM, type: "Person", label: "Mom", props: { display_name: "Mom", role: "participant", subject_pronoun: "she" }, source: "artifact:setup-record" },
+    { id: ANIKA, type: "Person", label: "Anika", props: { display_name: "Anika", role: "family" }, source: "artifact:setup-record" },
+    { id: "policy:mom-setup", type: "AccessPolicy", label: "Mom's joint setup", props: { policy_ref: "(test)" }, source: "artifact:setup-record" },
+  ],
+  edges: [{ type: "PERMITTED_IN", from: ANIKA, to: "policy:mom-setup", source: "artifact:setup-record" }],
+};
+const SETUP = {
+  ...(POLICY as Record<string, any>),
+  policy_id: "policy:mom-setup",
+  person_id: MOM,
+  established_by: [MOM, ANIKA],
+  relay_set_up_by: ANIKA,
+  approved_people: [ANIKA],
+  approved_audiences: [MOM],
+  topics: { allow: [], block: [], person_topics_enabled: false },
+  safety: { designated_caregivers: [{ person_id: ANIKA, alert_channel: "dashboard" }], emergency_number: "911" },
+  attestations: { ...(POLICY as Record<string, any>).attestations, introduced_by: ANIKA },
+  dashboard: { ...(POLICY as Record<string, any>).dashboard, grants: [] },
+};
 const discoveryOn = (over: Record<string, unknown> = {}) => ({
-  ...(POLICY as object),
+  ...SETUP,
   discovery: { enabled: true, photo_access_granted_by: [ANIKA], observe: { faces: true, places: true, times: true, themes: true }, invite_her_confirmation: false, ...over },
 });
 
 const rigWithLibrary = async (policy: unknown = discoveryOn()): Promise<FixtureRig> => {
-  const rig = await buildFixtureRig({ policy, manifest });
+  const rig = await buildFixtureRig({ policy, manifest, seed: SEED });
   await rig.service.ingestLibrary(OBSERVED, ANIKA);
   return rig;
 };
@@ -254,49 +282,6 @@ describe("never a test", () => {
   });
 });
 
-describe("what discovery gives the participation loop", () => {
-  it("an ask can simply name someone she told Relay about; nothing unconfirmed is ever matchable or reachable", async () => {
-    const rig = await rigWithLibrary();
-    const [who] = await rig.service.nextQuestions(1);
-    await rig.service.answerQuestion(who!, says(MOM, "That's my daughter Maya."));
-
-    const out = await rig.service.forwardAsk(diwaliForward({ forward_id: "fwd-maya", text: "Mom, should Maya bring the kheer or the halwa for Diwali?", photos: [] }));
-    expect(out.accepted && out.interpretation).toMatchObject({ mention_ids: ["person:maya"], option_topic_ids: ["topic:kheer", "topic:halwa"] });
-
-    // An unnamed face, however often it recurs, can never be what an ask is about or context for one.
-    const result = await retrieveCandidates(rig.graph, { ask_id: "ask:fwd-maya", policy_id: "policy:mom-default", audience: THREAD, allowed_sources: ["photo_library", "discovery_answer"], max_hops: 2, now_iso: AT });
-    expect(result.candidates.filter((c) => c.root_type === "Cluster")).toEqual([]);
-  });
-
-  it("a tie she stated in discovery can verify an asker - but only the policy decides whether they may ask", async () => {
-    const policy = { ...(discoveryOn() as Record<string, unknown>), approved_people: [ANIKA, "person:maya"] };
-    const rig = await rigWithLibrary(policy);
-    const [who] = await rig.service.nextQuestions(1);
-    await rig.service.answerQuestion(who!, says(MOM, "That's my daughter Maya."));
-    // Maya joins the family thread (setup), and forwards an ask. Her tie to Mom came from Mom's own words.
-    const maya = (await rig.graph.getNode("person:maya"))!;
-    await rig.graph.putEdge({ id: `MEMBER_OF_THREAD:person:maya->${THREAD}`, type: "MEMBER_OF_THREAD", from: "person:maya", to: THREAD, props: {}, prov: maya.prov });
-    await rig.service.forwardAsk(diwaliForward({ forward_id: "fwd-from-maya", asker_id: "person:maya" }));
-    const { runtime } = benchOn(rig, { policy });
-    const ask = await runtime.call("inspect_request", { thread_id: THREAD });
-    const identity = await runtime.call("resolve_identity_and_relationships", { ask_id: ask.ask_id, participants: ask.participants });
-    expect(identity).toMatchObject({ verified: true, relationships: [{ kind: "child", verified_by: "artifact:answer:a1" }] });
-    const granted = await runtime.call("get_access_policy", { ask_id: ask.ask_id, person: MOM, purpose: "answer_current_ask", audience: THREAD });
-    expect(granted.decision).toBe("granted");
-
-    // Same tie, but the joint setup never approved Maya to ask: verified, and still refused.
-    const strict = await rigWithLibrary();
-    const [q] = await strict.service.nextQuestions(1);
-    await strict.service.answerQuestion(q!, says(MOM, "That's my daughter Maya."));
-    await strict.graph.putEdge({ id: `MEMBER_OF_THREAD:person:maya->${THREAD}`, type: "MEMBER_OF_THREAD", from: "person:maya", to: THREAD, props: {}, prov: maya.prov });
-    await strict.service.forwardAsk(diwaliForward({ forward_id: "fwd-from-maya", asker_id: "person:maya" }));
-    const b = benchOn(strict, { policy: discoveryOn() });
-    const ask2 = await b.runtime.call("inspect_request", { thread_id: THREAD });
-    await b.runtime.call("resolve_identity_and_relationships", { ask_id: ask2.ask_id, participants: ask2.participants });
-    expect(await b.runtime.call("get_access_policy", { ask_id: ask2.ask_id, person: MOM, purpose: "answer_current_ask", audience: THREAD })).toMatchObject({ decision: "denied", reason: "asker_not_approved" });
-  });
-});
-
 describe("LadybugDB parity", () => {
   it("runs the same discovery loop, confirmations included, to the same graph", async () => {
     const store = await LadybugGraphStore.open(":memory:");
@@ -308,8 +293,8 @@ describe("LadybugDB parity", () => {
         await rig.service.answerQuestion(who!, says(MOM, "My daughter Maya.", "a2"));
         return rig.graph.snapshot();
       };
-      const onLbug = await run(await buildFixtureRig({ policy: discoveryOn(), manifest, graph: store }));
-      const inMemory = await run(await buildFixtureRig({ policy: discoveryOn(), manifest }));
+      const onLbug = await run(await buildFixtureRig({ policy: discoveryOn(), manifest, seed: SEED, graph: store }));
+      const inMemory = await run(await buildFixtureRig({ policy: discoveryOn(), manifest, seed: SEED }));
       expect(onLbug).toEqual(inMemory);
       expect(onLbug.edges.find((e) => e.type === "IDENTIFIED_AS")!.prov.confirmations).toHaveLength(1);
     } finally {

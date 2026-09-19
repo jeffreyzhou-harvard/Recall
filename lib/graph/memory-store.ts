@@ -1,5 +1,5 @@
-import { assertSourced, byId, newestAskFirst, withConfirmation, type GraphStore } from "./store";
-import type { Confirmation, CurrentAskNode, GraphData, GraphEdge, GraphNode, NodeOf, NodeType, Provenance } from "./types";
+import { assertErasable, assertSourced, byId, withConfirmation, type GraphStore } from "./store";
+import type { Confirmation, ErasableNodeType, GraphData, GraphEdge, GraphNode, NodeOf, NodeType, Provenance } from "./types";
 
 /** In-memory graph store. No I/O of any kind; safe in the browser and offline. */
 export class MemoryGraphStore implements GraphStore {
@@ -48,13 +48,6 @@ export class MemoryGraphStore implements GraphStore {
     return [...ids].map((eid) => structuredClone(this.edges.get(eid)!)).sort(byId);
   }
 
-  async findCurrentAsk(threadId: string): Promise<CurrentAskNode | null> {
-    const asks = [...this.nodes.values()]
-      .filter((n): n is CurrentAskNode => n.type === "CurrentAsk" && n.props.thread_id === threadId)
-      .sort(newestAskFirst);
-    return asks[0] ? structuredClone(asks[0]) : null;
-  }
-
   async nodesOfType<T extends NodeType>(type: T): Promise<Array<NodeOf<T>>> {
     return [...this.nodes.values()]
       .filter((n): n is NodeOf<T> => n.type === type)
@@ -77,6 +70,22 @@ export class MemoryGraphStore implements GraphStore {
     if (!this.nodes.has(confirmation.source_id)) throw new Error(`MemoryGraphStore: confirmation source "${confirmation.source_id}" is not in the graph`);
     target.prov = withConfirmation(target.prov, confirmation);
     return structuredClone(target.prov);
+  }
+
+  async removeNodesOfType(type: ErasableNodeType): Promise<number> {
+    assertErasable(type);
+    const gone = [...this.nodes.values()].filter((n) => n.type === type).map((n) => n.id);
+    for (const id of gone) {
+      for (const edgeId of this.touching.get(id) ?? []) {
+        const edge = this.edges.get(edgeId);
+        if (!edge) continue;
+        this.edges.delete(edgeId);
+        this.touching.get(edge.from === id ? edge.to : edge.from)?.delete(edgeId);
+      }
+      this.touching.delete(id);
+      this.nodes.delete(id);
+    }
+    return gone.length;
   }
 
   async snapshot(): Promise<GraphData> {

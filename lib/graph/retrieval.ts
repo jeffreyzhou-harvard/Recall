@@ -10,20 +10,20 @@ import type { GraphStore } from "./store";
 import { SPEAKABLE_AS_FACT, type EdgeType, type GraphEdge, type GraphNode, type MediaSpan, type NodeType, type SourceClass } from "./types";
 
 /**
- * Only topical edges are walked. Walking SPOKEN_BY or ADDRESSED_TO would put
- * everything Mom ever said two hops from every ask, which is a memory archive
- * - exactly what Relay is not (AGENTS.md section 14).
+ * Only topical edges are walked. Walking SPOKEN_BY or CONTRIBUTED_BY would put everything she or her
+ * family ever said two hops from every topic: a memory archive to browse, which is exactly what Relay
+ * is not (AGENTS.md section 14).
  */
 const TRAVERSABLE: ReadonlySet<EdgeType> = new Set(["ABOUT", "DEPICTS", "EVIDENCE_FOR", "RELATED_TO"]);
 
-/** Node types that can be offered as context. Topics and events are connective tissue, not evidence. */
-const CANDIDATE_TYPES: ReadonlySet<NodeType> = new Set(["Artifact", "EpisodicClaim", "PreferenceExpertise"]);
+/** Node types that can be offered as context for a topic: what was said about it, who and where it involves, and photos of it. */
+const CANDIDATE_TYPES: ReadonlySet<NodeType> = new Set(["Artifact", "EpisodicClaim", "PreferenceExpertise", "Person", "Place", "Event"]);
 
 const CLASS_RANK: Record<SourceClass, number> = {
-  current_ask: 0,
-  ask_artifact: 1,
-  prior_claim_with_source: 2,
-  discovery_answer: 3,
+  prior_claim_with_source: 0,
+  recall_call: 1,
+  discovery_answer: 2,
+  family_contribution: 3,
   joint_setup: 4,
   public_reference: 5,
   photo_library: 6,
@@ -39,6 +39,8 @@ export interface Citation {
   span: MediaSpan | null;
   author: string;
   observed_at: string;
+  /** Rule 13 travels with the citation: whoever speaks from it can see whether these are her words. */
+  patient_confirmed: boolean;
 }
 
 export interface CandidateSubgraph {
@@ -46,7 +48,7 @@ export interface CandidateSubgraph {
   root_type: NodeType;
   label: string;
   hops: number;
-  /** Shortest path from the ask to the root, as node and edge ids. */
+  /** Shortest path from the topic to the root, as node and edge ids. */
   path_node_ids: string[];
   path_edge_ids: string[];
   citations: Citation[];
@@ -67,7 +69,7 @@ export interface Exclusion {
 }
 
 export interface RetrievalParams {
-  ask_id: string;
+  topic_id: string;
   policy_id: string;
   audience: string;
   allowed_sources: readonly SourceClass[];
@@ -75,8 +77,18 @@ export interface RetrievalParams {
   now_iso: string;
 }
 
+/** A stated tie between two people in reach of the topic, with the word that was actually used for it ("daughter"). */
+export interface RelationFact {
+  edge_id: string;
+  from: string;
+  to: string;
+  relation: string;
+  said_as: string | null;
+}
+
 export interface RetrievalResult {
   candidates: CandidateSubgraph[];
+  relations: RelationFact[];
   excluded: Exclusion[];
 }
 
@@ -91,6 +103,7 @@ export function citationOf(node: GraphNode): Citation {
     span: p.span,
     author: p.author,
     observed_at: p.observed_at,
+    patient_confirmed: p.patient_confirmed,
   };
 }
 
@@ -103,7 +116,7 @@ interface Reached {
 
 async function walk(store: GraphStore, startId: string, maxHops: number): Promise<Reached[]> {
   const start = await store.getNode(startId);
-  if (!start) throw new Error(`retrieval: ask "${startId}" is not in the graph`);
+  if (!start) throw new Error(`retrieval: topic "${startId}" is not in the graph`);
   const seen = new Map<string, Reached>([[startId, { node: start, hops: 0, pathNodes: [startId], pathEdges: [] }]]);
   let frontier: Reached[] = [seen.get(startId)!];
   for (let hop = 1; hop <= maxHops; hop++) {
@@ -138,10 +151,7 @@ function backingArtifactId(node: GraphNode): string {
 }
 
 export async function retrieveCandidates(store: GraphStore, params: RetrievalParams): Promise<RetrievalResult> {
-  // The ask's own message is the question, not context for it; `inspect_request` already returns it.
-  const reached = (await walk(store, params.ask_id, params.max_hops)).filter(
-    (r) => CANDIDATE_TYPES.has(r.node.type) && r.node.prov.source_class !== "current_ask",
-  );
+  const reached = (await walk(store, params.topic_id, params.max_hops)).filter((r) => CANDIDATE_TYPES.has(r.node.type));
   const allowed = new Set(params.allowed_sources);
   const excluded: Exclusion[] = [];
   const kept: Reached[] = [];
@@ -197,6 +207,20 @@ export async function retrieveCandidates(store: GraphStore, params: RetrievalPar
     });
   }
 
+  // Ties between the people in reach, as they were stated. Same filters as nodes: confirmed, allowed, unexpired.
+  const people = new Set(candidates.filter((c) => c.root_type === "Person").map((c) => c.root_id));
+  const relations: RelationFact[] = [];
+  for (const personId of [...people].sort()) {
+    for (const e of await store.edgesOf(personId)) {
+      if (e.type !== "RELATED_TO" || typeof e.props.relation !== "string") continue;
+      if (!people.has(e.from) || !people.has(e.to) || relations.some((r) => r.edge_id === e.id)) continue;
+      if (!SPEAKABLE_AS_FACT.has(e.prov.status) || !allowed.has(e.prov.source_class)) continue;
+      if (e.prov.expires_at !== null && e.prov.expires_at <= params.now_iso) continue;
+      relations.push({ edge_id: e.id, from: e.from, to: e.to, relation: e.props.relation, said_as: typeof e.props.said_as === "string" ? e.props.said_as : null });
+    }
+  }
+  relations.sort((a, b) => (a.edge_id < b.edge_id ? -1 : 1));
+
   excluded.sort((a, b) => (a.node_id < b.node_id ? -1 : 1));
-  return { candidates, excluded };
+  return { candidates, relations, excluded };
 }

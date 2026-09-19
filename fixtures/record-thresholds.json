@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "description": "Every number the per-topic record and its change lines use (AGENTS.md section 6.4.4). NOT clinically validated; placeholders expected to change, with a second reviewer. The same events must always produce the same output.",
+  "record_window_calls": 8,
+  "min_calls_to_show": 3,
+  "change_window_calls": 4,
+  "min_calls_to_compare": 8,
+  "min_difference": 3,
+  "min_topics_for_summary": 3,
+  "weekly_note_days": 7
+}

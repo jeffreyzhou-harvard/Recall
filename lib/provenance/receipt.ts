@@ -1,17 +1,17 @@
 /**
- * The provenance receipt (the 82-90s beat) and the PROV-style log behind it,
+ * The provenance receipt (the 77-90s beat) and the PROV-style log behind it,
  * both derived from a finished run. Nothing here is authored: every field is
  * read from the session, the tool log, or the asset manifest.
  *
- *   original waveform, literal transcript, source links, silence trims,
- *   0 generated first-person words, assent audio + timestamp + content hash,
- *   delivered only to the original thread.
+ *   original waveform, literal transcript, silence trims, 0 generated
+ *   first-person words, store-confirmation and share-confirmation timestamps,
+ *   content hash, and the retrieval-layer update.
  */
 import { RELAY_AGENT_ID, type MediaSpan } from "@/lib/graph/types";
-import type { SessionRecord, ToolCallRecord, VoiceCard } from "@/lib/tools";
+import type { SessionRecord, ToolCallRecord } from "@/lib/tools";
 import { ProvLog, type SealedProvLog } from "./prov-log";
 
-export const THESIS_LINE = "Access changed. Authorship didn't.";
+export const THESIS_LINE = "Cues, not answers - every memory stays in her own words.";
 
 export interface ProvenanceReceipt {
   session_id: string;
@@ -20,35 +20,30 @@ export interface ProvenanceReceipt {
   source_links: string[];
   edits: { silence_trims: number; disfluency_trims: number; generated_first_person_words: 0 };
   her_words_pct: 100;
-  assent: { assent_id: string; recorded_at: string; audio_span: MediaSpan | null; audio_sha256: string; assent_hash: string };
+  store_confirmation: { confirmation_id: string; recorded_at: string; audio_span: MediaSpan | null; audio_sha256: string; confirmation_hash: string };
+  share_confirmation: { confirmation_id: string; decision: "yes" | "no" | "unclear" | "timeout"; recorded_at: string; confirmation_hash: string };
   content_hash: string;
-  delivered_to: string[];
-  delivered_at: string;
-  scaffolds_logged: number;
+  claim_id: string;
+  stored_at: string;
+  shared: boolean;
+  rungs_used: number;
+  /** "Maya logged as an effective cue for Cape May summers." One per cue offered. What Relay logged; never a statement about her. */
+  retrieval_updates: Array<{ topic_label: string; cue_id: string; rung: number; effective: boolean }>;
   prov_head: string;
   final_line: typeof THESIS_LINE;
 }
 
 /** PROV-style log of a run: who did what, using which evidence, producing which artifact. */
-export function buildProvLog(session: SessionRecord, toolLog: readonly ToolCallRecord[]): ProvLog {
+export function buildProvLog(session: SessionRecord, toolLog: readonly ToolCallRecord[], personId: string): ProvLog {
   const log = new ProvLog();
-  const ask = session.ask;
   const start = toolLog[0]?.started_at ?? "";
   log.agent(RELAY_AGENT_ID, "software", start, { label: "Relay" });
-  if (!ask) return log;
-
-  log.agent(ask.asker_id, "person", start);
-  log.agent(ask.addressee_id, "person", start);
-  log.entity(ask.ask_id, "relay:CurrentAsk", ask.received_at, { thread_id: ask.thread_id });
-  log.relate("wasAttributedTo", ask.ask_id, ask.asker_id, ask.received_at);
+  if (!session.topic) return log;
+  log.agent(personId, "person", start);
 
   for (const call of toolLog) {
     const id = `activity:${call.seq}:${call.tool}`;
-    log.activity(id, `relay:${call.tool}`, call.started_at, {
-      latency_ms: call.latency_ms,
-      policy_decision: call.policy_decision,
-      error: call.error?.name ?? null,
-    });
+    log.activity(id, `relay:${call.tool}`, call.started_at, { latency_ms: call.latency_ms, policy_decision: call.policy_decision, error: call.error?.name ?? null });
     log.relate("wasAssociatedWith", id, RELAY_AGENT_ID, call.started_at);
     for (const source of call.source_ids) log.relate("used", id, source, call.started_at);
   }
@@ -58,41 +53,44 @@ export function buildProvLog(session: SessionRecord, toolLog: readonly ToolCallR
   };
 
   const c = session.contribution;
-  if (c) {
-    const at = toolLog.find((t) => t.tool === "capture_exact_contribution")?.started_at ?? start;
-    const recording = `asset:${c.source.asset_id}`;
-    log.entity(recording, "relay:CallRecording", at, { sha256: c.source.sha256 });
-    log.entity(c.contribution_id, "relay:Contribution", at, { content_hash: c.content_hash, generated_first_person_words: 0 });
-    log.relate("wasAttributedTo", c.contribution_id, c.speaker_id, at);
-    log.relate("wasDerivedFrom", c.contribution_id, recording, at);
-    const capture = activityFor("capture_exact_contribution");
-    if (capture) log.relate("wasGeneratedBy", c.contribution_id, capture, at);
+  const stored = session.stored;
+  if (!c || !stored) return log;
+  // Her words are attributed to her, and to nobody and nothing else (rule 1).
+  log.entity(c.contribution_id, "relay:Contribution", stored.stored_at, { content_hash: c.content_hash, generated_first_person_words: 0 });
+  log.relate("wasAttributedTo", c.contribution_id, c.speaker_id, stored.stored_at);
+  log.relate("wasDerivedFrom", c.contribution_id, `asset:${c.source.asset_id}`, stored.stored_at);
+  const capture = activityFor("capture_contribution");
+  if (capture) log.relate("wasGeneratedBy", c.contribution_id, capture, stored.stored_at);
+
+  const store = session.store_confirmation;
+  if (store) {
+    log.entity(store.confirmation_id, "relay:StoreConfirmation", store.recorded_at, { decision: store.decision, confirmation_hash: store.confirmation_hash });
+    log.relate("wasAttributedTo", store.confirmation_id, c.speaker_id, store.recorded_at);
+    log.relate("wasInformedBy", store.confirmation_id, c.contribution_id, store.recorded_at);
   }
-  const a = session.assent;
-  if (a && c) {
-    log.entity(a.assent_id, "relay:Assent", a.recorded_at, { decision: a.decision, assent_hash: a.assent_hash });
-    log.relate("wasAttributedTo", a.assent_id, c.speaker_id, a.recorded_at);
-    log.relate("wasInformedBy", a.assent_id, c.contribution_id, a.recorded_at);
+  const share = session.share_confirmation;
+  if (share) {
+    log.entity(share.share_confirmation_id, "relay:ShareConfirmation", share.recorded_at, { decision: share.decision, confirmation_hash: share.confirmation_hash });
+    log.relate("wasAttributedTo", share.share_confirmation_id, c.speaker_id, share.recorded_at);
+    log.relate("wasInformedBy", share.share_confirmation_id, c.contribution_id, share.recorded_at);
   }
-  const d = session.delivery;
-  if (d && c && a) {
-    log.entity(d.delivery_id, "relay:Delivery", d.delivered_at, { delivered_to: d.delivered_to });
-    log.relate("wasDerivedFrom", d.delivery_id, c.contribution_id, d.delivered_at);
-    log.relate("used", d.delivery_id, a.assent_id, d.delivered_at);
-    const publish = activityFor("publish_contribution");
-    if (publish) log.relate("wasGeneratedBy", d.delivery_id, publish, d.delivered_at);
-  }
+  log.entity(stored.claim_id, "relay:EpisodicClaim", stored.stored_at, { shared: stored.shared });
+  log.relate("wasDerivedFrom", stored.claim_id, c.contribution_id, stored.stored_at);
+  log.relate("wasAttributedTo", stored.claim_id, c.speaker_id, stored.stored_at);
+  const commit = activityFor("confirm_and_store");
+  if (commit) log.relate("wasGeneratedBy", stored.claim_id, commit, stored.stored_at);
+  if (store) log.relate("used", commit ?? stored.claim_id, store.confirmation_id, stored.stored_at);
   return log;
 }
 
-/** Null unless something was actually delivered: there is no receipt for a contribution that never sent. */
+/** Null unless something was actually stored: there is no receipt for a contribution she did not confirm. */
 export function buildProvenanceReceipt(
   session: SessionRecord,
-  delivered: readonly VoiceCard[],
+  retrievalUpdates: ProvenanceReceipt["retrieval_updates"],
   sealed: SealedProvLog,
 ): ProvenanceReceipt | null {
-  const { contribution: c, assent: a, delivery: d } = session;
-  if (!c || !a || !d || a.decision !== "yes") return null;
+  const { contribution: c, store_confirmation: store, share_confirmation: share, stored } = session;
+  if (!c || !store || !share || !stored || store.decision !== "yes") return null;
   const verified = session.candidates.flatMap((cand) => cand.citations.map((cite) => cite.source_id));
   return {
     session_id: session.session_id,
@@ -101,17 +99,14 @@ export function buildProvenanceReceipt(
     source_links: [...new Set([`asset:${c.source.asset_id}`, ...verified])].sort(),
     edits: { silence_trims: c.silence_trims, disfluency_trims: c.disfluency_trims, generated_first_person_words: 0 },
     her_words_pct: 100,
-    assent: {
-      assent_id: a.assent_id,
-      recorded_at: a.recorded_at,
-      audio_span: a.audio.span,
-      audio_sha256: a.audio.media_hash,
-      assent_hash: a.assent_hash,
-    },
+    store_confirmation: { confirmation_id: store.confirmation_id, recorded_at: store.recorded_at, audio_span: store.audio.span, audio_sha256: store.audio.media_hash, confirmation_hash: store.confirmation_hash },
+    share_confirmation: { confirmation_id: share.share_confirmation_id, decision: share.decision, recorded_at: share.recorded_at, confirmation_hash: share.confirmation_hash },
     content_hash: c.content_hash,
-    delivered_to: delivered.map((card) => card.thread_id),
-    delivered_at: d.delivered_at,
-    scaffolds_logged: session.telemetry.scaffolds_fired.length,
+    claim_id: stored.claim_id,
+    stored_at: stored.stored_at,
+    shared: stored.shared,
+    rungs_used: session.telemetry.rungs_fired.length,
+    retrieval_updates: retrievalUpdates,
     prov_head: sealed.head,
     final_line: THESIS_LINE,
   };

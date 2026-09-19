@@ -70,24 +70,23 @@ await attempt("call transcript", () => {
   ok(`${GOLDEN_TRANSCRIPT.turns.length} turns within ${GOLDEN_TRANSCRIPT.asset_id} [timings ${GOLDEN_TRANSCRIPT.timing_status}]`);
 });
 
-console.log("\n4. the judged path delivers, and authorship holds");
+console.log("\n4. the judged path stores her words, authorship holds, and nothing leaks to the family side");
 await attempt("judged path", async () => {
   const run = await runJudgedPath();
   const { recording } = run;
-  if (!run.intake.accepted) throw new Error(`the ask was refused at intake: ${run.intake.detail}`);
-  if (recording.final_state !== "delivered") throw new Error(`ended in "${recording.final_state}", expected "delivered"`);
+  if (recording.final_state !== "stored") throw new Error(`ended in "${recording.final_state}", expected "stored"`);
   const rejected = recording.trace.filter((t) => !t.accepted);
   if (rejected.length > 0) throw new Error(`${rejected.length} event(s) were rejected by the reducer`);
 
-  const kinds = recording.messages.map((m) => m.kind).join(", ");
-  if (kinds !== "voice_contribution, support_receipt") throw new Error(`the family received [${kinds}]`);
-  for (const m of recording.messages) {
-    if ("thread_id" in m.to && m.to.thread_id !== recording.thread_id) throw new Error("something was delivered outside the original thread");
-  }
+  if (run.alerts.count() !== 0) throw new Error("something was sent to family on the golden path; only a safety alert ever may be");
+  if (!recording.spoken[0]?.text.includes("an AI assistant")) throw new Error("the first line of the call does not say Relay is an AI assistant (rule 16)");
+  const redirect = await run.service.askAboutHer("What did Mom say about her wedding?", "person:maya");
+  if (redirect.line.script_id !== "FAMILY-REDIRECT" || redirect.graph_content.length !== 0) throw new Error("the family-redirect path returned something other than the fixed line");
   const c = run.ctx.session.contribution!;
   const generated = generatedFirstPersonWords(c.words, await run.ctx.transcription.allTurns(c.source.asset_id));
   if (generated !== 0) throw new Error(`${generated} generated first-person word(s) in the outbound artifact`);
-  ok(`delivered: ${c.silence_trims} silence trim(s), 0 generated words, ${recording.spoken.length} lines spoken, ${recording.tool_log.length} tool calls`);
+  const rungs = recording.spoken.filter((s) => s.rung !== null).length;
+  ok(`stored: ${rungs} ladder rung(s) used, ${c.silence_trims} silence trim(s), 0 generated words, ${recording.spoken.length} lines spoken, ${recording.tool_log.length} tool calls, 0 sent to family`);
 });
 
 console.log(`\n5. demo readiness${strict ? " (strict)" : ""}`);

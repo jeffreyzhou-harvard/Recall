@@ -119,13 +119,14 @@ export async function ingestLibrary(raw: unknown, deps: IngestDeps): Promise<Ing
     span: null,
     observed_at: observedAt,
     author: deps.granted_by,
-    extraction_method: assetId ? "forwarded_message" : "photo_analysis",
+    extraction_method: assetId ? "family_form" : "photo_analysis",
     confidence,
     audience_scope: [...policy.approved_audiences],
     expires_at: null,
     supersedes: [],
     contradicts: [],
     status: "observed",
+    patient_confirmed: false,
     confirmations: [],
   });
 

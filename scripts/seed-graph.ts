@@ -23,9 +23,7 @@ rmSync(path, { recursive: true, force: true });
 rmSync(`${path}.wal`, { force: true });
 
 const store = await LadybugGraphStore.open(path);
-const rig = await buildFixtureRig({ graph: store }); // throws with the full problem list if the seed is invalid
-const intake = await rig.service.forwardAsk(rig.forward);
-if (!intake.accepted) throw new Error(`the judged ask was refused at intake: ${intake.detail}`);
+await buildFixtureRig({ graph: store }); // throws with the full problem list if the seed is invalid
 
 const snapshot = await store.snapshot();
 await store.close();
@@ -34,5 +32,5 @@ const byLayer = new Map<number, number>();
 for (const node of snapshot.nodes) byLayer.set(NODE_LAYER[node.type], (byLayer.get(NODE_LAYER[node.type]) ?? 0) + 1);
 
 console.log(`seeded ${path.slice(ROOT.length + 1)} (LadybugDB ${store.engineVersion})`);
-console.log(`  ${snapshot.nodes.length} nodes, ${snapshot.edges.length} edges; current ask: ${intake.ask_id}`);
+console.log(`  ${snapshot.nodes.length} nodes, ${snapshot.edges.length} edges`);
 for (const layer of [...byLayer.keys()].sort()) console.log(`  layer ${layer}: ${byLayer.get(layer)} node(s)`);

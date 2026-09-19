@@ -1,16 +1,16 @@
 /**
  * End-to-end check of the LIVE path, against the real services:
  *
- *   web app ask -> gates -> a real WebRTC video call -> her audio to Deepgram -> the least support that
- *   fits (Muse Spark is consulted only when more than one rung is eligible) -> her exact words captured ->
- *   played back to her -> her yes -> delivered
+ *   a turn of the schedule -> the joint setup grants the call -> a real WebRTC video call -> her audio to
+ *   Deepgram -> the ladder climbs (free recall, context, association) -> her exact words captured ->
+ *   played back to her -> her yes to remembering it, her yes to sharing it -> stored -> the family side
  *
- *   npm run build && npm run e2e:live      (macOS: uses `say` and Chrome; needs both keys in .env.local)
+ *   npm run build && npm run e2e:live      (macOS: uses `say` and Chrome; needs DEEPGRAM_API_KEY in .env.local)
  *
  * Her browser's microphone is fed a WAV of synthesized speech on a fixed timeline, so a whole
  * conversation really happens: Deepgram hears it, the orchestrator reacts, Relay's lines are spoken
  * on her page. The synthetic voice is test scaffolding only - generated here, into a temp directory,
- * never committed and never shipped. It costs a few cents of Deepgram and Muse credit per run.
+ * never committed and never shipped. It costs a few cents of Deepgram credit per run.
  *
  * Not part of `npm run check`.
  */
@@ -27,14 +27,16 @@ const procs = [];
 const tmp = mkdtempSync(join(tmpdir(), "relay-live-"));
 
 // --- her side of the conversation, on a fixed timeline (seconds from when she joins) ---------------------------
-// Each line lands inside the 12 s Relay waits after it stops talking: about 5-17 s, 24-36 s, 41-53 s (Muse Spark
-// takes 3-6 s to advise on the scaffold). A line that misses its window is not a bug in Relay - it hears
-// silence, and ends the call kindly without sending.
+// Each line lands inside the 12 s Relay waits after it stops talking, whether her device's voice is quick or
+// slow. A line that misses its window is not a bug in Relay - it hears silence, and ends the call kindly.
 const RATE = 48_000;
 const LINES = [
-  [12, "Which thing again?"],
-  [29, "Make the kheer. Your grandfather always added cardamom last."],
-  [46, "Yes."],
+  [22, "Cape May?"],
+  [34, "I'm not sure."],
+  [46, "Maya, my daughter!"],
+  [58, "We went to Cape May every summer."],
+  [73, "Yes."],
+  [86, "Yes."],
 ];
 function pcmOf(text, i) {
   const file = join(tmp, `line-${i}.wav`);
@@ -43,7 +45,7 @@ function pcmOf(text, i) {
   const at = wav.indexOf("data") + 8;
   return wav.subarray(at, at + wav.readUInt32LE(at - 4));
 }
-const total = 60 * RATE * 2;
+const total = 100 * RATE * 2;
 const mic = Buffer.alloc(44 + total);
 mic.write("RIFF", 0); mic.writeUInt32LE(36 + total, 4); mic.write("WAVEfmt ", 8); mic.writeUInt32LE(16, 16); mic.writeUInt16LE(1, 20); mic.writeUInt16LE(1, 22);
 mic.writeUInt32LE(RATE, 24); mic.writeUInt32LE(RATE * 2, 28); mic.writeUInt16LE(2, 32); mic.writeUInt16LE(16, 34); mic.write("data", 36); mic.writeUInt32LE(total, 40);
@@ -51,9 +53,11 @@ LINES.forEach(([at, text], i) => pcmOf(text, i).copy(mic, 44 + at * RATE * 2));
 const micFile = join(tmp, "her-mic.wav");
 writeFileSync(micFile, mic);
 
-// --- a policy that allows calls at any hour, so this can run at 3 a.m. It is the test's own file, git-ignored. ---
-const policy = JSON.parse(readFileSync("fixtures/policy/mom-default.json", "utf8"));
+// --- a joint setup that allows calls at any hour, so this can run at 3 a.m. It is the test's own file, git-ignored. ---
+const policy = JSON.parse(readFileSync("fixtures/policy/susan-setup.json", "utf8"));
 policy.call_windows = [{ days: ["sun", "mon", "tue", "wed", "thu", "fri", "sat"], start: "00:00", end: "23:59" }];
+// Which topic is due depends on today's date, so the test allows only the one her scripted lines are about.
+policy.topics.allow = ["event:cape-may-summers"];
 mkdirSync(".data", { recursive: true });
 writeFileSync(".data/e2e-policy.json", JSON.stringify(policy));
 
@@ -62,7 +66,7 @@ if (await fetch(BASE).then(() => true).catch(() => false)) {
   process.exit(2);
 }
 const log = openSync(".data/e2e-live-server.log", "w"); // timings and levels only; see RELAY_CALL_DEBUG
-const server = spawn("npx", ["next", "start", "-p", "3191"], { stdio: ["ignore", log, log], detached: true, env: { ...process.env, RELAY_CALL: "video", RELAY_CALL_DEBUG: "1", RELAY_OPERATOR_SECRET: SECRET, RELAY_POLICY_FILE: ".data/e2e-policy.json", TELEGRAM_BOT_TOKEN: "" } });
+const server = spawn("npx", ["next", "start", "-p", "3191"], { stdio: ["ignore", log, log], detached: true, env: { ...process.env, RELAY_CALL: "video", RELAY_CALL_DEBUG: "1", RELAY_OPERATOR_SECRET: SECRET, RELAY_POLICY_FILE: ".data/e2e-policy.json" } });
 for (let i = 0; i < 60 && !(await fetch(BASE).then((r) => r.ok).catch(() => false)); i++) await sleep(500);
 
 async function browser(port, url, extra = []) {
@@ -90,12 +94,13 @@ try {
   const host = await browser(9341, `${BASE}/call/host?operator=${SECRET}`);
   await host.until("!!document.querySelector('[data-testid=waiting]')", Boolean);
 
-  // "Ask Mom with Relay", from the web app. One request that stays open until the session has finished.
-  const forward = { forward_id: `fwd-live-${Date.now()}`, thread_id: "artifact:thread-family", asker_id: "person:anika", addressee_id: "person:mom", text: "Mom, which should I make for Diwali?", photos: [{ asset_id: "photo-desserts", caption: "Kheer and halwa" }], requested_audience: "artifact:thread-family", received_at: new Date().toISOString() };
-  const session = fetch(`${BASE}/api/live/asks`, { method: "POST", headers: { "content-type": "application/json", "x-relay-operator": SECRET }, body: JSON.stringify(forward) }).then((r) => r.json());
+  // One turn of the schedule. Nobody asks for this call: the graph, the joint setup, and the clock decide it.
+  // The request stays open until the call has ended.
+  const operator = { "content-type": "application/json", "x-relay-operator": SECRET };
+  const session = fetch(`${BASE}/api/live/schedule`, { method: "POST", headers: operator }).then((r) => r.json());
 
   const link = await host.until("document.querySelector('[data-testid=participant-link]')?.href", Boolean);
-  check("the granted session placed a call, and Relay's page joined it", !!link);
+  check("the joint setup granted the call, and Relay's page joined it", !!link);
   // Chrome's audio service is sandboxed and cannot read the mic file on macOS - it plays silence instead, without a word.
   const her = await browser(9342, link, [`--use-file-for-fake-audio-capture=${micFile}%noloop`, "--disable-features=AudioServiceSandbox"]);
   // Tap Join once the button is live. Before hydration the page has no state to read, and a tap would be lost.
@@ -112,20 +117,24 @@ try {
   }
 
   const line = await her.until("document.querySelector('[data-testid=relay-line]')?.textContent", Boolean);
-  check("Relay's first line reached her page, labeled as Relay", /^Relay/.test(line ?? "") && /Anika wants your help with Diwali dessert\./.test(line ?? ""), line);
+  check("Relay's first line on her page says it is an AI assistant, labeled as Relay", /^Relay/.test(line ?? "") && /I'm Relay, an AI assistant Maya set up/.test(line ?? ""), line);
 
-  const { outcome, recording: r } = await session;
-  writeFileSync(".data/e2e-live-recording.json", JSON.stringify({ outcome, recording: r }, null, 2)); // git-ignored; synthetic speech only
-  check("the ask was accepted at intake", outcome?.accepted === true);
-  check("the session ended in delivery", r?.final_state === "delivered", `${r?.final_state}${r?.trace ? "  via " + [...new Set(r.trace.filter((t) => t.accepted).map((t) => t.to))].join(" > ") : ""}`);
+  const { recording: r } = await session;
+  writeFileSync(".data/e2e-live-recording.json", JSON.stringify(r, null, 2)); // git-ignored; synthetic speech only
+  check("the call ended with her words stored", r?.final_state === "stored", `${r?.final_state}${r?.trace ? "  via " + [...new Set(r.trace.filter((t) => t.accepted).map((t) => t.to))].join(" > ") : ""}`);
   const spoken = (r?.spoken ?? []).map((s) => s.text);
-  check("Relay said its cited lines, in order", spoken.join(" | ") === "Anika wants your help with Diwali dessert. | Kheer or halwa. Anika sent this photo. | Want me to send that to Anika?", spoken.join(" | "));
-  const scaffold = r?.tool_log?.find((c) => c.tool === "select_scaffold")?.output;
-  check("the scaffold was chosen from the eligible rungs", scaffold?.scaffold_id === "restate_options", `${scaffold?.scaffold_id}, decided by ${scaffold?.decided_by}`);
-  const card = r?.messages?.find((m) => m.kind === "voice_contribution")?.card;
-  check("Deepgram heard her, and her own words were delivered", /kheer/i.test(card?.literal_transcript ?? "") && /cardamom/i.test(card?.literal_transcript ?? ""), JSON.stringify(card?.literal_transcript));
-  check("no words were generated, and the pauses Deepgram timed were trimmed", r?.provenance_receipt?.edits?.generated_first_person_words === 0, JSON.stringify(r?.provenance_receipt?.edits));
-  check("nothing went undelivered", (r?.delivery_failures ?? ["?"]).length === 0);
+  check("Relay said its reviewed lines, in order, climbing one rung at a time", spoken.join(" | ") === "Hi Susan, I'm Relay, an AI assistant Maya set up to keep you company. | I'd love to hear about the summers at Cape May. What comes to mind? | It's a place your family went together. | You and Maya used to go there together. | What do you remember about those summers? | Want me to remember that? | Would you like me to share it with your family? | Thank you, Susan. It was lovely talking with you. Goodbye for now.", spoken.join(" | "));
+  const rungs = (r?.tool_log ?? []).filter((c) => c.tool === "select_scaffold").map((c) => c.output?.rung);
+  check("the ladder stopped the moment she reached it", rungs.join(",") === "1,2,3", rungs.join(","));
+  const p = r?.provenance_receipt;
+  check("Deepgram heard her, and her own words were stored", /cape may/i.test(p?.literal_transcript ?? "") && /summer/i.test(p?.literal_transcript ?? ""), JSON.stringify(p?.literal_transcript));
+  check("no words were generated; both confirmations are on the receipt", p?.edits?.generated_first_person_words === 0 && p?.share_confirmation?.decision === "yes" && !!p?.store_confirmation?.recorded_at, JSON.stringify({ edits: p?.edits, share: p?.share_confirmation?.decision }));
+
+  const ask = await fetch(`${BASE}/api/family/ask`, { method: "POST", headers: operator, body: JSON.stringify({ question: "What did Mom say about her wedding?", member: "person:maya" }) }).then((x) => x.json());
+  check("the family's question gets the redirect line, and no graph content", ask?.line?.text === "Susan's talked about this before. Want to give her a call?" && ask?.graph_content?.length === 0, JSON.stringify(ask));
+  const dash = await fetch(`${BASE}/api/family/dashboard?member=person:maya`, { headers: operator }).then((x) => x.json());
+  const kinds = (dash?.weekly_note?.note?.lines ?? []).map((l) => l.kind);
+  check("the Weekly Note carries the line she chose to share, and nothing was sent to anyone", kinds.includes("warm") && kinds.includes("share") && (dash?.safety_alerts ?? []).length === 0, JSON.stringify(kinds));
 } catch (e) {
   check("ran without error", false, String(e));
 } finally {

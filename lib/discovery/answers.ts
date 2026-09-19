@@ -25,7 +25,7 @@
 import { KIN_WORDS, KNOWLEDGE_EDGE, assertRelation, type Relation } from "@/lib/graph/relations";
 import { edgeId } from "@/lib/graph/seed";
 import type { GraphStore } from "@/lib/graph/store";
-import type { Confirmation, EpistemicStatus, GraphEdge, GraphNode, MediaSpan, NodeType, Provenance } from "@/lib/graph/types";
+import { patientConfirmed, type Confirmation, type EpistemicStatus, type GraphEdge, type GraphNode, type MediaSpan, type NodeType, type Provenance } from "@/lib/graph/types";
 import { tokens } from "@/lib/providers/transcription";
 import type { AccessPolicy } from "@/lib/tools/policy";
 import type { Question } from "./questions";
@@ -163,6 +163,7 @@ export async function applyAnswer(question: Question, answer: Answer, proposals:
     supersedes: [],
     contradicts: [],
     status,
+    patient_confirmed: patientConfirmed(status),
     confirmations: [],
   });
   if (!(await graph.getNode(artifactId))) {

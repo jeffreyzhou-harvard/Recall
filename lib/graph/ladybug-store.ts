@@ -10,14 +10,14 @@
  * columns so Cypher can use them.
  */
 import { createRequire } from "node:module";
-import { assertSourced, byId, newestAskFirst, withConfirmation, type GraphStore } from "./store";
+import { assertErasable, assertSourced, byId, withConfirmation, type GraphStore } from "./store";
 import {
   EDGE_SIGNATURES,
   EDGE_TYPES,
   NODE_LAYER,
   NODE_TYPES,
   type Confirmation,
-  type CurrentAskNode,
+  type ErasableNodeType,
   type EdgeType,
   type GraphData,
   type GraphEdge,
@@ -45,7 +45,7 @@ interface LbugModule {
 }
 
 const NODE_COLUMNS =
-  "id STRING, label STRING, layer INT64, props STRING, prov STRING, source_class STRING, expires_at STRING, thread_id STRING, PRIMARY KEY(id)";
+  "id STRING, label STRING, layer INT64, props STRING, prov STRING, source_class STRING, expires_at STRING, PRIMARY KEY(id)";
 
 /** DDL derived from the same tables the seed validator uses, so the schemas cannot drift apart. */
 export function schemaDdl(): string[] {
@@ -128,16 +128,6 @@ export class LadybugGraphStore implements GraphStore {
       .sort(byId);
   }
 
-  async findCurrentAsk(threadId: string): Promise<CurrentAskNode | null> {
-    const rows = await this.run(
-      "MATCH (n:CurrentAsk) WHERE n.thread_id = $thread " +
-        "RETURN n.id AS id, label(n) AS type, n.label AS label, n.props AS props, n.prov AS prov ORDER BY n.id",
-      { thread: threadId },
-    );
-    const asks = rows.map((r) => LadybugGraphStore.toNode(r) as CurrentAskNode).sort(newestAskFirst);
-    return asks[0] ?? null;
-  }
-
   async nodesOfType<T extends NodeType>(type: T): Promise<Array<NodeOf<T>>> {
     // `type` is one of the twelve table names, never user input.
     const rows = await this.run(
@@ -149,7 +139,7 @@ export class LadybugGraphStore implements GraphStore {
 
   async putNode(node: GraphNode): Promise<void> {
     await this.run(
-      `CREATE (:${node.type} {id:$id, label:$label, layer:$layer, props:$props, prov:$prov, source_class:$source_class, expires_at:$expires_at, thread_id:$thread_id})`,
+      `CREATE (:${node.type} {id:$id, label:$label, layer:$layer, props:$props, prov:$prov, source_class:$source_class, expires_at:$expires_at})`,
       {
         id: node.id,
         label: node.label,
@@ -158,7 +148,6 @@ export class LadybugGraphStore implements GraphStore {
         prov: JSON.stringify(node.prov),
         source_class: node.prov.source_class,
         expires_at: node.prov.expires_at ?? "",
-        thread_id: node.type === "CurrentAsk" ? node.props.thread_id : "",
       },
     );
   }
@@ -226,17 +215,24 @@ export class LadybugGraphStore implements GraphStore {
     };
   }
 
+  async removeNodesOfType(type: ErasableNodeType): Promise<number> {
+    assertErasable(type);
+    const rows = await this.run(`MATCH (n:${type}) RETURN n.id AS id`, {});
+    await this.run(`MATCH (n:${type}) DETACH DELETE n`, {});
+    return rows.length;
+  }
+
   /**
-   * Native Cypher form of the core citation query: prior claims within two
-   * topical hops of an ask, restricted to allowed source classes and unexpired
-   * evidence. The parity test holds this to the same answer as retrieval.ts.
+   * Native Cypher form of the core citation query: her own and her family's claims about a topic,
+   * restricted to allowed source classes and unexpired evidence. The parity test holds this to the
+   * same answer as retrieval.ts.
    */
-  async claimIdsForAsk(askId: string, allowed: readonly SourceClass[], nowIso: string): Promise<string[]> {
+  async claimIdsForTopic(topicId: string, allowed: readonly SourceClass[], nowIso: string): Promise<string[]> {
     const rows = await this.run(
-      "MATCH (a:CurrentAsk {id:$ask})-[:ABOUT]->(t:Topic)<-[:ABOUT]-(c:EpisodicClaim) " +
+      "MATCH (c:EpisodicClaim)-[:ABOUT]->(t {id:$topic}) " +
         "WHERE c.source_class IN $allowed AND (c.expires_at = '' OR c.expires_at > $now) " +
         "RETURN DISTINCT c.id AS id ORDER BY id",
-      { ask: askId, allowed: [...allowed], now: nowIso },
+      { topic: topicId, allowed: [...allowed], now: nowIso },
     );
     return rows.map((r) => r.id as string);
   }
