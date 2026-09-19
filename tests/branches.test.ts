@@ -237,6 +237,50 @@ describe("she can always stop it", () => {
   });
 });
 
+describe("her audio never stays behind (rule 8)", () => {
+  const depsOf = (rig: Awaited<ReturnType<typeof buildFixtureRig>>) => (rig.service as unknown as { deps: ConstructorParameters<typeof import("@/lib/service/relay-service").RelayService>[0] }).deps;
+
+  it("an error nobody planned for still hangs up - which is what wipes the call - and the error itself is what surfaces", async () => {
+    const rig = await buildFixtureRig();
+    let hangUps = 0;
+    const service = new (await import("@/lib/service/relay-service")).RelayService({
+      ...depsOf(rig),
+      // Hanging up fails too, on the way out. It must neither replace the real error nor be tried twice.
+      callDriver: () => ({ call_asset_id: "call-golden", connect: async () => {}, speak: async () => {}, playback: async () => {}, listen: () => Promise.reject(new Error("the line caught fire")), hangUp: async () => (hangUps++, Promise.reject(new Error("and the hang-up failed"))) }),
+    });
+    await expect(service.runScheduledCall("session:unplanned")).rejects.toThrow("the line caught fire");
+    expect(hangUps).toBe(1);
+  });
+
+  it("every ordinary ending hangs up exactly once", async () => {
+    for (const steps of [[...RECALLED, ...CAPTURE_AND_CONFIRM()], [...OPENING, ["her", "Please stop."], ["relay", SAID.stopAck]], [...OPENING, ["her", "I can't breathe."], ["relay", SAID.safety]]] as Step[][]) {
+      const rig = await buildFixtureRig({ transcript: (await import("./helpers")).call(steps) });
+      const deps = depsOf(rig);
+      const make = deps.callDriver!;
+      let hangUps = 0;
+      deps.callDriver = () => {
+        const driver = make();
+        const hangUp = driver.hangUp.bind(driver);
+        driver.hangUp = async () => (hangUps++, hangUp());
+        return driver;
+      };
+      await rig.service.runScheduledCall("session:once");
+      expect(hangUps).toBe(1);
+    }
+  });
+
+  it("a call that was never answered is closed as well", async () => {
+    const rig = await buildFixtureRig();
+    let hangUps = 0;
+    const service = new (await import("@/lib/service/relay-service")).RelayService({
+      ...depsOf(rig),
+      callDriver: () => ({ call_asset_id: "call-golden", connect: () => Promise.reject(Object.assign(new Error("nobody joined"), { name: "CallUnavailableError" })), speak: async () => {}, playback: async () => {}, listen: () => Promise.reject(new Error("unreachable")), hangUp: async () => void hangUps++ }),
+    });
+    expect((await service.runScheduledCall("session:unanswered"))!.recording.final_state).toBe("no_answer_today");
+    expect(hangUps).toBe(1);
+  });
+});
+
 describe("the safety handoff", () => {
   it("drops the recall flow, alerts the designated caregiver BEFORE saying anything, and says the fixed line once", async () => {
     const r = await run([...UP_TO_ASSOCIATION, ["her", "I fell in the kitchen this morning."], ["relay", SAID.safety]]);
