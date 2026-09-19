@@ -11,6 +11,8 @@ export async function POST(request: Request): Promise<Response> {
   if (refused) return refused;
   const body = await bodyOf(request);
   if (!body || typeof body.member !== "string" || text(body.what_happened, 2000).trim() === "") return Response.json({ error: "expected { member, who, what_happened, when_where? }" }, { status: 400 });
+  const deniedMember = guard(request, body.member);
+  if (deniedMember) return deniedMember;
   const out = await (await liveRecall()).service.tellRecallAMemory({
     contributor_id: body.member,
     claim: { who: text(body.who, 200), what_happened: text(body.what_happened, 2000), when_where: text(body.when_where, 200) || null, photo_asset_id: null, about_topic_id: null },

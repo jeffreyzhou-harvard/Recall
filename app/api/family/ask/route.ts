@@ -9,6 +9,8 @@ export async function POST(request: Request): Promise<Response> {
   if (refused) return refused;
   const body = await bodyOf(request);
   if (!body || typeof body.question !== "string" || typeof body.member !== "string") return Response.json({ error: "expected { question, member }" }, { status: 400 });
+  const deniedMember = guard(request, body.member);
+  if (deniedMember) return deniedMember;
   const { line, graph_content } = await (await liveRecall()).service.askAboutHer(body.question.slice(0, 2000), body.member);
   return Response.json({ line, graph_content });
 }

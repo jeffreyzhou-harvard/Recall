@@ -374,7 +374,7 @@ describe("what opens the family side can never cause a call (rule 5)", () => {
 
   it("the family key opens the family routes and not the schedule; the operator key opens both", async () => {
     const { isFamily, isOperator } = await import("@/server/operator");
-    await withEnv({ NODE_ENV: "production", RECALL_OPERATOR_SECRET: "op-secret", RECALL_FAMILY_SECRET: "fam-secret" }, () => {
+    await withEnv({ NODE_ENV: "production", RECALL_OPERATOR_SECRET: "op-secret", RECALL_FAMILY_CREDENTIALS: JSON.stringify({ "person:maya": "fam-secret" }) }, () => {
       expect([isFamily(request({ "x-recall-family": "fam-secret" })), isOperator(request({ "x-recall-family": "fam-secret" }))]).toEqual([true, false]);
       expect(isOperator(request({ "x-recall-operator": "fam-secret" }))).toBe(false); // nor by sending it under the other name
       expect([isFamily(request({ "x-recall-operator": "op-secret" })), isOperator(request({ "x-recall-operator": "op-secret" }))]).toEqual([true, true]);
