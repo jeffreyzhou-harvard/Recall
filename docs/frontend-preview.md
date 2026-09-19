@@ -1,6 +1,6 @@
 # Recall frontend preview
 
-Built on branch `designs`, merged with main through `16c34d7`, and prepared for the shared frontend handoff. The latest AGENTS.md and SPECS.md were reviewed before integration.
+Built on branch `designs`, merged with main through `00a823b`, and prepared for the shared frontend handoff. The latest AGENTS.md and SPECS.md were reviewed before integration.
 
 ## Routes
 
@@ -51,7 +51,7 @@ Validation before the latest main merge: `npm run check` passed (258 tests, lang
 
 ## Backend handoff
 
-After merging the latest main: `npm run check` passes all 407 tests plus language/provenance checks; `npm run build -- --webpack` passes. Validation used Node 24.19.0; the new onboarding database requires Node >=22.13.
+After merging the latest main: `npm run check` passes all 418 tests plus language/provenance checks; `npm run build -- --webpack` passes. Validation used Node 24.19.0; the new onboarding database requires Node >=22.13.
 
 | Surface | Frontend entry | Integration boundary |
 | --- | --- | --- |
