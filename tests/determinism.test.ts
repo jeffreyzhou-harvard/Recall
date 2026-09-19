@@ -73,16 +73,25 @@ describe("static determinism guard", () => {
     expect(offenders.map((f) => f.slice(ROOT.length + 1))).toEqual([]);
   });
 
-  it("nothing on the judged path makes a network call or imports the native graph database", () => {
-    const offenders: string[] = [];
-    for (const file of filesUnder(join(ROOT, "lib"))) {
-      const rel = file.slice(ROOT.length + 1);
-      const source = readFileSync(file, "utf8");
-      if (/\bfetch\s*\(|new WebSocket\s*\(|new XMLHttpRequest\s*\(/.test(source)) offenders.push(`${rel}: network call`);
-      if (rel !== join("lib", "graph", "ladybug-store.ts") && /@ladybugdb\/core|ladybug-store/.test(source)) {
-        offenders.push(`${rel}: imports the native graph store`);
-      }
-    }
+  // Live-only code: the one place each external system is touched. Everything else under /lib is
+  // judged-path safe, and must not reach these even indirectly.
+  const LIVE_ONLY = [join("lib", "graph", "ladybug-store.ts"), join("lib", "bridge", "telegram") + "/"];
+  const isLiveOnly = (rel: string): boolean => LIVE_ONLY.some((p) => rel === p || rel.startsWith(p));
+  const NETWORK = /\bfetch\s*\(|new WebSocket\s*\(|new XMLHttpRequest\s*\(|new EventSource\s*\(/;
+  const LIVE_IMPORT = /@ladybugdb\/core|ladybug-store|bridge\/telegram|@\/server\//;
+
+  it("only lib/bridge/telegram/api.ts makes network calls", () => {
+    const callers = filesUnder(join(ROOT, "lib"))
+      .filter((f) => NETWORK.test(readFileSync(f, "utf8")))
+      .map((f) => f.slice(ROOT.length + 1));
+    expect(callers).toEqual([join("lib", "bridge", "telegram", "api.ts")]);
+  });
+
+  it("nothing judged-path safe imports live-only code: not the rest of /lib, not the harness, not /present", () => {
+    const judged = [...filesUnder(join(ROOT, "lib")), ...filesUnder(join(ROOT, "fixtures")), join(ROOT, "app", "present", "page.tsx"), join(ROOT, "app", "page.tsx")];
+    const offenders = judged
+      .map((f) => f.slice(ROOT.length + 1))
+      .filter((rel) => !isLiveOnly(rel) && LIVE_IMPORT.test(readFileSync(join(ROOT, rel), "utf8")));
     expect(offenders).toEqual([]);
   });
 });

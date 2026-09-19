@@ -46,6 +46,8 @@ export interface SessionRecording {
   prompts: SessionRecord["prompts"];
   /** Everything that reached the family, in order: the voice card, a notice, the support receipt. */
   messages: PostedMessage[];
+  /** Anything that should have reached them and did not, because a live transport failed. Empty on the judged path. */
+  delivery_failures: string[];
   caregiver_receipt: ToolOutput<"build_caregiver_receipt"> | null;
   provenance_receipt: ProvenanceReceipt | null;
   prov: SealedProvLog;
@@ -99,6 +101,7 @@ export async function buildRecording(input: {
     spoken: session.spoken,
     prompts: session.prompts,
     messages: input.messages,
+    delivery_failures: session.delivery_failures,
     caregiver_receipt: input.receipt,
     provenance_receipt: buildProvenanceReceipt(session, cards, sealed),
     prov: sealed,

@@ -44,6 +44,8 @@ export interface SessionRecord {
   telemetry: AccessibilityTelemetry;
   /** Set when unapproved call audio was dropped at call end. */
   unapproved_audio_discarded: boolean;
+  /** Messages the bridge could not deliver (a live transport was down). Never silent: recorded here and in the recording. */
+  delivery_failures: string[];
 }
 
 export function newSession(sessionId: string): SessionRecord {
@@ -61,6 +63,7 @@ export function newSession(sessionId: string): SessionRecord {
     delivery: null,
     telemetry: { response_latencies_ms: [], thread_loss_events: 0, scaffolds_fired: [] },
     unapproved_audio_discarded: false,
+    delivery_failures: [],
   };
 }
 

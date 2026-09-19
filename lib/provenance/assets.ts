@@ -57,6 +57,18 @@ export class AssetIndex {
     return this.byId.has(id);
   }
 
+  /**
+   * Add media that arrived at runtime - the one photo forwarded with a live ask. It is hashed on
+   * arrival and then as immutable as anything in the manifest: registering the same id again with
+   * different bytes is refused.
+   */
+  register(entry: AssetEntry): AssetEntry {
+    const known = this.byId.get(entry.id);
+    if (known && known.sha256 !== entry.sha256) throw new AssetResolutionError(`asset "${entry.id}" is already registered with different bytes`);
+    if (!known) this.byId.set(entry.id, entry);
+    return this.byId.get(entry.id)!;
+  }
+
   get(id: string): AssetEntry {
     const asset = this.byId.get(id);
     if (!asset) throw new AssetResolutionError(`asset "${id}" is not in the manifest`);
