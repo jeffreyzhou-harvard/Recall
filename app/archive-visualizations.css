@@ -142,7 +142,7 @@
 .archive-graph-node[aria-pressed="true"] .archive-graph-node-ring,
 .archive-graph-node:focus-visible .archive-graph-node-ring { stroke: var(--recall-focus); stroke-width: 4px; }
 .archive-graph-node:focus-visible { outline: none; }
-.archive-graph-label { fill: var(--recall-ink); font-family: inherit; font-size: 18px; }
+.archive-graph-label { paint-order: stroke; stroke: var(--recall-tint); stroke-width: 6px; stroke-linejoin: round; fill: var(--recall-ink); font-family: inherit; font-size: 18px; }
 .archive-graph-node[data-kind="event"] .archive-graph-label { font-size: 20px; font-weight: 600; }
 .archive-graph-initial { fill: var(--recall-ink); font-family: inherit; font-size: 28px; }
 

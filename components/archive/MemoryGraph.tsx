@@ -53,7 +53,12 @@ export function MemoryGraph({ moments, photos, stories, onSelect }: Props) {
         const placeId = `place:${moment.place}`;
         const existing = nodes.find((node) => node.id === placeId);
         if (existing) existing.momentIds.push(moment.id);
-        else nodes.push({ id: placeId, label: moment.place, kind: "place", x: centerX + Math.cos(angle + .3) * Math.min(430, Math.max(300, width * .42)), y: centerY + Math.sin(angle + .3) * 250, detail: "Named in your contribution", momentIds: [moment.id] });
+        else {
+          // Keep the outer place nodes clear of the photo captions beneath them.
+          const placeAngle = angle + (Math.cos(angle) < 0 && Math.sin(angle) > 0 ? .6 : .3);
+          const lowerRight = Math.cos(angle) > 0 && Math.sin(angle) > 0;
+          nodes.push({ id: placeId, label: moment.place, kind: "place", x: centerX + Math.cos(placeAngle) * Math.min(430, Math.max(300, width * .42)), y: centerY + Math.sin(placeAngle) * 250 + (lowerRight ? 60 : 0), detail: "Named in your contribution", momentIds: [moment.id] });
+        }
         edges.push({ from: eventId, to: placeId, kind: "named" });
       }
     });
