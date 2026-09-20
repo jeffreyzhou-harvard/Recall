@@ -28,6 +28,30 @@ Versions below describe the repository's current dependency families; [package.j
 
 | Layer | Technology and role |
 | --- | --- |
+| `npm run check` | `typecheck` + `test` + `lint:language` + `verify`. Must pass before a task is called done. |
+| `npm run lint:language` | The banned-phrase and conduct lint (`AGENTS.md` §12, test 8) over every fixed line and every line Recall rendered on the golden path. |
+| `npm run verify` | Asset hashes, seed validation, citation resolution, the judged path end to end, authorship invariants. |
+| `npm run verify:strict` | The pre-demo gate. Same, but **fails while any placeholder media or placeholder word timing remains.** |
+| `npm run assets:hash` | Re-hash `/assets` into the manifest. Refuses to touch a changed `final` asset without `--allow-replace`. |
+| `npm run assets:placeholder` | Generate stand-in media. Never overwrites an existing file. |
+| `npm run graph:seed` | Build an on-disk LadybugDB graph at `.data/recall.lbug` from the family seed, for Cypher poking. |
+| `npm run prizes:check` | Check that the seven-target judge brief is complete. |
+| `npm run prizes:brief` | Print the concise round-one and round-two talk track for the team sync. |
+| `npm run prizes:prompt` | Print the bounded prompt for drafting sponsor justifications from the shared brief. |
+
+## Prize alignment
+
+The internal [prize alignment brief](docs/PRIZE_ALIGNMENT.md) keeps every demo explanation pointed at the same human moment and technical proof. It covers seven targets: Long Lake, OpenAI, Meta, Dropbox, Deepgram, Ramp, and Cognition/Devin. The winning story is consistent across rounds: Recall helps a person reach her own memories in her own words, then gives family a reason to call her directly.
+
+Before a team sync, run `npm run prizes:check` and `npm run prizes:brief`. Use `npm run prizes:prompt` when preparing a short, judge-facing justification from the shared demo records.
+
+## Frontend boilerplate
+
+The frontend is ready for backend integration: `/` is the patient call, `/caregiver` is the caregiver session waveform and conversation-suggestion form, `/onboarding` is phone-first setup, and `/revisit` is the next-conversation invitation. `/family` aliases `/caregiver`.
+
+These screens use isolated sample state and local files. They do not yet load authorized household data, schedule calls or persist suggestions. The waveform displays labeled per-topic call counts, not recorded audio or a memory score. The UI permits separately labeled question suggestions; the live backend still has its redirect-only question contract. See [the frontend handoff](docs/frontend-preview.md#backend-handoff) for entry points and integration boundaries.
+
+## How it fits together
 | Frontend | Next.js 16 App Router, React 19, TypeScript 7 |
 | Styling and motion | Custom CSS, Tailwind CSS 4, Framer Motion 13, Lucide icons, locally hosted Atkinson Hyperlegible Next |
 | State and validation | Zustand 5, a deterministic call reducer, Zod 4 |
@@ -49,6 +73,7 @@ The face library is pinned and archived upstream; see [People and model limitati
 ## Run locally
 
 Use **Node.js 22.13 or newer**.
+main
 
 ```bash
 npm ci
@@ -161,10 +186,6 @@ SQLite schemas are created by the app at runtime; no separate PostgreSQL service
 
 ## Checks and repository map
 
-```bash
-npm run check
-npm run build
-```
 
 | Command | Purpose |
 | --- | --- |
