@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { ArrowRight, MessageCircle, Search, X } from "lucide-react";
+import { ArrowRight, X } from "lucide-react";
 import type { FamilyQueryResult } from "@/lib/knowledge/family-query";
 import "./graph-questions.css";
 
@@ -58,23 +58,24 @@ export function GraphQuestions({ revision, onOpenMoment }: { revision: string; o
   const sourceNumber = (id: string) => (result?.sources.findIndex(source => source.id === id) ?? -1) + 1;
 
   return <section className="circle-graph-questions" aria-labelledby={`${uid}-title`}>
-    <div className="circle-graph-question-heading">
-      <MessageCircle size={23} strokeWidth={1.6} aria-hidden="true" />
-      <div><h2 id={`${uid}-title`}>Ask your family’s stories.</h2><p>Find a memory, follow a connection, or discover something to talk about.</p></div>
-    </div>
     <form onSubmit={event => { event.preventDefault(); void ask(question); }}>
-      <label htmlFor={`${uid}-question`}>What would you like to explore?</label>
+      <h2 id={`${uid}-title`} className="circle-graph-question-title"><label htmlFor={`${uid}-question`}>Ask your family’s stories</label></h2>
       <div className="circle-graph-question-field">
-        <textarea id={`${uid}-question`} ref={field} value={question} onChange={event => setQuestion(event.target.value)} maxLength={600} rows={2}
-          placeholder="Which places come up in our family stories?" aria-describedby={`${uid}-hint`} readOnly={busy} />
+        <textarea id={`${uid}-question`} ref={field} value={question} onChange={event => setQuestion(event.target.value)} maxLength={600} rows={1}
+          placeholder="Ask about a person, place, or memory…" aria-describedby={`${uid}-hint`} readOnly={busy} />
         {busy ? <button type="button" className="circle-button" onClick={cancel}><X size={17} aria-hidden="true" />Cancel</button>
-          : <button type="submit" className="circle-button primary" disabled={question.trim().length < 2}>Ask Recall<ArrowRight size={17} aria-hidden="true" /></button>}
+          : <button type="submit" className="circle-button primary" disabled={question.trim().length < 2}>Ask<ArrowRight size={17} aria-hidden="true" /></button>}
       </div>
-      <p id={`${uid}-hint`} className="circle-graph-question-hint">Answers draw on stories and connections shared with you. Each source stays attached.</p>
+      <div className="circle-graph-question-meta">
+        <p id={`${uid}-hint`} className="circle-graph-question-hint">From shared stories, with sources.</p>
+        {!result && !busy && !error && <details className="circle-graph-question-examples">
+          <summary>Try a question</summary>
+          <div className="circle-graph-question-suggestions" aria-label="Example questions">
+            {suggestions.map(suggestion => <button key={suggestion} type="button" onClick={() => void ask(suggestion)}>{suggestion}</button>)}
+          </div>
+        </details>}
+      </div>
     </form>
-    {!result && !busy && !error && <div className="circle-graph-question-suggestions" aria-label="Example questions">
-      {suggestions.map(suggestion => <button key={suggestion} type="button" onClick={() => void ask(suggestion)}><Search size={14} aria-hidden="true" />{suggestion}</button>)}
-    </div>}
     <div role="status" className="circle-graph-question-status">{busy ? "Looking through your shared stories…" : result ? `${result.sources.length} ${result.sources.length === 1 ? "source" : "sources"} found.` : ""}</div>
     {error && <p className="circle-graph-question-error" role="alert">{error}</p>}
     {result && <div className="circle-graph-question-result">
