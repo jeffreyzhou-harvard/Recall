@@ -37,6 +37,10 @@ export type CircleState = {
   }[];
   demo: boolean;
   demoCall?: { topics: Record<string, string>; sharedContributions: string[] };
+  /** Moment ids the fictional sample stories were written for, so a deleted one is not written back. */
+  sampleStories?: string[];
+  /** Moment ids the fictional sample call history was written for; each is written once. */
+  sampleHistory?: string[];
   drafts?: {
     id: string;
     owner: string;

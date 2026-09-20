@@ -1,7 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import type { SessionSummary } from "@/lib/family/session-summary";
+import { withoutTopic, type SessionSummary } from "@/lib/family/session-summary";
 import familyCopy from "@/fixtures/family-copy.json";
 import thresholds from "@/fixtures/record-thresholds.json";
 
@@ -256,5 +256,6 @@ export function SessionHistory({ sessions: allSessions, recordWindow = threshold
 function recordCount(session: SessionSummary) {
   const template = session.unaidedCalls === null ? familyCopy.lines.record_not_enough : familyCopy.lines.record_unaided;
   const slots: Record<string, string> = { topic: session.topicName, unaided: String(session.unaidedCalls), calls: String(session.recentCalls) };
-  return template.text.replace(/\{(\w+)\}/g, (_, key: string) => slots[key] ?? "");
+  // The cover, the receipt and every label already name the topic beside this sentence.
+  return withoutTopic(template.text.replace(/\{(\w+)\}/g, (_, key: string) => slots[key] ?? ""), session.topicName);
 }

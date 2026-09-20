@@ -81,18 +81,36 @@
 }
 
 .care-record-print { display: none; }
-@page { margin: 18mm; }
-/* Print the record alone. It is portalled to the body, so dropping its siblings
-   leaves no blank sheets and works wherever the dashboard is mounted. */
+@page { margin: 18mm 16mm; }
+/* Print the record alone, as a document a doctor can file. It is portalled to the body, so dropping
+   its siblings leaves no blank sheets and works wherever the dashboard is mounted. */
 @media print {
   body:has(> .care-record-print) > *:not(.care-record-print) { display: none; }
   body { background: #fff; }
-  .care-record-print { display: block; color: #000; background: #fff; font-size: 12pt; line-height: 1.55; }
-  .care-record-print h1 { font-size: 20pt; font-weight: 650; letter-spacing: -.01em; }
-  .care-record-print-subject { margin-top: 4pt; font-size: 13pt; font-weight: 650; }
-  .care-record-print p { margin-top: 8pt; max-width: none; break-inside: avoid; }
-  .care-record-print-detail { margin-top: 2pt; padding-left: 16pt; }
-  .care-record-print-gap { display: block; height: 10pt; }
+  .care-record-print { display: block; color: #000; background: #fff; font: 10.5pt/1.5 Georgia, "Times New Roman", serif; }
+  .care-record-print p { max-width: none; }
+
+  .care-record-print-head { padding-bottom: 10pt; border-bottom: 1.5pt solid #000; }
+  .care-record-print-mark { font-family: "Atkinson Hyperlegible Next", sans-serif; font-size: 8pt; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; }
+  .care-record-print h1 { margin-top: 2pt; font-size: 19pt; font-weight: 400; letter-spacing: -.01em; }
+  .care-record-print-head dl { display: flex; gap: 26pt; margin-top: 12pt; }
+  .care-record-print-head dt { font-family: "Atkinson Hyperlegible Next", sans-serif; font-size: 7.5pt; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #333; }
+  .care-record-print-head dd { margin-top: 1pt; font-size: 11pt; }
+
+  .care-record-print-note { margin-top: 14pt; padding: 9pt 12pt; border: .5pt solid #000; background: #f4f4f4; break-inside: avoid; }
+  .care-record-print-note p { font-size: 9.5pt; line-height: 1.45; }
+  .care-record-print-note p + p { margin-top: 5pt; }
+
+  .care-record-print-section { margin-top: 20pt; }
+  .care-record-print h2 { padding-bottom: 4pt; border-bottom: .5pt solid #000; font-family: "Atkinson Hyperlegible Next", sans-serif; font-size: 8.5pt; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+  .care-record-print-section > p { margin-top: 9pt; break-inside: avoid; }
+
+  /* Topic name on the left, what the calls recorded for it on the right, so the page scans in one column of names. */
+  .care-record-print-topic { display: grid; grid-template-columns: 150pt 1fr; gap: 16pt; padding: 9pt 0; border-bottom: .25pt solid #999; break-inside: avoid; }
+  .care-record-print-topic h3 { font-size: 11pt; font-weight: 700; }
+  .care-record-print-topic p + p { margin-top: 3pt; }
+
+  .care-record-print-foot { margin-top: 22pt; padding-top: 6pt; border-top: .5pt solid #000; font-family: "Atkinson Hyperlegible Next", sans-serif; font-size: 8pt; color: #333; }
 }
 /* One Circle workspace and type scale for the entire counts-only record. */
 .circle-record { min-width: 0; max-width: 1200px; color: var(--recall-ink); font-variant-numeric: tabular-nums; }

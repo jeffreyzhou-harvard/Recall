@@ -3,10 +3,11 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
-import { CircleError, readCircle, updateCircle, type CirclePhoto, type CircleMoment } from "./store";
+import { CircleError, readCircle, updateCircle, type CirclePhoto, type CircleMoment, type CircleState } from "./store";
 import { mediaFolder } from "./photos";
 import { removeCollectionFiles, removeCollectionItems } from "./delete";
 import type { FamilyConnections, Moment } from "@/lib/archive/types";
+import demoFixture from "@/fixtures/sample-family-demo.json";
 
 /** Illustrative connections only: no accounts, invitations, or patient-call evidence are created. */
 export function sampleFamilyConnections(moments: Moment[]): FamilyConnections {
@@ -28,6 +29,41 @@ export function sampleFamilyConnections(moments: Moment[]): FamilyConnections {
       { from: "Susan", to: "Anika", label: "Anika is Susan’s granddaughter.", relation: "granddaughter" },
     ],
   };
+}
+
+/** The sample kit's own photo groups, the only ones the fictional demo material is written for. */
+export const sampleDemoMoments = (state: CircleState): CircleMoment[] =>
+  state.moments.filter((moment) => demoFixture.moments.some((entry) => entry.title === moment.title));
+
+/**
+ * Fictional family stories for the sample collection, so the Stories page has something in it
+ * without a second upload. Every one is written as a named family member's own account, like any
+ * other family contribution: none is attributed to the person Recall calls (AGENTS.md rules 1, 13).
+ */
+export function ensureSampleStories(household: string, owner: string) {
+  const state = readCircle(household);
+  if (!state.demo) return;
+  const written = new Set(state.sampleStories ?? []);
+  if (sampleDemoMoments(state).every((moment) => written.has(moment.id))) return;
+  updateCircle(household, (current) => {
+    if (!current.demo) return;
+    const done = new Set(current.sampleStories ?? []);
+    for (const moment of current.moments) {
+      if (done.has(moment.id)) continue;
+      const entry = demoFixture.moments.find((item) => item.title === moment.title);
+      if (!entry) continue;
+      // A few days after the photographs, so the collection reads in the order it happened.
+      const at = new Date(Date.parse(moment.endAt ?? moment.startAt ?? new Date().toISOString()) + 3 * 86400000).toISOString();
+      entry.stories.forEach((story, index) => {
+        const id = `sample-story:${moment.id}:${index}`;
+        if (current.stories.some((saved) => saved.id === id)) return;
+        current.stories.push({ id, eventId: moment.id, author: story.author, owner, requestId: id, text: story.text, source: "written", createdAt: at });
+        moment.revision++;
+      });
+      done.add(moment.id);
+    }
+    current.sampleStories = [...done];
+  });
 }
 
 const version = "sample-family-upload-demo-v3";

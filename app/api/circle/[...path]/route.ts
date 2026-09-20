@@ -25,7 +25,7 @@ import { transcribeAudio } from "@/server/circle/ai";
 import { discardAudio, expireAudioDrafts } from "@/server/circle/audio";
 import { deleteCollectionItem, deleteStory } from "@/server/circle/delete";
 import { askFamilyGraph, familyQueryRevision } from "@/server/circle/graph-query";
-import { loadSampleFamily, sampleFamilyConnections } from "@/server/circle/sample";
+import { ensureSampleStories, loadSampleFamily, sampleFamilyConnections } from "@/server/circle/sample";
 import { editPeople, faceThumbnail, getPeople, saveFaceScan } from "@/server/circle/people";
 import { sameOrigin, sessionCookie, browserPrincipal } from "@/server/session";
 import { getOnboarding, newInvitationToken } from "@/server/onboarding";
@@ -243,6 +243,7 @@ async function handle(request: Request, context: Context): Promise<Response> {
     if (["state", "audio", "media", "story"].includes(action)) await expireAudioDrafts(household);
     if (action === "state" && !isPost) {
       if (process.env.NODE_ENV === "development" && readCircle(household).demoCall) await syncSampleSharedMemories(household);
+      ensureSampleStories(household, person.person_id);
       const state = readCircle(household);
       const contacts = withCircleDb((db) =>
         db
