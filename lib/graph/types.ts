@@ -316,7 +316,26 @@ export type TopicOutcomeNode = NodeBase<
 >;
 export type ExportEventNode = NodeBase<"ExportEvent", { requester_id: string; at: string }>;
 export type DashboardAccessGrantNode = NodeBase<"DashboardAccessGrant", { member_id: string; action: "viewed" | "refused" | "revoked"; surface: string; at: string }>;
-export type SafetyEventNode = NodeBase<"SafetyEvent", { category: string; at: string; recipients: string[] }>;
+export type SafetyEventNode = NodeBase<
+  "SafetyEvent",
+  {
+    category: string;
+    at: string;
+    recipients: string[];
+    alert_id: string;
+    acknowledged_at: string | null;
+    acknowledged_by: string | null;
+    escalated_at: string | null;
+    /** When the backup tier may fire. Null if there is no backup, or after ack/escalation. */
+    escalate_after: string | null;
+    /** Caregiver this pending alert was sent to. Used to match a reply-1. */
+    caregiver_id: string;
+    /** Digits-only form of the number the alert was sent to, or null if that caregiver has no SMS number. */
+    caregiver_phone: string | null;
+    /** Streak count at send time, for `missed_calls` only. Null for a phrase-match alert. */
+    detail_count: number | null;
+  }
+>;
 
 export type PlaceNode = NodeBase<"Place", { aliases: string[]; topic?: TopicFacet }>;
 export type ActivityNode = NodeBase<"Activity", { aliases: string[] }>;

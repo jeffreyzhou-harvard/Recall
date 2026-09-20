@@ -16,7 +16,7 @@ import type { SafetyPhrases } from "@/lib/safety/phrases";
 import type { CallScript } from "@/lib/script/call-script";
 import { RecallService, type SessionRun } from "@/lib/service/recall-service";
 import { SetupStore, type Fault, type ScaffoldAdvisor } from "@/lib/tools";
-import { CALL_SCRIPT, FAMILY_COPY, FAMILY_SEED, GOLDEN_TRANSCRIPT, JUDGED_TIMING, MANIFEST, POLICY, RECORD_THRESHOLDS, SAFETY_PHRASES } from "./index";
+import { CALL_SCRIPT, FAMILY_COPY, FAMILY_SEED, GOLDEN_TRANSCRIPT, JUDGED_TIMING, MANIFEST, POLICY, RECORD_THRESHOLDS, SAFETY_PHRASES, SAFETY_THRESHOLDS } from "./index";
 
 export interface FixtureOptions {
   /** Extra seed files merged onto the family graph. */
@@ -68,6 +68,7 @@ export async function buildFixtureRig(options: FixtureOptions = {}): Promise<Fix
     copy: FAMILY_COPY,
     thresholds: RECORD_THRESHOLDS,
     safetyPhrases: options.safetyPhrases ?? SAFETY_PHRASES,
+    safetyThresholds: SAFETY_THRESHOLDS,
     alerts,
     callDriver: transcript ? () => new FixtureCallDriver(transcript, clock, JUDGED_TIMING.call_connect_delay_ms) : null,
     scaffoldAdvisor: options.scaffoldAdvisor,

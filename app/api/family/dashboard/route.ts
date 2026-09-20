@@ -20,6 +20,8 @@ export async function GET(request: Request): Promise<Response> {
   return Response.json({
     weekly_note: await recall.service.weeklyNote(member),
     topic_record: await recall.service.topicRecord(member),
+    // Count-only, pull-only, same tone as a Weekly Note gap line. Not a Weekly Note and not a push.
+    missed_call_notice: await recall.service.unansweredStreakNotice(member),
     // The alert card is shown to a designated caregiver and to nobody else.
     safety_alerts: designated ? recall.alerts.sentTo(member) : [],
   });

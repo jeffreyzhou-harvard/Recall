@@ -292,7 +292,7 @@ export class Onboarding {
     const current = await this.currentSetup(householdId);
     if (current) {
       const doc = current.document;
-      if (doc.recall_set_up_by === personId || doc.safety.designated_caregivers.some((c) => c.person_id === personId)) {
+      if (doc.recall_set_up_by === personId || doc.safety.designated_caregivers.some((c) => c.person_id === personId) || doc.safety.backup_caregiver_id === personId) {
         throw new OnboardingError("needs_joint_agreement", `${leaving.display_name} is named in the greeting or as a designated caregiver; change that in a joint setup first`);
       }
       const at = this.clock.iso();

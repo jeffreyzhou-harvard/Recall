@@ -116,7 +116,7 @@ export async function bench(options: FixtureOptions = {}): Promise<Bench> {
   const rig = await buildFixtureRig(options);
   const deps = (rig.service as unknown as { deps: RecallDeps }).deps;
   const store = createRecallStore();
-  const ctx: ToolContext = { graph: deps.graph, setup: deps.setup, assets: deps.assets, clock: deps.clock, gate: new GateKeeper(), transcription: deps.transcription, session: newSession("session:bench"), prov: new ProvLog(), script: deps.script, copy: deps.copy, safetyPhrases: deps.safetyPhrases, alerts: deps.alerts, machine: () => store.getState().machine };
+  const ctx: ToolContext = { graph: deps.graph, setup: deps.setup, assets: deps.assets, clock: deps.clock, gate: new GateKeeper(), transcription: deps.transcription, session: newSession("session:bench"), prov: new ProvLog(), script: deps.script, copy: deps.copy, safetyPhrases: deps.safetyPhrases, safetyThresholds: deps.safetyThresholds, alerts: deps.alerts, machine: () => store.getState().machine };
   const runtime = new ToolRuntime({ clock: deps.clock, call: ctx }, TOOL_IMPLS);
   const now = deps.clock.iso();
   const pick = await runtime.call("get_next_recall_topic", { person_id: "person:susan", schedule_context: { now } });

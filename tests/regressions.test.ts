@@ -272,7 +272,7 @@ describe("what comes up next", () => {
   /** Which topic the ranking would choose now, on the rig's own graph and clock. */
   const nextTopic = async (rig: Awaited<ReturnType<typeof buildFixtureRig>>) => {
     const deps = (rig.service as unknown as { deps: RecallDeps }).deps;
-    const ctx = { graph: deps.graph, setup: deps.setup, assets: deps.assets, clock: deps.clock, gate: new GateKeeper(), transcription: deps.transcription, session: newSession("session:peek"), prov: new ProvLog(), script: deps.script, copy: deps.copy, safetyPhrases: deps.safetyPhrases, alerts: deps.alerts, machine: () => createRecallStore().getState().machine } satisfies ToolContext;
+    const ctx = { graph: deps.graph, setup: deps.setup, assets: deps.assets, clock: deps.clock, gate: new GateKeeper(), transcription: deps.transcription, session: newSession("session:peek"), prov: new ProvLog(), script: deps.script, copy: deps.copy, safetyPhrases: deps.safetyPhrases, safetyThresholds: deps.safetyThresholds, alerts: deps.alerts, machine: () => createRecallStore().getState().machine } satisfies ToolContext;
     const pick = await new ToolRuntime({ clock: deps.clock, call: ctx }, TOOL_IMPLS).call("get_next_recall_topic", { person_id: "person:susan", schedule_context: { now: deps.clock.iso() } });
     return pick.topic!.topic_id;
   };

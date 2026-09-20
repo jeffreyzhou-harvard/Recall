@@ -16,6 +16,7 @@
  * returns graph content.
  */
 import { patientConfirmed, RECALL_AGENT_ID, type GraphEdge, type GraphNode, type Provenance, type SourceClass, type WeeklyNoteNode } from "@/lib/graph/types";
+import { readMissedCallState } from "@/lib/safety/missed-calls";
 import { edgeId } from "@/lib/graph/seed";
 import type { GraphStore } from "@/lib/graph/store";
 import type { OutcomeRow } from "./record";
@@ -60,6 +61,15 @@ export class FamilyView {
 
   herName(): Promise<string> {
     return this.displayName(this.personId);
+  }
+
+  /**
+   * Consecutive scheduled attempts that never connected. A count only: no cause,
+   * and nothing she said (rule 8). Zero after any call that reached her.
+   */
+  async missedCallStreak(): Promise<{ count: number; last_attempt_at: string | null }> {
+    const state = await readMissedCallState(this.graph);
+    return { count: state.streak, last_attempt_at: state.last_attempt_at };
   }
 
   memberName(memberId: string): Promise<string> {
