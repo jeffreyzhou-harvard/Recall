@@ -72,11 +72,16 @@ export class WebCall implements CallDriver {
     const resolve = this.resolve; this.resolve = null; resolve?.(undefined);
   }
   audio(id: string): Buffer | null { return this.command?.id === id && ["playback", "speak"].includes(this.command.kind) ? this.playing : null; }
-  async receive(id: string, bytes: Buffer, stopping = false) {
+  async receive(id: string, bytes: Buffer | (() => Promise<Buffer>), stopping = false) {
     if (this.command?.id !== id || this.command.kind !== "listen" || this.processing || !this.resolve) throw new Error("This recording step has ended.");
     this.processing = true;
+    // Latch a submitted hang-up before any upload or provider await. Its final turn still
+    // passes the safety check, but completing it can never reopen the call.
+    this.stopped ||= stopping;
     try {
-      const wav = parseWav(bytes);
+      // Reserve the turn before reading an HTTP upload, so a concurrent stop cannot discard
+      // an already-submitted final turn before its safety check.
+      const wav = parseWav(typeof bytes === "function" ? await bytes() : bytes);
       let result;
       try { result = await this.recognize(wav.bytes, this.abort.signal); }
       catch {
@@ -89,7 +94,6 @@ export class WebCall implements CallDriver {
       this.recording.set(media.entry.id, media);
       // Survives a process failure during commit. Normal hang-up deletes every unreferenced recording.
       await this.media.save(media);
-      this.stopped = stopping;
       const resolve = this.resolve; this.resolve = null; resolve({ asset_id: media.entry.id, start_ms: 0, end_ms: wav.duration });
     } catch (e) { this.reject?.(new CallUnavailableError("The recording could not be received.")); throw e; }
     finally { this.processing = false; }

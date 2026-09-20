@@ -24,7 +24,14 @@ export class DurableAlerts implements AlertChannel {
     this.db.prepare("UPDATE alerts SET delivered=1 WHERE household=? AND id=?").run(this.household, original.alert_id);
   }
   sentTo(id: string): SafetyAlert[] { return this.db.prepare("SELECT data FROM alerts WHERE household=? AND caregiver=? ORDER BY id").all(this.household, id).map((r) => JSON.parse(r.data as string)); }
-  async retryPending() { for (const row of this.db.prepare("SELECT data FROM alerts WHERE household=? AND delivered=0").all(this.household)) await this.send(JSON.parse(row.data as string)); }
+  async retryPending() {
+    let failed = false;
+    for (const row of this.db.prepare("SELECT data FROM alerts WHERE household=? AND delivered=0").all(this.household)) {
+      try { await this.send(JSON.parse(row.data as string)); }
+      catch { failed = true; } // One unavailable caregiver channel must not hold up the others.
+    }
+    if (failed) throw new Error("Some caregiver handoffs are still waiting for delivery.");
+  }
   close() { this.db.close(); }
 }
 export function webhookFor(id: string): { url: string; token: string } | null {
