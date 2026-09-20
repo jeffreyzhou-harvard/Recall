@@ -1,10 +1,9 @@
 /**
  * Onboarding routes. LIVE ONLY.
  *
- * There is no sign-in yet, so "who is doing this" (`by`, `agreed_by`) is whatever the caller says. Until
- * there is one, every route here is for the operator: open in development, behind the shared secret in
- * production. The one exception is accepting an invitation, where the token itself is the credential.
- * The rules about who may do what are not here: they are in lib/onboarding, and they hold either way.
+ * Household routes accept the operator or a current caregiver with a household-bound account. Actor
+ * fields are bound to that caregiver. First setup is a separate, blank-install-only transaction; an
+ * invitation token is the credential for joining. Joint consent rules remain in lib/onboarding.
  */
 import { OnboardingError, type OnboardingErrorCode } from "@/lib/onboarding/types";
 import { isOperator } from "@/server/operator";

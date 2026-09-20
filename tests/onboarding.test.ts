@@ -56,6 +56,23 @@ describe.each(STORES)("onboarding, %s", (_name, makeStore) => {
   };
 
   describe("a household", () => {
+    it("claims first setup once, including concurrent attempts and unactivated households", async () => {
+      const onboarding = new Onboarding(makeStore(), new FixtureClock("2026-10-12T15:00:00.000Z"));
+      expect(await onboarding.isEmpty()).toBe(true);
+      const attempts = await Promise.all([codeOf(onboarding.createFirstHousehold({ participant: SUSAN, caregiver: MAYA })), codeOf(onboarding.createFirstHousehold({ participant: SUSAN, caregiver: MAYA }))]);
+      expect(attempts).toEqual(["ok", "already_exists"]);
+      expect(await onboarding.isEmpty()).toBe(false);
+      expect((await onboarding.status("household:1")).household.status).toBe("onboarding");
+      expect(await codeOf(onboarding.createFirstHousehold({ participant: SUSAN, caregiver: MAYA }))).toBe("already_exists");
+    });
+
+    it("rolls back a failed first-account initialization so first setup can be retried", async () => {
+      const onboarding = new Onboarding(makeStore(), new FixtureClock("2026-10-12T15:00:00.000Z"));
+      await expect(onboarding.createFirstHousehold({ participant: SUSAN, caregiver: MAYA }, async () => { throw new Error("Account initialization failed"); })).rejects.toThrow("Account initialization failed");
+      expect(await onboarding.isEmpty()).toBe(true);
+      expect((await onboarding.createFirstHousehold({ participant: SUSAN, caregiver: MAYA })).household.household_id).toBe("household:1");
+    });
+
     it("starts with her and the caregiver setting Recall up with her - both, or neither", async () => {
       const { onboarding, hid, her, maya } = await start();
       expect([hid, maya, her]).toEqual(["household:1", "person:h1:1", "person:h1:2"]);

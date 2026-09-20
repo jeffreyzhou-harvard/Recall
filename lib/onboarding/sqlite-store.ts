@@ -140,7 +140,9 @@ export class SqliteOnboardingStore implements OnboardingStore {
         this.db.exec("COMMIT");
         return out;
       } catch (e) {
-        if (this.db.isTransaction) this.db.exec("ROLLBACK");
+        // isTransaction is absent on some supported Node releases. Always attempt the rollback;
+        // preserve the original error if SQLite already ended the transaction itself.
+        try { this.db.exec("ROLLBACK"); } catch { /* no open transaction */ }
         throw e;
       }
     });

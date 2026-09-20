@@ -1,11 +1,9 @@
 /** Short-lived signed browser sessions. Credentials remain on the server and are rechecked on every request. */
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { accountForKey, accountForMember } from "./accounts";
 export type Principal = { role: "operator"; member_id: null } | { role: "family" | "patient"; member_id: string };
 export const SESSION_COOKIE = "recall_session";
 const lifetime = 8 * 60 * 60;
-const local = globalThis as typeof globalThis & { __recallLocalKey?: string };
-function localKey(): string { return local.__recallLocalKey ??= randomBytes(32).toString("hex"); }
 export function credentials(): { operator?: string; members: Record<string, string> } | null {
   try {
     const members: unknown = JSON.parse(process.env.RECALL_FAMILY_CREDENTIALS || "{}");
@@ -23,10 +21,6 @@ export function equal(a: string, b: string | undefined): boolean {
   const aa = Buffer.from(a), bb = Buffer.from(b);
   return aa.length === bb.length && timingSafeEqual(aa, bb);
 }
-export function localSetupAvailable(request: Request): boolean {
-  const c = credentials();
-  return !!c && !c.operator && !Object.keys(c.members).length && process.env.NODE_ENV !== "production" && ["localhost", "127.0.0.1", "[::1]"].includes(new URL(request.url).hostname);
-}
 export function sameOrigin(request: Request): boolean { return request.headers.get("origin") === new URL(request.url).origin; }
 export function principalForKey(key: string): Principal | null {
   const c = credentials();
@@ -39,7 +33,7 @@ export function principalForKey(key: string): Principal | null {
 function signingKey(principal: Principal, request: Request): string | undefined {
   const c = credentials();
   if (!c) return;
-  return principal.role === "operator" ? c.operator || (localSetupAvailable(request) ? localKey() : undefined) : principal.role === "family" && Object.hasOwn(c.members, principal.member_id) ? c.members[principal.member_id] : (() => { const a = accountForMember(principal.member_id); return a?.role === principal.role ? a.verifier : undefined; })();
+  return principal.role === "operator" ? c.operator : principal.role === "family" && Object.hasOwn(c.members, principal.member_id) ? c.members[principal.member_id] : (() => { const a = accountForMember(principal.member_id); return a?.role === principal.role ? a.verifier : undefined; })();
 }
 export function sessionCookie(principal: Principal, request: Request): string {
   const key = signingKey(principal, request);

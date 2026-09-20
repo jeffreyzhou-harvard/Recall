@@ -1,3 +1,4 @@
+import { householdGuard, managerActor } from "@/server/household-access";
 import { webhookFor } from "@/server/alerts";
 import { attestationsMissing } from "@/lib/tools/policy";
 import { z } from "zod";
@@ -5,21 +6,21 @@ import { getOnboarding } from "@/server/onboarding";
 import { activeHousehold } from "@/server/active-household";
 import { liveRecall } from "../../../../family/shared";
 import { topicChoices } from "@/server/topics";
-import { guard, bodyOf, respond } from "../../../shared";
+import { bodyOf, respond } from "../../../shared";
 import { OnboardingError } from "@/lib/onboarding/types";
 const choices = z.strictObject({ expected_version: z.number().int().positive(), patient_agreed: z.literal(true), caregiver_agreed: z.literal(true), members: z.array(z.strictObject({ id: z.string(), approved: z.boolean(), detail: z.enum(["none", "weekly_note", "weekly_note_and_record"]) })), topics: z.array(z.string()), web_calls_enabled: z.boolean().optional(), alert_channel: z.enum(["dashboard", "webhook"]).optional() });
 export const runtime = "nodejs";
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
-  const denied = guard(request); if (denied) return denied;
+  const { id } = await context.params;
+  const denied = await householdGuard(request, id); if (denied) return denied;
   const input = choices.safeParse(await bodyOf(request));
   if (!input.success) return Response.json({ error: "Review the choices together and record both agreements." }, { status: 400 });
-  const { id } = await context.params;
   if (id !== activeHousehold(process.cwd())) return Response.json({ error: "Open the active household." }, { status: 409 });
   return respond(async () => {
     const onb = getOnboarding(), current = await onb.currentSetup(id), people = (await onb.people(id)).filter((p) => !p.removed_at);
     if (!current) throw new OnboardingError("needs_joint_agreement", "Complete the initial joint setup.");
     const p = input.data, doc = structuredClone(current.document), now = new Date().toISOString();
-    const patient = people.find((m) => m.role === "participant")!, caregiver = people.find((m) => m.person_id === doc.recall_set_up_by && m.role === "caregiver");
+    const patient = people.find((m) => m.role === "participant")!, caregiver = people.find((m) => m.person_id === managerActor(request, doc.recall_set_up_by) && m.role === "caregiver");
     if (!caregiver || new Set(p.members.map((m) => m.id)).size !== p.members.length || p.members.some((m) => !people.some((person) => person.person_id === m.id && person.role !== "participant") || (!m.approved && m.detail !== "none"))) throw new OnboardingError("invalid", "Check the household members and their access.");
     const known = await topicChoices((await liveRecall()).graph);
     if (p.topics.some((t) => !known.some((k) => k.id === t && p.members.some((m) => m.id === k.contributor_id && m.approved)))) throw new OnboardingError("invalid", "Choose topics from approved contributors.");

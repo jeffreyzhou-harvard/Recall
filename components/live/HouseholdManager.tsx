@@ -23,19 +23,19 @@ export function HouseholdManager() {
   const resetAgreement = () => { setPatientAgreed(false); setCaregiverAgreed(false); };
   const load = useCallback(async () => {
     if (!household) return;
-    const [status, nextTopics, liveStatus] = await Promise.all([api<{ people: Member[]; setup: SetupVersion | null }>(base), api<Topic[]>("/api/onboarding/topics"), api<{ web_configured: boolean; scheduler_enabled: boolean; issue: string | null }>("/api/live/schedule")]);
+    const [status, nextTopics, liveStatus] = await Promise.all([api<{ people: Member[]; setup: SetupVersion | null }>(base), api<Topic[]>("/api/onboarding/topics"), session?.principal?.role === "operator" ? api<{ web_configured: boolean; scheduler_enabled: boolean; issue: string | null }>("/api/live/schedule") : Promise.resolve(null)]);
     if (!status.setup) throw new Error("Complete joint setup before choosing people and topics.");
     setDiagnostics(liveStatus);
     setPeople(status.people.filter((p) => !p.removed_at)); setSetup(status.setup); setTopics(nextTopics);
     const doc = status.setup.document; setWebEnabled(!doc.calls_paused); setChannel(doc.safety.designated_caregivers[0]?.alert_channel ?? "dashboard");
     setChoices(status.people.filter((p) => !p.removed_at && p.role !== "participant").map((p) => ({ id: p.person_id, approved: doc.approved_people.includes(p.person_id), detail: doc.dashboard.grants.find((g) => g.member_id === p.person_id && !g.revoked_at)?.detail_level ?? "none" })));
     setAllowed(doc.topics.allow); resetAgreement();
-  }, [base, household]);
+  }, [base, household, session?.principal?.role]);
   useEffect(() => { void load().catch(() => setError("Household choices could not be loaded.")); }, [load]);
   async function work(fn: () => Promise<void>) { if (busy) return; setBusy(true); setError(""); setMessage(""); try { await fn(); } catch (e) { setError(e instanceof Error ? e.message : "The change could not be saved."); } finally { setBusy(false); } }
   if (!household) return <div className="live-setup"><h1>Start with joint setup.</h1><p>Choose who Recall is for and what they are comfortable sharing.</p><Link className="care-action" href="/onboarding">Set up Recall<ArrowRight size={18} aria-hidden="true" /></Link></div>;
   if (!setup) return <div className="live-setup"><p role={error ? "alert" : "status"}>{error || "Opening your choices…"}</p>{error && <Link className="setup-text-button" href="/onboarding">Return to joint setup</Link>}</div>;
-  const caregiver = people.find((p) => p.person_id === setup.document.recall_set_up_by), patient = people.find((p) => p.role === "participant");
+  const caregiver = people.find((p) => p.person_id === (session?.principal?.role === "family" ? session.principal.member_id : setup.document.recall_set_up_by)), patient = people.find((p) => p.role === "participant");
   return <section className="recall-onboarding live-setup live-manage">
     <Link className="setup-back" href="/onboarding"><ArrowLeft size={18} aria-hidden="true" />Joint setup</Link>
     <h1>Familiar things to talk about.</h1>

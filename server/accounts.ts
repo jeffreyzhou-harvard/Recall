@@ -20,6 +20,10 @@ export function issueAccount(household: string, member: string, role: Account["r
   withDb((db) => db.prepare("INSERT INTO accounts VALUES (?, ?, ?, ?) ON CONFLICT(member_id) DO UPDATE SET household_id=excluded.household_id,role=excluded.role,verifier=excluded.verifier").run(member, household, role, hash(key)));
   return key;
 }
-export function revokeAccount(member: string): void { withDb((db) => db.prepare("DELETE FROM accounts WHERE member_id=?").run(member)); }
+export function revokeAccount(member: string, onlyIfKey?: string): void {
+  withDb((db) => onlyIfKey === undefined
+    ? db.prepare("DELETE FROM accounts WHERE member_id=?").run(member)
+    : db.prepare("DELETE FROM accounts WHERE member_id=? AND verifier=?").run(member, hash(onlyIfKey)));
+}
 export function accountForKey(key: string): Account | undefined { return withDb((db) => db.prepare("SELECT * FROM accounts WHERE verifier=?").get(hash(key)) as Account | undefined); }
 export function accountForMember(member: string): Account | undefined { return withDb((db) => db.prepare("SELECT * FROM accounts WHERE member_id=?").get(member) as Account | undefined); }

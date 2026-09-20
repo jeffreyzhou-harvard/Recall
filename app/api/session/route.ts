@@ -1,15 +1,17 @@
 import { activeHousehold } from "@/server/active-household";
-import { browserPrincipal, localSetupAvailable, principalForKey, sameOrigin, sessionCookie, SESSION_COOKIE } from "@/server/session";
+import { browserPrincipal, principalForKey, sameOrigin, sessionCookie, SESSION_COOKIE } from "@/server/session";
+import { firstSetupAvailable, managedHousehold } from "@/server/household-access";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export async function GET(request: Request): Promise<Response> {
-  return Response.json({ principal: browserPrincipal(request), local_setup_available: localSetupAvailable(request), household_id: browserPrincipal(request)?.role === "operator" ? activeHousehold() || null : null }, { headers: { "Cache-Control": "no-store" } });
+  const principal = browserPrincipal(request), managed = await managedHousehold(request);
+  return Response.json({ principal, local_setup_available: false, first_setup_available: await firstSetupAvailable(), can_manage_setup: principal?.role === "operator" || !!managed, managed_household_id: managed, household_id: principal?.role === "operator" ? activeHousehold() || null : managed }, { headers: { "Cache-Control": "no-store" } });
 }
 export async function POST(request: Request): Promise<Response> {
   if (!sameOrigin(request)) return Response.json({ error: "Open this form from Recall." }, { status: 403 });
   let body;
   try { body = await request.json(); } catch { return Response.json({ error: "Enter your access key." }, { status: 400 }); }
-  const p = body?.local === true && localSetupAvailable(request) ? { role: "operator" as const, member_id: null } : typeof body?.key === "string" && body.key.length <= 512 ? principalForKey(body.key) : null;
+  const p = typeof body?.key === "string" && body.key.length <= 512 ? principalForKey(body.key) : null;
   if (!p) return Response.json({ error: "This access key was not accepted." }, { status: 403 });
   return Response.json({ principal: p }, { headers: { "Set-Cookie": sessionCookie(p, request), "Cache-Control": "no-store" } });
 }

@@ -21,12 +21,12 @@ export function JointSetup() {
   const patch = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((d) => ({ ...d, [key]: value, patient_agreed: key === "patient_agreed" ? value as boolean : false, caregiver_agreed: key === "caregiver_agreed" ? value as boolean : key === "patient_agreed" ? d.caregiver_agreed : false }));
   useEffect(() => { title.current?.focus(); }, [step, finished]);
   useEffect(() => {
-    const id = new URLSearchParams(window.location.search).get("household") || session?.household_id;
+    const id = session?.managed_household_id || new URLSearchParams(window.location.search).get("household") || session?.household_id;
     if (!id) { setLoaded(true); return; }
     setHousehold(id); setPending(true);
     const controller = new AbortController();
     api<Status>(`/api/onboarding/households/${encodeURIComponent(id)}`, { signal: controller.signal }).then((status) => {
-      const her = status.people.find((p) => p.role === "participant" && !p.removed_at), carer = status.people.find((p) => p.role === "caregiver" && !p.removed_at);
+      const her = status.people.find((p) => p.role === "participant" && !p.removed_at), carer = status.people.find((p) => p.role === "caregiver" && !p.removed_at && (session?.principal?.role !== "family" || p.person_id === session.principal.member_id));
       if (!her || !carer) throw new Error("This household needs a participant and caregiver.");
       setParticipant(her.display_name); setCaregiver(carer.display_name); setIds({ participant: her.person_id, caregiver: carer.person_id });
       const p = status.setup?.document;
@@ -34,7 +34,7 @@ export function JointSetup() {
       setLoaded(true);
     }).catch((e) => { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : "Setup could not be loaded."); }).finally(() => { if (!controller.signal.aborted) setPending(false); });
     return () => controller.abort();
-  }, [session?.household_id]);
+  }, [session?.household_id, session?.managed_household_id, session?.principal?.role, session?.principal?.member_id]);
   async function save(e: FormEvent) {
     e.preventDefault(); if (pending) return;
     setError("");
@@ -45,7 +45,7 @@ export function JointSetup() {
     try {
       let hid = household, people = ids;
       if (!hid) {
-        const made = await api<{ household: { household_id: string }; participant_id: string; caregiver_id: string }>("/api/onboarding/households", { method: "POST", body: JSON.stringify({ participant: { display_name: participant, phone }, caregiver: { display_name: caregiver } }) });
+        const made = await api<{ household: { household_id: string }; participant_id: string; caregiver_id: string }>(session?.principal?.role === "operator" ? "/api/onboarding/households" : "/api/onboarding/start", { method: "POST", body: JSON.stringify({ participant: { display_name: participant, phone }, caregiver: { display_name: caregiver } }) });
         hid = made.household.household_id; people = { participant: made.participant_id, caregiver: made.caregiver_id };
         setHousehold(hid); setIds(people); setPhone(""); window.history.replaceState(null, "", `/onboarding?household=${encodeURIComponent(hid)}`);
       }
@@ -148,6 +148,6 @@ export function JointSetup() {
       {error && <p role="alert" className="setup-error">{error}</p>}
       <footer className="setup-actions">{step > 0 && <button type="button" className="recall-button recall-secondary" disabled={pending} onClick={() => { setError(""); setStep(step - 1); }}><ArrowLeft aria-hidden="true" />Back</button>}<button className="recall-button recall-primary" disabled={pending}>{pending ? "Saving…" : step === 3 ? "Save choices" : "Continue"}<ArrowRight aria-hidden="true" /></button></footer>
     </form>}
-    {finished && <div className="setup-complete"><p>Calls are paused. Add a familiar topic, then review it together before turning on calls.</p><Link className="recall-button recall-primary" href="/onboarding/manage">Add a conversation topic<ArrowRight aria-hidden="true" /></Link><Link className="setup-text-button" href={`/caregiver?member=${encodeURIComponent(ids?.caregiver ?? "")}`}>Open caregiver view</Link><button className="setup-text-button" onClick={() => { setFinished(false); setStep(3); }}>Review your choices</button></div>}
+    {finished && <div className="setup-complete"><p>You’re signed in on this browser. Calls are paused. Add a familiar topic, then review it together before turning on calls.</p><Link className="recall-button recall-primary" href="/onboarding/manage">Add a conversation topic<ArrowRight aria-hidden="true" /></Link><Link className="setup-text-button" href={`/caregiver?member=${encodeURIComponent(ids?.caregiver ?? "")}`}>Open caregiver view</Link><button className="setup-text-button" onClick={() => { setFinished(false); setStep(3); }}>Review your choices</button></div>}
   </div>;
 }

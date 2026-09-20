@@ -10,7 +10,7 @@ export default function GetStartedPage() {
         <Link href="/onboarding" className="recall-button recall-primary">Set up together</Link>
         <Link href="/join" className="recall-button recall-secondary">I have an invitation</Link>
       </div>
-      <p className="recall-welcome-footnote">Have your setup key or family invitation ready.</p>
+      <p className="recall-welcome-footnote">First-time setup needs no code. If your family already uses Recall, sign in or join with their invitation.</p>
     </section>
   </WelcomeLayout>;
 }

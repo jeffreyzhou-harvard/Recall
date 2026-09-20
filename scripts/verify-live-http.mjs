@@ -14,8 +14,8 @@ await new Promise((r) => listener.close(r));
 const base = `http://localhost:${port}`;
 const operator = randomBytes(32).toString("hex"), family = randomBytes(32).toString("hex");
 let child, logs = "";
-async function start(member) {
-  child = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "-p", String(port)], { env: { ...process.env, NODE_ENV: "production", RECALL_DATA_DIR: dir, RECALL_ONBOARDING_DB: join(dir, "onboarding.db"), RECALL_HOUSEHOLD: "", RECALL_POLICY_FILE: "", RECALL_CALL: "none", RECALL_SCHEDULER: "0", DEEPGRAM_API_KEY: "", RECALL_SAFETY_WEBHOOKS: "{}", RECALL_OPERATOR_SECRET: operator, RECALL_FAMILY_SECRET: "", RECALL_FAMILY_CREDENTIALS: JSON.stringify(member ? { [member]: family } : {}), MUSE_API_KEY: "" }, stdio: ["ignore", "pipe", "pipe"] });
+async function start(member, blank = false) {
+  child = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "-p", String(port)], { env: { ...process.env, NODE_ENV: "production", RECALL_DATA_DIR: dir, RECALL_ONBOARDING_DB: join(dir, "onboarding.db"), RECALL_HOUSEHOLD: "", RECALL_POLICY_FILE: "", RECALL_CALL: "none", RECALL_SCHEDULER: "0", DEEPGRAM_API_KEY: "", RECALL_SAFETY_WEBHOOKS: "{}", RECALL_OPERATOR_SECRET: blank ? "" : operator, RECALL_FAMILY_SECRET: "", RECALL_FAMILY_CREDENTIALS: JSON.stringify(member ? { [member]: family } : {}), MUSE_API_KEY: "" }, stdio: ["ignore", "pipe", "pipe"] });
   child.stdout.on("data", (chunk) => { logs += chunk; }); child.stderr.on("data", (chunk) => { logs += chunk; });
   for (let i = 0; i < 100; i++) {
     if (child.exitCode !== null) throw new Error("Test server exited unexpectedly");
@@ -30,17 +30,31 @@ async function request(path, body, headers = { "x-recall-operator": operator }) 
 }
 async function json(response, expected = 200) { const text = await response.text(); assert.equal(response.status, expected, text); return JSON.parse(text); }
 try {
-  await start();
+  await start(undefined, true);
   for (const path of ["/", "/caregiver", "/onboarding", "/revisit", "/join", "/onboarding/manage"]) assert.equal((await fetch(base + path)).status, 200);
-  assert.equal((await json(await request("/api/call/status"))).status, "unavailable");
   assert.equal((await request("/api/family/dashboard?member=unknown", undefined, {})).status, 403);
-  const made = await json(await request("/api/onboarding/households", { participant: { display_name: "HTTP test participant", phone: "+16095550123" }, caregiver: { display_name: "HTTP test caregiver" } }), 201);
+  assert.equal((await json(await request("/api/session", undefined, {}))).first_setup_available, true);
+  const firstInput = { participant: { display_name: "HTTP test participant", phone: "+16095550123" }, caregiver: { display_name: "HTTP test caregiver" } };
+  assert.equal((await request("/api/onboarding/start", firstInput, { origin: "https://another.test" })).status, 403);
+  const first = await request("/api/onboarding/start", firstInput, {});
+  const made = await json(first, 201), ownerCookie = first.headers.get("set-cookie").split(";")[0], ownerHeaders = { cookie: ownerCookie };
+  assert.equal(made.key, undefined);
+  assert.equal((await request("/api/onboarding/start", firstInput, {})).status, 409);
+  assert.equal((await request("/api/session", { local: true }, {})).status, 403);
+  assert.equal((await request("/api/live/schedule", {}, ownerHeaders)).status, 403);
+  assert.equal((await request("/api/onboarding/households/household:other", undefined, ownerHeaders)).status, 403);
+  assert.equal((await request("/api/onboarding/households/household:other/preferences", {}, ownerHeaders)).status, 403);
+  assert.equal((await json(await request("/api/session", undefined, ownerHeaders))).can_manage_setup, true);
   const hid = made.household.household_id, member = made.caregiver_id;
   const prefs = { days: ["mon"], start: "09:00", end: "12:00", timezone: "America/New_York", max_minutes: 8, max_calls_per_week: 1, min_hours_between_calls: 24, pace: "standard", emergency_number: "911", saved_contact_name: "Recall", number_saved: false, photo_saved: false, introduced: false, dashboard: "weekly_note_and_record", patient_agreed: true, caregiver_agreed: true, expected_version: 0 };
-  assert.equal((await request(`/api/onboarding/households/${hid}/preferences`, { ...prefs, patient_agreed: false })).status, 400);
-  const saved = await json(await request(`/api/onboarding/households/${hid}/preferences`, prefs));
+  assert.equal((await request(`/api/onboarding/households/${hid}/preferences`, { ...prefs, patient_agreed: false }, ownerHeaders)).status, 400);
+  const saved = await json(await request(`/api/onboarding/households/${hid}/preferences`, prefs, ownerHeaders));
   assert.equal(saved.document.calls_paused, true);
-  await json(await request("/api/onboarding/activate", { household_id: hid }));
+  await json(await request("/api/onboarding/activate", { household_id: hid }, ownerHeaders));
+  assert.equal((await request(`/api/onboarding/households/${hid}/invitations`, { display_name: "Cannot impersonate", role: "family", invited_by: made.participant_id }, ownerHeaders)).status, 403);
+  await stop(); await start();
+  assert.equal((await json(await request("/api/session", undefined, ownerHeaders))).can_manage_setup, true);
+  assert.equal((await json(await request("/api/call/status"))).status, "unavailable");
   let dashboard = await json(await request(`/api/family/dashboard?member=${member}`));
   assert.equal(dashboard.info.sessions.length, 0); assert.equal(dashboard.info.contributions.length, 0);
   await json(await request("/api/family/memory", { member, who: "Our family", what_happened: "We planted tulips together." }));
@@ -54,7 +68,10 @@ try {
   assert.equal((await request("/api/family/dashboard?member=another-member", undefined, { cookie })).status, 403);
   assert.equal((await request("/api/live/schedule", {}, { cookie })).status, 403);
   assert.equal((await request("/api/family/knowledge?member=another-member", undefined, { cookie })).status, 403);
-  assert.equal((await request("/api/onboarding/knowledge", undefined, { cookie })).status, 403);
+  assert.equal((await request("/api/onboarding/knowledge", undefined, { cookie })).status, 200);
+  assert.equal((await request("/api/onboarding/knowledge", undefined, {})).status, 403);
+  assert.equal((await request(`/api/onboarding/households/${hid}`, undefined, {})).status, 403);
+  assert.equal((await request("/api/onboarding/start", firstInput, {})).status, 403);
   assert.deepEqual(await json(await request(`/api/family/knowledge?member=${member}`, undefined, { cookie })), []);
   const csrf = await fetch(base + "/api/family/memory", { method: "POST", headers: { cookie, origin: "https://other.test", "Content-Type": "application/json" }, body: JSON.stringify({ member, who: "x", what_happened: "Must not save." }) });
   assert.equal(csrf.status, 403);
@@ -66,12 +83,15 @@ try {
   const relativeLogin = await request("/api/session", { key: joined.key }, {});
   assert.equal(relativeLogin.status, 200); const relativeCookie = relativeLogin.headers.get("set-cookie").split(";")[0];
   assert.equal((await request(`/api/family/dashboard?member=${joined.person_id}`, undefined, { cookie: relativeCookie })).status, 403);
+  assert.equal((await request("/api/onboarding/knowledge", undefined, { cookie: relativeCookie })).status, 403);
+  assert.equal((await request(`/api/onboarding/households/${hid}`, undefined, { cookie: relativeCookie })).status, 403);
   const topic = await json(await request("/api/onboarding/topics", { contributor_id: member, label: "planting tulips", story: "We planted tulips together." }), 201);
   const importBody = { request_id: randomUUID(), contributor_id: member, reviewed: true, items: [{ kind: "calendar", label: "a family gathering", text: "Family gathering in the garden.", date: "2020-07-14", place: "garden" }] };
   const imported = await json(await request("/api/onboarding/knowledge", importBody), 201);
   assert.equal(imported.imported, 1);
   assert.deepEqual(await json(await request("/api/onboarding/knowledge", importBody), 201), imported);
-  assert.equal((await request("/api/onboarding/knowledge", importBody, { cookie })).status, 403);
+  assert.deepEqual(await json(await request("/api/onboarding/knowledge", importBody, { cookie }), 201), imported);
+  assert.equal((await request("/api/onboarding/knowledge", importBody, { cookie: relativeCookie })).status, 403);
   assert.equal((await request("/api/onboarding/knowledge", { ...importBody, request_id: randomUUID(), reviewed: false })).status, 400);
   const importedTopics = await json(await request("/api/onboarding/topics"));
   assert.ok(importedTopics.some((t) => t.id === imported.topics[0].id));
@@ -101,6 +121,6 @@ try {
   dashboard = await json(await request(`/api/family/dashboard?member=${member}`, undefined, { cookie }));
   assert.equal(dashboard.weekly_note.status, "no_access"); assert.equal(dashboard.topic_record.status, "no_access");
   assert.equal((await request("/api/family/export", { member }, { cookie })).status, 403);
-  console.log("Live HTTP verification passed: setup, consent, persistence across restart, sessions, member isolation, CSRF, export, invitations, topic approval, selected graph imports, patient isolation and revocation.");
+  console.log("Live HTTP verification passed: code-free initial setup, scoped caregiver sessions, setup, consent, persistence across restart, sessions, member isolation, CSRF, export, invitations, topic approval, selected graph imports, patient isolation and revocation.");
 } catch (error) { console.error(error); process.exitCode = 1; }
 finally { await stop(); rmSync(dir, { recursive: true, force: true }); }

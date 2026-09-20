@@ -23,6 +23,7 @@ export interface NewHousehold {
   participant: { display_name: string; subject_pronoun?: string | null; phone: string };
   caregiver: { display_name: string; subject_pronoun?: string | null };
 }
+export type CreatedHousehold = { household: Household; participant: Person; caregiver: Person };
 
 export const ONBOARDING_STEPS = ["participant_added", "caregiver_added", "joint_setup_agreed", "contact_saved_and_recall_introduced", "designated_caregiver_named", "topics_allowed"] as const;
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
@@ -124,18 +125,30 @@ export class Onboarding {
   // --- people -------------------------------------------------------------------------------------------------
 
   /** Her, and the caregiver setting Recall up with her. Both or neither. */
-  async createHousehold(input: NewHousehold): Promise<{ household: Household; participant: Person; caregiver: Person }> {
+  async isEmpty(): Promise<boolean> { return (await this.store.listHouseholds()).length === 0; }
+
+  /** First-run claim is checked inside the same transaction as creation, including unactivated households. */
+  async createFirstHousehold(input: NewHousehold, beforeCommit?: (made: CreatedHousehold) => Promise<void>): Promise<CreatedHousehold> {
+    return this.create(input, true, beforeCommit);
+  }
+
+  async createHousehold(input: NewHousehold): Promise<CreatedHousehold> { return this.create(input, false); }
+
+  private async create(input: NewHousehold, firstOnly: boolean, beforeCommit?: (made: CreatedHousehold) => Promise<void>): Promise<CreatedHousehold> {
     Onboarding.plain(input.participant.display_name, input.caregiver.display_name);
     return this.store.transaction(async () => {
       const at = this.clock.iso();
       const n = (await this.store.listHouseholds()).length + 1;
+      if (firstOnly && n !== 1) throw new OnboardingError("already_exists", "Recall is already set up. Sign in to continue.");
       const household: Household = { household_id: `household:${n}`, created_at: at, status: "onboarding" };
       const caregiver = this.parsePerson({ person_id: `person:h${n}:1`, household_id: household.household_id, role: "caregiver", display_name: input.caregiver.display_name, subject_pronoun: input.caregiver.subject_pronoun ?? null, phone: null, added_by: null, added_at: at, removed_at: null });
       const participant = this.parsePerson({ person_id: `person:h${n}:2`, household_id: household.household_id, role: "participant", display_name: input.participant.display_name, subject_pronoun: input.participant.subject_pronoun ?? null, phone: input.participant.phone, added_by: caregiver.person_id, added_at: at, removed_at: null });
       await this.store.addHousehold(household);
       await this.store.addPerson(caregiver);
       await this.store.addPerson(participant);
-      return { household, participant, caregiver };
+      const made = { household, participant, caregiver };
+      await beforeCommit?.(made);
+      return made;
     });
   }
 

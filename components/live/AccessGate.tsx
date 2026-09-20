@@ -18,9 +18,11 @@ export function SessionLoading() {
   </section>;
 }
 
-export function AccessGate({ children, operator = false, patient = false, anyRole = false }: {
+export function AccessGate({ children, operator = false, setup = false, firstSetup = false, patient = false, anyRole = false }: {
   children: ReactNode;
   operator?: boolean;
+  setup?: boolean;
+  firstSetup?: boolean;
   patient?: boolean;
   anyRole?: boolean;
 }) {
@@ -32,12 +34,12 @@ export function AccessGate({ children, operator = false, patient = false, anyRol
   const errorId = `${fieldId}-error`;
   const hintId = `${fieldId}-hint`;
 
-  async function signIn(local = false) {
+  async function signIn() {
     if (pending) return;
     setPending(true);
     setError("");
     try {
-      await api("/api/session", { method: "POST", body: JSON.stringify(local ? { local: true } : { key: key.trim() }) });
+      await api("/api/session", { method: "POST", body: JSON.stringify({ key: key.trim() }) });
       setKey("");
       await refreshSession();
     } catch (e) {
@@ -49,12 +51,13 @@ export function AccessGate({ children, operator = false, patient = false, anyRol
 
   if (!session) return <SessionLoading />;
   const principal = session.principal;
-  const allowed = principal && (anyRole || (patient ? principal.role === "patient" : operator ? principal.role === "operator" : principal.role !== "patient"));
+  const allowed = (firstSetup && session.first_setup_available) || (setup && session.can_manage_setup) || (principal && !setup && (anyRole || (patient ? principal.role === "patient" : operator ? principal.role === "operator" : principal.role !== "patient")));
   if (allowed) return children;
 
   return <section className="recall-access">
-    <h1>{operator ? "Set up Recall together" : patient ? "Sign in for your calls" : "Sign in to Recall"}</h1>
-    <p>{operator
+    <h1>{setup ? "Continue your family’s setup" : operator ? "Set up Recall together" : patient ? "Sign in for your calls" : "Sign in to Recall"}</h1>
+    <p>{setup ? "Recall already has private access. Sign in with your caregiver access key to review your family’s choices."
+      : operator
       ? "You and the person receiving calls will choose what feels comfortable, together."
       : patient ? "Use the access key your caregiver saved with you."
       : "Use your private access key to open your account."}</p>
@@ -66,11 +69,7 @@ export function AccessGate({ children, operator = false, patient = false, anyRol
       {error && <p className="recall-access-error" id={errorId} role="alert">{error}</p>}
       <button className="recall-button recall-primary" disabled={pending || !key.trim()}>{pending ? "Signing in…" : operator ? "Continue to setup" : "Sign in"}</button>
     </form>
-    {session.local_setup_available && !patient && <div className="recall-local-setup">
-      <button className="care-text-action" disabled={pending} onClick={() => void signIn(true)}>Start setup on this device</button>
-      <p>Available while Recall is running locally.</p>
-    </div>}
-    {!operator && !patient && <p className="recall-access-bottom">New to Recall? <Link href="/get-started">Get started</Link></p>}
+    {!operator && !setup && !patient && <p className="recall-access-bottom">New to Recall? <Link href="/get-started">Get started</Link></p>}
   </section>;
 }
 
