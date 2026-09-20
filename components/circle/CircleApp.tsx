@@ -29,6 +29,7 @@ import { MomentPanel } from "./MomentPanel";
 import { PeoplePanel } from "./PeoplePanel";
 import { DeleteStory } from "./DeleteStory";
 import { RecallSessions } from "./RecallSessions";
+import { GraphQuestions } from "./GraphQuestions";
 import { SidebarResizeHandle, SidebarToggle, useResizableSidebar } from "@/components/navigation/ResizableSidebar";
 import { dateLabel, type CircleView } from "./types";
 import "./circle.css";
@@ -633,6 +634,8 @@ export function CircleApp({ initialSection = "moments" }: { initialSection?: Sec
                         onSelect={(m) => openMoment(m.id)}
                       />
                     ) : (
+                      <>
+                      {data.people.find(person => person.id === data.member)?.role !== "participant" && <GraphQuestions key={data.member} revision={data.graphQueryRevision ?? JSON.stringify([data.moments, data.stories, data.connections])} onOpenMoment={openMoment} />}
                       <MemoryGraph
                         moments={data.moments}
                         photos={data.photos}
@@ -640,6 +643,7 @@ export function CircleApp({ initialSection = "moments" }: { initialSection?: Sec
                         connections={data.connections}
                         onSelect={(m) => openMoment(m.id)}
                       />
+                      </>
                     )}
                   </motion.div>
                 </AnimatePresence>

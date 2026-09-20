@@ -6,6 +6,7 @@ export type CircleView = Omit<ArchiveView, "moments"> & {
   name: string;
   personName: string;
   household: string;
+  graphQueryRevision?: string;
   canManage: boolean;
   hasEmail: boolean;
   demo: boolean;
