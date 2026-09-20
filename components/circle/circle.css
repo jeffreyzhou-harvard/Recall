@@ -66,6 +66,7 @@
   background: none;
   border: 0;
   text-align: left;
+  text-decoration: none;
   padding: 0 10px 30px;
   color: #304635;
 }
@@ -116,7 +117,7 @@
   display: grid;
   gap: 5px;
 }
-.circle-rail nav button {
+.circle-rail nav a {
   position: relative;
   display: flex;
   gap: 11px;
@@ -129,9 +130,10 @@
   color: #7a8472;
   font-size: 13px;
   text-align: left;
+  text-decoration: none;
   isolation: isolate;
 }
-.circle-rail nav button small {
+.circle-rail nav a small {
   margin-left: auto;
   background: #d1dabe;
   border-radius: 4px;
@@ -139,18 +141,18 @@
   text-align: center;
   font-size: 10px;
 }
-.circle-rail nav button i {
+.circle-rail nav a i {
   position: absolute;
   inset: 0;
   background: #dfe4d4;
   z-index: -1;
   border-radius: 7px;
 }
-.circle-rail nav button[aria-current] {
+.circle-rail nav a[aria-current] {
   color: #344b37;
   font-weight: 600;
 }
-.circle-rail nav button:hover {
+.circle-rail nav a:hover {
   color: #344b37;
   background: #e5e8db;
 }
@@ -1592,7 +1594,7 @@
     flex: 3;
     gap: 4px;
   }
-  .circle-rail nav button {
+  .circle-rail nav a {
     flex: 1;
     flex-direction: column;
     justify-content: center;
@@ -1601,7 +1603,7 @@
     min-height: 50px;
     padding: 5px;
   }
-  .circle-rail nav button small {
+  .circle-rail nav a small {
     display: none;
   }
   .circle-rail-bottom {
@@ -2199,6 +2201,34 @@
 .circle-workspace {
   min-width: 0;
 }
+.circle-topbar .circle-mobile-brand {
+  display: none;
+}
+.circle-conversations-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: #344d39;
+  text-underline-offset: 4px;
+}
+.circle-conversations-link:hover {
+  text-decoration: underline;
+}
+.circle-home-account,
+.circle-remember-back {
+  margin-top: 20px;
+}
+@media (max-width: 760px) {
+  .circle-topbar .circle-mobile-brand {
+    display: inline-flex;
+    font-size: 24px;
+    min-height: 44px;
+    flex-shrink: 0;
+  }
+  .circle-topbar .circle-breadcrumb {
+    display: none;
+  }
+}
 .circle-brand {
   display: flex;
   align-items: center;
@@ -2341,7 +2371,7 @@
   .circle-rail nav {
     min-width: 0;
   }
-  .circle-rail nav button {
+  .circle-rail nav a {
     padding-inline: 6px;
   }
 }

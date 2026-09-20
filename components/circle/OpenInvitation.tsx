@@ -62,7 +62,7 @@ export function OpenInvitation() {
   }
   return (
     <main className="circle-entry">
-      <Link className="circle-entry-brand" href="/">
+      <Link className="circle-entry-brand" href="/" aria-label="Recall home">
         <Flower2 /> recall<span>·</span>
       </Link>
       <div className="circle-invite-art">

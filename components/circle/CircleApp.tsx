@@ -1,6 +1,7 @@
 "use client";
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   ArrowRight,
@@ -17,7 +18,6 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { RecallWordmark } from "@/components/recall/RecallFrame";
 import { MemoryGraph } from "@/components/archive/MemoryGraph";
 import { PhotoUpload } from "./PhotoUpload";
 import { FamilyPanel } from "./FamilyPanel";
@@ -46,6 +46,7 @@ export function CircleApp() {
     [momentId, setMomentId] = useState<string | null>(null),
     [toast, setToast] = useState("");
   const reduced = useReducedMotion();
+  const heading = useRef<HTMLHeadingElement>(null);
   const refresh = useCallback(async () => {
     const r = await fetch("/api/circle/state", { cache: "no-store" });
     const d = await r.json();
@@ -71,10 +72,15 @@ export function CircleApp() {
       const h = location.hash.slice(1);
       if (["moments", "places", "connections"].includes(h))
         setSection(h as Section);
+      else if (!h) setSection("moments");
     };
     update();
     window.addEventListener("hashchange", update);
-    return () => window.removeEventListener("hashchange", update);
+    window.addEventListener("popstate", update);
+    return () => {
+      window.removeEventListener("hashchange", update);
+      window.removeEventListener("popstate", update);
+    };
   }, []);
   useEffect(() => {
     if (!toast) return;
@@ -83,7 +89,11 @@ export function CircleApp() {
   }, [toast]);
   const navigate = (s: Section) => {
     setSection(s);
-    history.replaceState(null, "", "#" + s);
+    if (location.hash !== "#" + s) history.pushState(null, "", "#" + s);
+    requestAnimationFrame(() => {
+      heading.current?.focus({ preventScroll: true });
+      heading.current?.scrollIntoView({ block: "start", behavior: "instant" });
+    });
   };
   const moments =
     data?.moments.filter(
@@ -109,14 +119,14 @@ export function CircleApp() {
         Skip to your collection
       </a>
       <aside className="circle-rail">
-        <button
+        <Link
           className="circle-brand"
-          aria-label="Recall moments"
-          onClick={() => navigate("moments")}
+          aria-label="Recall home"
+          href="/"
         >
           <Flower2 />
           recall<span>·</span>
-        </button>
+        </Link>
         <div className="circle-family-badge">
           <span className="circle-family-symbol">
             {data?.personName[0] || "R"}
@@ -138,10 +148,15 @@ export function CircleApp() {
               { id: "connections", name: "Connections", Icon: Network },
             ] as const
           ).map(({ id, name, Icon }) => (
-            <button
+            <a
               key={id}
+              href={`#${id}`}
               aria-current={section === id ? "page" : undefined}
-              onClick={() => navigate(id)}
+              onClick={(event) => {
+                if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                event.preventDefault();
+                navigate(id);
+              }}
             >
               <Icon size={19} />
               <span>{name}</span>
@@ -152,7 +167,7 @@ export function CircleApp() {
                   transition={{ type: "spring", stiffness: 350, damping: 32 }}
                 />
               )}
-            </button>
+            </a>
           ))}
         </nav>
         <div className="circle-rail-note">
@@ -182,12 +197,16 @@ export function CircleApp() {
       </aside>
       <div className="circle-workspace">
         <header className="circle-topbar">
-          <span>
+          <Link className="circle-mobile-brand circle-entry-brand" href="/" aria-label="Recall home">
+            <Flower2 aria-hidden="true" />recall<span>·</span>
+          </Link>
+          <span className="circle-breadcrumb">
             {data?.personName ? `${data.personName}’s circle` : "Your family"}
             <i>/</i>
             {section.charAt(0).toUpperCase() + section.slice(1)}
           </span>
           <div>
+            <Link className="circle-conversations-link" href="/conversations">Conversations</Link>
             {data?.demo && (
               <span className="circle-demo-label">Sample family</span>
             )}
@@ -231,7 +250,7 @@ export function CircleApp() {
                         ? "A LIFE HAS A GEOGRAPHY"
                         : "EVERY STORY BRINGS US CLOSER"}
                   </p>
-                  <h1>
+                  <h1 ref={heading} tabIndex={-1}>
                     {section === "moments"
                       ? "A life, in moments."
                       : section === "places"

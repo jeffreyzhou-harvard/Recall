@@ -46,6 +46,7 @@ function Remember() {
             Reload photographs
           </button>
         )}
+        <Link className="circle-text-button" href="/">Back to home</Link>
       </main>
     );
   const moment = data.moments[index],
@@ -54,13 +55,18 @@ function Remember() {
   return (
     <main className="circle-remember">
       <header>
-        <Link href={data.canManage ? "/caregiver" : "/revisit"}>
+        <Link href="/" aria-label="Recall home">
           <Flower2 />
           recall<span>·</span>
         </Link>
         <span>A little time for you, {data.name}.</span>
         <SignOut />
       </header>
+      {data.people.find((p) => p.id === data.member)?.role !== "participant" && (
+        <nav className="circle-remember-back" aria-label="Collection navigation">
+          <Link className="circle-text-button" href="/caregiver"><ArrowLeft size={18} aria-hidden="true" />Back to collection</Link>
+        </nav>
+      )}
       {!moment ? (
         <div className="circle-entry">
           <Heart size={42} />

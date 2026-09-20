@@ -129,13 +129,14 @@ export function FamilyDashboard({ initialSection = "moments" }: { initialSection
   return <div className="care-portal-layout">
     <a className="care-skip-link" href="#caregiver-content">Skip to content</a>
     <aside className="care-portal-rail">
-      <Link href="/caregiver" className="care-rail-brand" aria-label="Recall home"><RecallWordmark /></Link>
+      <Link href="/" className="care-rail-brand" aria-label="Recall home"><RecallWordmark /></Link>
       <div className="care-family-identity">
         <span className="care-family-initial" aria-hidden="true">{data?.info.person_name.trim().slice(0, 1) || <Images size={24} />}</span>
         <div><strong>{data ? `${data.info.person_name}’s family` : "Your family"}</strong><span>Family collection</span></div>
       </div>
-      <label className="care-mobile-navigation"><span className="archive-viz-sr">Caregiver section</span><select value={section} onChange={(event) => { if (event.target.value === "settings") window.location.assign("/onboarding/manage"); else navigate(event.target.value as Section); }}>{([ ["moments", "Moments"], ["places", "Places"], ["connections", "Connections"], ["stories", "Stories"], ["sessions", "Recall sessions"] ] as const).map(([value, label]) => <option value={value} key={value}>{label}</option>)}{canManage && <option value="settings">Family settings</option>}</select></label>
+      <label className="care-mobile-navigation"><span className="archive-viz-sr">Caregiver section</span><select value={section} onChange={(event) => { if (event.target.value === "collection") window.location.assign("/caregiver"); else if (event.target.value === "settings") window.location.assign("/onboarding/manage"); else navigate(event.target.value as Section); }}><option value="collection">Photo collection</option>{([ ["moments", "Moments"], ["places", "Places"], ["connections", "Connections"], ["stories", "Stories"], ["sessions", "Recall sessions"] ] as const).map(([value, label]) => <option value={value} key={value}>{label}</option>)}{canManage && <option value="settings">Family settings</option>}</select></label>
       <nav className="care-portal-nav" aria-label="Caregiver sections">
+        <Link href="/caregiver"><Images size={22} aria-hidden="true" />Photo collection</Link>
         {([{ id: "moments", label: "Moments", icon: Images }, { id: "places", label: "Places", icon: MapPin }, { id: "connections", label: "Connections", icon: Network }, { id: "stories", label: "Stories", icon: AudioLines }] as const).map((item) => <a key={item.id} href={`#${item.id}`} aria-current={section === item.id ? "page" : undefined} onClick={(event) => { event.preventDefault(); navigate(item.id); }}><item.icon size={22} aria-hidden="true" />{item.label}</a>)}
         <a href="#sessions" aria-current={section === "sessions" ? "page" : undefined} onClick={(event) => { event.preventDefault(); navigate("sessions"); }}><AudioLines size={22} aria-hidden="true" />Recall sessions</a>
         {canManage && <Link href="/onboarding/manage"><Settings size={22} aria-hidden="true" />Family settings</Link>}
@@ -147,7 +148,7 @@ export function FamilyDashboard({ initialSection = "moments" }: { initialSection
     </aside>
 
     <div className="care-portal-workspace">
-    <header className="care-workspace-bar"><p>{data ? `${data.info.person_name}’s family` : "Your family"}<span aria-hidden="true">/</span>{{ moments: "Moments", places: "Places", connections: "Connections", stories: "Stories", sessions: "Recall sessions" }[section]}</p><span className="care-workspace-note">Made for your family</span></header>
+    <header className="care-workspace-bar"><p><Link href="/caregiver">Photo collection</Link><span aria-hidden="true">/</span>{{ moments: "Moments", places: "Places", connections: "Connections", stories: "Stories", sessions: "Recall sessions" }[section]}</p><span className="care-workspace-note">Made for your family</span></header>
     <main className="care-portal-main" id="caregiver-content" tabIndex={-1}>
       {!member && !loading && <section className="care-empty"><h1>Your family’s conversations</h1><p>Finish setting up together to open your family view.</p><Link className="care-action care-action-primary" href="/onboarding">Continue setup</Link></section>}
       {loading && !data && <p role="status">Loading your family view…</p>}

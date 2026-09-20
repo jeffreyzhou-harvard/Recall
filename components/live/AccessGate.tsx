@@ -2,6 +2,7 @@
 
 import { useId, useState, type ReactNode, type FormEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { api } from "@/client/api";
 import { useLive } from "./LiveProvider";
 import "@/app/welcome.css";
@@ -211,12 +212,14 @@ export function AccessGate({
       <p className="recall-access-bottom">
         New here? <Link href="/onboarding">Start your family</Link>
       </p>
+      <Link className="care-text-action" href="/">Back to home</Link>
     </section>
   );
 }
 
 export function SignOut() {
   const { refreshSession, setMember } = useLive();
+  const router = useRouter();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   async function signOut() {
@@ -227,6 +230,7 @@ export function SignOut() {
       await api("/api/session", { method: "DELETE" });
       setMember("");
       await refreshSession();
+      router.replace("/");
     } catch {
       setError(
         "We couldn’t sign you out. Please reconnect and try signing out again.",
