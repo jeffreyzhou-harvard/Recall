@@ -95,6 +95,8 @@ async function completeCall(cookie: string, household: string, replies: string[]
   return { live, photos, spoken };
 }
 describe("paired local caregiver and patient demos", () => {
+  /** The sample kit arrives with fictional family-written stories; a call adds only its own shared line. */
+  const fromCall = <T extends { callEvidence?: unknown }>(view: { stories: T[] }) => view.stories.filter(story => story.callEvidence);
   it("preserves Maya and People after an invitation and Susan's photo-storytelling link", async () => {
     const family = await post("demo"), familyCookie = cookies(family);
     const maya = await state(familyCookie);
@@ -173,7 +175,7 @@ describe("paired local caregiver and patient demos", () => {
     const disguisedSample = sessionCookie({ role: "patient", member_id: made.participant.person_id }, request("/api/session"), SAMPLE_PATIENT_COOKIE).split(";")[0]!;
     expect((await get("sample-patient/state", disguisedSample)).status).toBe(401);
   });
-  it("populates a fresh sample's moments, people, places and connections on upload, then stories after the shared call", async () => {
+  it("populates a fresh sample's moments, people, places, connections and family stories on upload, then a story from the shared call", async () => {
     const opened = await post("demo", "", { fresh: true }), familyCookie = cookies(opened);
     expect(opened.status).toBe(200);
     const initial = await state(familyCookie);
@@ -191,7 +193,10 @@ describe("paired local caregiver and patient demos", () => {
     expect(await upload.json()).toMatchObject({ added: 12, moments: 4, rejected: [], warning: null });
     const populated = await state(familyCookie);
     expect(populated.photos).toHaveLength(18);
-    expect(populated.stories).toEqual([]);
+    // The kit's own fictional stories, each a named family member's account and none from a call.
+    expect(populated.stories).toHaveLength(6);
+    expect([...new Set(populated.stories.map(story => story.author))].sort()).toEqual(["Anika", "Maya", "Priya"]);
+    expect(fromCall(populated)).toEqual([]);
     expect(populated.moments).toHaveLength(6);
     for (const title of new Set(sampleKit.map(entry => entry.event))) {
       const moment = populated.moments.find(moment => moment.title === title)!;
@@ -206,13 +211,13 @@ describe("paired local caregiver and patient demos", () => {
     const patient = await post("demo-patient", familyCookie), patientCookie = cookies(patient);
     expect(patient.status).toBe(200);
     expect(samplePatient(request("/api/demo/session", patientCookie))!.household_id).toBe(initial.household);
-    expect((await state(familyCookie)).stories).toEqual([]);
+    expect(fromCall(await state(familyCookie))).toEqual([]);
     const words = "We spent the day together and Maya made lunch for us.";
     const { live } = await completeCall(patientCookie, initial.household, [words, "Yes.", "Yes."]);
     const after = await state(familyCookie);
-    expect(after.stories).toHaveLength(1);
-    expect(after.stories[0]).toMatchObject({ text: words, author: "Susan", callEvidence: { status: "participant_confirmed", source: "Shared Recall call" } });
-    expect(after.moments.some(moment => moment.id === after.stories[0]!.eventId)).toBe(true);
+    expect(fromCall(after)).toHaveLength(1);
+    expect(fromCall(after)[0]).toMatchObject({ text: words, author: "Susan", callEvidence: { status: "participant_confirmed", source: "Shared Recall call" } });
+    expect(after.moments.some(moment => moment.id === fromCall(after)[0]!.eventId)).toBe(true);
     expect((await live.graph.nodesOfType("Contribution"))[0]!.props).toMatchObject({ literal_transcript: words, shared: true });
     expect(after.photos).toEqual(populated.photos);
 
@@ -229,7 +234,7 @@ describe("paired local caregiver and patient demos", () => {
     expect(samplePatient(request("/api/demo/session", newCookie))!.household_id).toBe(clean.household);
     const reopenedPatient = await post("demo-patient", newCookie);
     expect(samplePatient(request("/api/demo/session", cookies(reopenedPatient)))!.household_id).toBe(clean.household);
-    expect((await state(familyCookie)).stories[0]!.text).toBe(words);
+    expect(fromCall(await state(familyCookie))[0]!.text).toBe(words);
     expect(readCircle(initial.household).photos).toHaveLength(18);
   });
   it("keeps an active patient call in its sample family until it ends", async () => {

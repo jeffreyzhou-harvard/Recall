@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "description": "Fictional material that arrives with the sample photo kit (fixtures/sample-family.json), so the Recall sessions shelf, the per-topic record and the Stories page have something to show without a second upload. Keyed by the kit's own photo-group titles: a sample family opened without the kit stays empty. Never read by the judged path, by fixtures/graph/family.json, or by a real household.",
+  "source": "Fictional sample family call history",
+  "call_gap_days": 7,
+  "hour_utc": 15,
+  "rung_notes": "One entry per call, oldest first. 1 = reached unaided, 2 or 3 = reached after a cue, 4 = reached at the recognition rung, null = not reached in that call. Recall's ladder ends at rung 4 for an autobiographical topic (AGENTS.md section 6.1).",
+  "moments": [
+    {
+      "title": "Our Cape May summer",
+      "rungs": [1, 1, 3, 1, 1, 1, 3, 1],
+      "stories": [
+        {
+          "author": "Maya",
+          "text": "We drove down the Friday after school let out, every single year, and the car smelled like sunscreen before we were even over the bridge. Mom made us stop at the same farm stand for peaches each time."
+        },
+        {
+          "author": "Priya",
+          "text": "That was the summer Susan taught Anika to float. She kept one hand under her back the whole afternoon and told her the water would hold her if she let it."
+        }
+      ]
+    },
+    {
+      "title": "A long weekend in Acadia",
+      "rungs": [1, 1, 1, 1, 3, 4, 3, 4],
+      "stories": [
+        {
+          "author": "Maya",
+          "text": "We got up in the dark to drive to the top and watch the sun come up, and Mom brought a thermos and four cups because she knew we would all say we did not want any."
+        }
+      ]
+    },
+    {
+      "title": "A birthday around the table",
+      "rungs": [1, 3],
+      "stories": [
+        {
+          "author": "Anika",
+          "text": "We used the good plates for no reason other than it being somebody's birthday. Grandma said the plates were not doing anyone any good sitting in the cupboard."
+        }
+      ]
+    },
+    {
+      "title": "The kitchen before Diwali",
+      "rungs": [3, 4, 3, 4, 1, 1, 1, 3],
+      "stories": [
+        {
+          "author": "Priya",
+          "text": "Susan and I made the sweets together the night before, the way our mother did it. She always said mine were too small and hers were the right size."
+        },
+        {
+          "author": "Maya",
+          "text": "The kitchen was warm for two days straight and nobody was allowed to touch anything on the counter until the evening."
+        }
+      ]
+    }
+  ]
+}

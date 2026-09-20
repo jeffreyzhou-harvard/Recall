@@ -7,6 +7,7 @@ import type { ToolOutput } from "@/lib/tools/contracts";
 import type { RecallService } from "@/lib/service/recall-service";
 import type { SafetyAlert } from "@/lib/safety/alert";
 import familyCopy from "@/fixtures/family-copy.json";
+import { withoutTopic } from "@/lib/family/session-summary";
 import { SessionHistory } from "./SessionHistory";
 import { RecordPrintout } from "./RecordPrintout";
 import "./sessions.css";
@@ -30,7 +31,7 @@ export function RecallSessions({ member, demo }: { member: string; demo: boolean
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
   const [pausing, setPausing] = useState(false);
-  const [printJob, setPrintJob] = useState<{ name: string; text: string } | null>(null);
+  const [printJob, setPrintJob] = useState<{ name: string; member: string; text: string } | null>(null);
   const data = loaded?.member === member ? loaded.data : null;
   const refresh = useCallback(() => setVersion(v => v + 1), []);
 
@@ -73,7 +74,7 @@ export function RecallSessions({ member, demo }: { member: string; demo: boolean
         const body = await response.json();
         throw new Error(body.error || "The record could not be exported.");
       }
-      setPrintJob({ name: data!.info.person_name, text: await response.text() });
+      setPrintJob({ name: data!.info.person_name, member: data!.info.member_name, text: await response.text() });
     } catch (e) { setExportError(e instanceof Error ? e.message : "The record could not be exported."); }
     finally { setExporting(false); }
   }
@@ -115,7 +116,7 @@ export function RecallSessions({ member, demo }: { member: string; demo: boolean
       </>}
       {data.can_pause && <div className="circle-record-preferences"><button className="circle-text-button" disabled={data.calls_paused || pausing} onClick={() => void pauseCalls()}>{data.calls_paused ? "Calls are paused" : pausing ? "Pausing calls…" : "Pause Recall calls"}</button></div>}
     </>}
-    {printJob && <RecordPrintout name={printJob.name} text={printJob.text} />}
+    {printJob && <RecordPrintout name={printJob.name} member={printJob.member} text={printJob.text} />}
   </section>;
 }
 
@@ -140,7 +141,7 @@ export function SessionRecord({ data, onExport, exporting }: { data: SessionDash
         <p className="circle-record-window">Up to the last {data.info.record_window_calls} calls for each topic</p>
         {record.topics.map(topic => <article className="circle-record-topic" key={topic.topic_name}>
           <div><h3>{topic.topic_name}</h3>{topic.last_call_on && <p>Last call <time dateTime={topic.last_call_on}>{topic.last_call_on}</time></p>}</div>
-          <div>{topic.lines.map(line => <p key={line.script_id}>{line.text}</p>)}</div>
+          <div>{topic.lines.map(line => <p key={line.script_id}>{withoutTopic(line.text, topic.topic_name)}</p>)}</div>
         </article>)}
         {record.change_lines.length > 0 && <section className="circle-record-comparisons" aria-labelledby="circle-comparisons-title">
           <h3 id="circle-comparisons-title">Earlier and recent calls</h3>

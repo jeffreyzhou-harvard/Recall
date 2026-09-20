@@ -4,7 +4,7 @@ import { browserPrincipal } from "@/server/session";
 import { accountForMember } from "@/server/accounts";
 import { activeHousehold } from "@/server/active-household";
 import { localSampleRequest } from "@/server/sample-access";
-import { getSampleRecall } from "@/server/sample-call";
+import { ensureSampleCallHistory, getSampleRecall } from "@/server/sample-call";
 import { readCircle } from "@/server/circle/store";
 
 export const guard = (request: Request, memberId?: string): Response | null => (isFamily(request, memberId) ? null : Response.json({ error: "not allowed" }, { status: 403 }));
@@ -33,6 +33,7 @@ export function familyHousehold(request: Request): string | null {
 /** Re-read setup before every load; the same tools enforce revocations in both transports. */
 export async function liveRecall(request?: Request): Promise<LiveRecall> {
   const sample = sampleHousehold(request);
+  if (sample) await ensureSampleCallHistory(sample);
   const recall = sample ? await getSampleRecall(sample) : await getLiveRecall();
   await recall.refreshSetup();
   return recall;

@@ -2,14 +2,18 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { setupFromPreferences } from "@/lib/onboarding/form";
-import { dashboardAccess } from "@/lib/tools/policy";
-import { edgeId } from "@/lib/graph/seed";
+import { dashboardAccess, type AccessPolicy } from "@/lib/tools/policy";
+import { edgeId, sessionIdAt } from "@/lib/graph/seed";
+import DEMO from "@/fixtures/sample-family-demo.json";
 import { getOnboarding } from "./onboarding";
 import { createLiveRecall, type LiveRecall } from "./recall-live";
 import { dataDirectory } from "./data-directory";
-import { CircleError, readCircle, updateCircle, type CircleState } from "./circle/store";
+import { CircleError, readCircle, updateCircle, type CircleState, type CircleMoment } from "./circle/store";
+import { sampleDemoMoments } from "./circle/sample";
 import { mediaFolder } from "./circle/photos";
 import { createTopic } from "./topics";
+
+const DAY = 86400000;
 
 const cache = globalThis as typeof globalThis & { __sampleCalls?: Map<string, Promise<LiveRecall>>; __sampleWork?: Map<string, Promise<unknown>>; __sampleRunning?: Map<string, Promise<unknown>>; __sampleErrors?: Map<string, string> };
 const keyFor = (household: string) => `${dataDirectory(process.cwd())}:${household}`;
@@ -44,6 +48,20 @@ export async function getSampleRecall(household: string): Promise<LiveRecall> {
   return calls.get(key)!;
 }
 
+/** One topic node per named photo group, reused by the call and by the fictional call history. */
+async function ensureSampleTopic(live: LiveRecall, policy: AccessPolicy, household: string, moment: CircleMoment): Promise<string | null> {
+  const known = readCircle(household).demoCall?.topics[moment.id];
+  if (known) return known;
+  const label = moment.title.replace(/[?!.{}\n\r]/g, "").split(/\s+/).slice(0, 8).join(" ").slice(0, 80).trim();
+  if (!label) return null;
+  const topic = await createTopic(live.graph, policy, { contributor_id: policy.recall_set_up_by, label, story: `Photographs from ${label}.` });
+  updateCircle(household, current => {
+    current.demoCall ??= { topics: {}, sharedContributions: [] };
+    current.demoCall.topics[moment.id] = topic.id;
+  });
+  return topic.id;
+}
+
 /** Named sample photo groups become attributed photo cues, never patient-confirmed memories. */
 export async function prepareSampleCall(household: string) {
   return locked(household, async () => {
@@ -55,17 +73,10 @@ export async function prepareSampleCall(household: string) {
     for (const moment of state.moments) {
       const photos = moment.photoIds.map(id => state.photos.find(photo => photo.id === id)).filter(photo => !!photo);
       if (!photos.length) continue;
-      const label = moment.title.replace(/[?!.{}\n\r]/g, "").split(/\s+/).slice(0, 8).join(" ").slice(0, 80).trim();
-      if (!label) continue;
-      if (!topics[moment.id]) {
-        const topic = await createTopic(live.graph, policy, { contributor_id: policy.recall_set_up_by, label, story: `Photographs from ${label}.` });
-        topics[moment.id] = topic.id;
-        updateCircle(household, current => {
-          current.demoCall ??= { topics: {}, sharedContributions: [] };
-          current.demoCall.topics[moment.id] = topic.id;
-        });
-      }
-      const topicId = topics[moment.id]!, topic = (await live.graph.getNode(topicId))!;
+      const made = await ensureSampleTopic(live, policy, household, moment);
+      if (!made) continue;
+      topics[moment.id] = made;
+      const topicId = made, topic = (await live.graph.getNode(topicId))!;
       for (const photo of photos) {
         const artifactId = `artifact:sample-photo:${photo.id}:${topicId}`;
         if (await live.graph.getNode(artifactId)) continue;
@@ -74,7 +85,7 @@ export async function prepareSampleCall(household: string) {
         const prov = { ...topic.prov, source_id: artifactId, asset_id: media.entry.id, media_hash: media.entry.sha256 };
         const write = async () => {
           await live.media!.save(media, true);
-          await live.graph.putNode({ id: artifactId, type: "Artifact", label: "Sample family photograph", props: { kind: "photo", text: null, alt: label }, prov });
+          await live.graph.putNode({ id: artifactId, type: "Artifact", label: "Sample family photograph", props: { kind: "photo", text: null, alt: topic.label }, prov });
           for (const [type, to] of [["DEPICTS", topicId], ["EVIDENCE_FOR", `claim:${topicId}`], ["PERMITTED_IN", policy.policy_id]] as const) await live.graph.putEdge({ id: edgeId(type, artifactId, to), type, from: artifactId, to, props: {}, prov });
         };
         if (live.graph.atomic) await live.graph.atomic(write); else await write();
@@ -88,6 +99,51 @@ export async function prepareSampleCall(household: string) {
       await live.refreshSetup();
     }
     return live;
+  });
+}
+
+/**
+ * A fictional run of earlier calls for the sample family, so the session shelf, the per-topic record
+ * and the doctor's copy have something in them before anyone rehearses a call. It writes the same
+ * TopicOutcome nodes a real call would (AGENTS.md section 7) and nothing else: no transcript, no
+ * contribution, no claim in her name. Sample households only, and once per photo group.
+ */
+export async function ensureSampleCallHistory(household: string) {
+  const state = readCircle(household);
+  if (!state.demo) return;
+  const seeded = new Set(state.sampleHistory ?? []);
+  // Oldest photo group first, so each group's calls sit a day apart on the shelf.
+  const pending = sampleDemoMoments(state).sort((a, b) => (a.startAt ?? "").localeCompare(b.startAt ?? "") || a.id.localeCompare(b.id));
+  if (pending.every(moment => seeded.has(moment.id))) return;
+  await locked(household, async () => {
+    const live = await getSampleRecall(household);
+    await live.refreshSetup();
+    const policy = live.setup.current();
+    const done = new Set(readCircle(household).sampleHistory ?? []);
+    const midnight = new Date();
+    const anchor = Date.UTC(midnight.getUTCFullYear(), midnight.getUTCMonth(), midnight.getUTCDate(), DEMO.hour_utc);
+    for (const [index, moment] of pending.entries()) {
+      if (done.has(moment.id)) continue;
+      const topicId = await ensureSampleTopic(live, policy, household, moment);
+      const topic = topicId ? await live.graph.getNode(topicId) : null;
+      if (!topicId || !topic) continue;
+      done.add(moment.id);
+      const rungs = DEMO.moments.find(entry => entry.title === moment.title)!.rungs as (number | null)[];
+      for (const [call, rung] of rungs.entries()) {
+        const at = new Date(anchor - index * DAY - (rungs.length - 1 - call) * DEMO.call_gap_days * DAY).toISOString();
+        const sessionId = sessionIdAt(topicId, at), outcomeId = `outcome:${sessionId}`;
+        if (await live.graph.getNode(outcomeId)) continue;
+        const prov = { ...topic.prov, asset_id: null, media_hash: null, span: null, observed_at: at };
+        const write = async () => {
+          await live.graph.putNode({ id: sessionId, type: "Session", label: "Recall call", props: { topic_id: topicId, started_at: at, ended_at: at, outcome: rung === null ? "no_answer_today" : "stored" }, prov });
+          // The ladder ends at rung 4 for an autobiographical topic (section 6.1), so an unreached call used 4.
+          await live.graph.putNode({ id: outcomeId, type: "TopicOutcome", label: "Topic outcome", props: { session_id: sessionId, topic_id: topicId, first_rung_reached_unaided: rung, highest_rung_used: rung ?? 4, timestamp: at }, prov });
+          await live.graph.putEdge({ id: edgeId("OUTCOME_OF", outcomeId, sessionId), type: "OUTCOME_OF", from: outcomeId, to: sessionId, props: {}, prov });
+        };
+        if (live.graph.atomic) await live.graph.atomic(write); else await write();
+      }
+    }
+    updateCircle(household, current => { if (current.demo) current.sampleHistory = [...done]; });
   });
 }
 

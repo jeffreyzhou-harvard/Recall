@@ -48,7 +48,9 @@ describe("Circle call record", () => {
     const data = dashboard("weekly_note_and_record", { ...thresholds, record_window_calls: 10, min_calls_to_show: 5 });
     data.info.sessions[0] = { ...data.info.sessions[0]!, unaidedCalls: null, recentCalls: 2 };
     const markup = render(data);
-    expect(markup).toContain("Cape May - not enough calls yet.");
+    // The cover names the topic once, so its count sentence drops the repeated "Cape May - " prefix.
+    expect(markup).toContain(">Cape May</span><span class=\"circle-session-book-count\">Not enough calls yet.<");
+    expect(markup).not.toContain("Cape May - not enough calls yet.");
     expect(markup).toContain("within the last 10 calls");
     expect(markup).toContain("Dashed outline: fewer than 5 calls");
     expect(markup).not.toContain("0 of 2");
