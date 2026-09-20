@@ -5,7 +5,7 @@ import {
   ArrowRight,
   Check,
   ImagePlus,
-  Sparkles,
+  Layers3,
   Upload,
   X,
 } from "lucide-react";
@@ -144,7 +144,6 @@ export function PhotoUpload({
               <span className="circle-success-icon">
                 <Check size={30} />
               </span>
-              <p className="circle-eyebrow">A LITTLE MORE OF YOUR STORY</p>
               <h2>
                 {receipt.added
                   ? `${receipt.added} photos.\n${receipt.moments} ${receipt.moments === 1 ? "moment" : "moments"}.`
@@ -230,12 +229,9 @@ export function PhotoUpload({
                     />
                   ))}
                 <span>
-                  <Sparkles size={24} />
+                  <Layers3 size={24} aria-hidden="true" />
                 </span>
               </div>
-              <p className="circle-eyebrow">
-                THE LITTLE THINGS, COMING TOGETHER
-              </p>
               <h2>
                 {sent < 100 && !sample
                   ? "Bringing your photos in."
@@ -269,9 +265,6 @@ export function PhotoUpload({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
-              <p className="circle-eyebrow">
-                NO FOLDERS. NO FILLING IN THE BLANKS.
-              </p>
               <h2>Just bring the photographs.</h2>
               <p>
                 We’ll find the moments, give them a name, and make room for the
@@ -333,7 +326,7 @@ export function PhotoUpload({
                     className="circle-button primary wide"
                     onClick={() => void start()}
                   >
-                    <Sparkles size={18} />
+                    <Layers3 size={18} aria-hidden="true" />
                     Organize {files.length} photos
                     <ArrowRight size={18} />
                   </button>

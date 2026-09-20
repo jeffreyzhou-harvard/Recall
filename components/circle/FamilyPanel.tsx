@@ -84,7 +84,6 @@ export function FamilyPanel({
   return (
     <ArchiveDialog title="Your family" drawer onClose={onClose} busy={busy}>
       <div className="circle-panel">
-        <p className="circle-eyebrow">BETTER WITH EVERY VOICE</p>
         <h2>Your little circle.</h2>
         <p>Different photographs. Different stories. One place to keep them.</p>
         <div className="circle-family-list">

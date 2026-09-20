@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   ArrowRight,
+  BookOpen,
   Flower2,
   Camera,
   Check,
@@ -14,7 +15,7 @@ import {
   Plus,
   Search,
   ShieldCheck,
-  Sparkles,
+  Info,
   Users,
   UsersRound,
   X,
@@ -183,7 +184,7 @@ export function CircleApp() {
           ))}
         </nav>
         <div className="circle-rail-note">
-          <span>✳</span>
+          <BookOpen size={24} aria-hidden="true" />
           <p>
             The photographs
             <br />
@@ -256,13 +257,6 @@ export function CircleApp() {
             <>
               <header className="circle-heading">
                 <div>
-                  {section !== "people" && <p className="circle-eyebrow">
-                    {section === "moments"
-                      ? "THE LITTLE THINGS, KEPT CLOSE"
-                      : section === "places"
-                        ? "A LIFE HAS A GEOGRAPHY"
-                        : "EVERY STORY BRINGS US CLOSER"}
-                  </p>}
                   <h1 ref={heading} tabIndex={-1}>
                     {section === "moments"
                       ? "A life, in moments."
@@ -316,12 +310,9 @@ export function CircleApp() {
                       />
                     ))}
                     <span>
-                      <Sparkles size={20} />
+                      <Images size={20} aria-hidden="true" />
                     </span>
                   </div>
-                  <p className="circle-eyebrow">
-                    LESS ORGANIZING. MORE REDISCOVERING.
-                  </p>
                   <h2>
                     A handful of photos.
                     <br />A whole world of stories.
@@ -345,7 +336,7 @@ export function CircleApp() {
                       onClick={() => setModal("sample")}
                     >
                       Try it with 9 sample photos
-                      <Sparkles size={16} />
+                      <Images size={16} aria-hidden="true" />
                     </button>
                   )}
                   <div className="circle-how">
@@ -455,7 +446,7 @@ export function CircleApp() {
                                     <div className="circle-card-date">
                                       {dateLabel(m.startAt)}
                                       {m.titleSource === "ai" && (
-                                        <Sparkles
+                                        <Info
                                           size={14}
                                           aria-label="AI-organized moment"
                                         />
@@ -541,11 +532,8 @@ export function CircleApp() {
                           <aside className="circle-story-sidebar">
                             <div className="circle-question-card">
                               <span>“</span>
-                              <p className="circle-eyebrow">A STORY WAITING</p>
                               <h3>
-                                What’s outside
-                                <br />
-                                the frame?
+                                What’s outside the frame?
                               </h3>
                               <p>
                                 The sounds. The inside joke.

@@ -71,7 +71,6 @@ export function OpenInvitation() {
         <span />
         <Flower2 size={46} />
       </div>
-      <p className="circle-eyebrow">A PLACE IN YOUR FAMILY’S STORY</p>
       <h1>
         {info ? `You’re invited, ${info.name}.` : "A little closer, together."}
       </h1>

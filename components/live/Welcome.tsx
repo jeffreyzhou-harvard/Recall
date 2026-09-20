@@ -99,7 +99,6 @@ export function Welcome() {
       </header>
       <div className="circle-landing-layout">
         <section>
-          <p className="circle-eyebrow">THE LITTLE THINGS, KEPT CLOSE</p>
           <h1>
             A photograph holds
             <br />a moment.

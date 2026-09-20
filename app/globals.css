@@ -12,6 +12,11 @@
 }
 
 @layer base {
+  :root {
+    --recall-page-inset: clamp(24px, 3vw, 48px);
+    --recall-section-gap: 32px;
+    --recall-panel-inset: 32px;
+  }
   html { -webkit-text-size-adjust: 100%; }
   body { background: var(--color-paper); color: var(--color-ink); }
   ::selection { background: var(--color-sage); color: var(--color-ink); }

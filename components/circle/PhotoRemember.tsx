@@ -97,7 +97,6 @@ function Remember() {
               )}
             </div>
             <section className="circle-remember-story" key={moment.id}>
-              <p className="circle-eyebrow">A MOMENT TO COME BACK TO</p>
               <h1>{moment.title}</h1>
               <p className="circle-remember-question">
                 {moment.question ||

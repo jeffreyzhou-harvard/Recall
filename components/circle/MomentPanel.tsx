@@ -8,7 +8,7 @@ import {
   ChevronRight,
   MapPin,
   Pencil,
-  Sparkles,
+  Info,
   Users,
   X,
 } from "lucide-react";
@@ -234,9 +234,6 @@ export function MomentPanel({
               </div>
             )}
             <section className="circle-story-invitation">
-              <p className="circle-eyebrow">
-                A PHOTO HOLDS A MOMENT. YOU HOLD THE STORY.
-              </p>
               <h3>
                 {m.question ||
                   "What comes to mind when you see this photograph?"}
@@ -376,7 +373,7 @@ export function MomentPanel({
             )}
             <details className="circle-provenance">
               <summary>
-                <Sparkles size={15} />
+                <Info size={16} aria-hidden="true" />
                 {m.titleSource === "ai"
                   ? "Organized with a little help from AI"
                   : "How this moment came together"}

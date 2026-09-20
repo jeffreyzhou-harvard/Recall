@@ -1,11 +1,11 @@
 /* Live household setup uses the shared Recall brand and reading preferences. */
 .live-setup { width: 100%; max-width: 720px; padding: 24px 32px 64px; margin-inline: auto; line-height: 1.45; overflow-wrap: anywhere; }
 .care-main > .live-setup { padding-inline: 0; }
-.live-setup h1 { max-width: 16ch; margin-top: 28px; font-size: clamp(36px, 5vw, 48px); font-weight: 650; line-height: 1.13; letter-spacing: -.02em; }
+.live-setup h1 { max-width: 16ch; margin-top: 24px; font-size: clamp(36px, 5vw, 48px); font-weight: 650; line-height: 1.13; letter-spacing: -.02em; }
 .live-setup h2, .live-setup legend { font-size: 27px; font-weight: 600; line-height: 1.25; }
 .live-setup h3 { font-size: 22px; font-weight: 600; }
 .live-setup p { max-width: 60ch; }
-.live-setup .setup-intro { margin-bottom: 32px; font-size: var(--recall-body-size); color: var(--recall-muted); }
+.live-setup .setup-intro { margin-block: 12px 32px; font-size: var(--recall-body-size); color: var(--recall-muted); }
 .live-setup .setup-back { margin-bottom: 8px; }
 .live-setup-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-block: 24px 32px; padding-block: 18px; border-block: 1px solid var(--recall-line); list-style: none; }
 .live-setup-steps li { display: flex; align-items: center; gap: 8px; font-size: 17px; color: var(--recall-muted); }
@@ -31,8 +31,8 @@
 .live-setup input:disabled, .live-setup select:disabled { background: var(--recall-tint); color: var(--recall-muted); border-color: var(--recall-muted); opacity: 1; cursor: not-allowed; }
 .live-setup .live-setup-hint { display: block; color: var(--recall-muted); font-size: max(18px, calc(var(--recall-body-size) - 2px)); font-weight: 400; line-height: 1.45; }
 .live-setup > .live-setup-hint, .live-setup form > .live-setup-hint { margin-top: 24px; }
-.live-setup-section { margin-block: 32px; padding-top: 28px; border-top: 1px solid var(--recall-line); min-width: 0; }
-.live-setup-section > legend { float: left; width: 100%; margin-bottom: 18px; }
+.live-setup-section { margin-block: 32px; padding-top: 32px; border-top: 1px solid var(--recall-line); min-width: 0; }
+.live-setup-section > legend { float: left; width: 100%; margin-bottom: 16px; }
 .live-setup-section > legend + * { clear: both; }
 .live-setup-section > h2 { margin-bottom: 12px; }
 .live-setup-section > p + .live-setup-check { margin-top: 18px; }
@@ -51,7 +51,7 @@
 .live-setup-summary dd { font-weight: 500; }
 .live-setup-agreements { margin-top: 28px; padding: 18px; border: 1px solid var(--recall-muted); border-radius: 8px; background: var(--recall-tint); }
 .live-setup-agreements .live-setup-check + .live-setup-check { margin-top: 12px; }
-.live-setup .setup-actions { gap: 18px; margin: 32px 0 0; }
+.live-setup .setup-actions { gap: 16px; margin: 32px 0 0; }
 .live-setup .recall-button { font-size: 23px; min-height: 64px; padding: 16px; }
 .live-setup .setup-actions > .recall-secondary { flex-basis: 150px; }
 .live-setup .setup-error, .live-setup-status { margin-block: 24px; padding: 18px; border: 1px solid var(--recall-muted); border-radius: 6px; color: var(--recall-ink); background: var(--recall-tint); font-size: var(--recall-body-size); }
@@ -74,7 +74,7 @@
   .live-setup h1 { margin-top: 24px; }
   .live-setup-steps { gap: 8px; margin-block: 18px 28px; }
   .live-setup-steps li { flex-direction: column; align-items: flex-start; gap: 8px; font-size: 16px; }
-  .live-setup-pair { gap: 18px; }
+  .live-setup-pair { grid-template-columns: 1fr; gap: 24px; }
   .live-setup-summary > div { grid-template-columns: 1fr; gap: 5px; }
   .live-setup .setup-actions > .recall-secondary { flex: 0 1 120px; }
   .live-setup .setup-actions .recall-button { font-size: 21px; padding: 12px; gap: 8px; }
@@ -87,3 +87,6 @@
   .live-setup .setup-actions { gap: 12px; }
   .live-setup .setup-actions > .recall-secondary { flex-basis: 102px; }
 }
+
+/* The grouped phone field owns its border and height. */
+.live-setup .live-setup-phone .live-setup-phone-number-row input { border: 0; min-height: 52px; border-radius: 0 6px 6px 0; }
