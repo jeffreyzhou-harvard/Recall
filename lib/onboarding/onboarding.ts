@@ -49,7 +49,7 @@ const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.str
  */
 export function loosenings(prev: AccessPolicy, next: AccessPolicy): string[] {
   const out: string[] = [];
-  const fixed: Array<keyof AccessPolicy> = ["policy_id", "version", "person_id", "established_by", "established_at", "recall_set_up_by", "timezone", "review", "safety"];
+  const fixed: Array<keyof AccessPolicy> = ["policy_id", "version", "person_id", "call_transport", "established_by", "established_at", "recall_set_up_by", "timezone", "review", "safety"];
   for (const key of fixed) if (!same(prev[key], next[key])) out.push(`${key} can only change in a joint setup`);
   if (!subset(next.approved_people, prev.approved_people)) out.push("an approved person was added");
   if (!subset(prev.formerly_approved, next.formerly_approved) || !subset(next.formerly_approved, [...prev.formerly_approved, ...prev.approved_people])) out.push("the list of formerly approved people can only gain someone who was approved");
@@ -222,9 +222,10 @@ export class Onboarding {
    * What they agree together. `agreedBy` must include HER and at least one caregiver: it is a joint setup, and a
    * setup she is not part of is not one (rule 14). This is the only way to add, widen, resume, or change safety.
    */
-  async recordJointSetup(householdId: string, document: unknown, agreedBy: readonly string[], recordedBy: string, note: string | null = null): Promise<SetupVersion> {
+  async recordJointSetup(householdId: string, document: unknown, agreedBy: readonly string[], recordedBy: string, note: string | null = null, expectedVersion?: number): Promise<SetupVersion> {
     Onboarding.plain(note);
     return this.store.transaction(async () => {
+      if (expectedVersion !== undefined && ((await this.currentSetup(householdId))?.version ?? 0) !== expectedVersion) throw new OnboardingError("already_exists", "Setup changed. Reload before saving.");
       // Who agreed comes first: without the two of them there is nothing to read.
       const agreed = [...new Set(agreedBy)];
       const people = await Promise.all(agreed.map((id) => this.member(householdId, id)));

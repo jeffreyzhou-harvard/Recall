@@ -1,5 +1,2 @@
-import { RecallPhone } from "@/components/recall/RecallPhone";
-
-export default function Home() {
-  return <RecallPhone />;
-}
+import { CallWaiting } from "@/components/live/CallWaiting";
+export default function Home() { return <CallWaiting />; }

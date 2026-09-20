@@ -18,3 +18,13 @@ export async function liveRecall(): Promise<LiveRecall> {
   await recall.refreshSetup();
   return recall;
 }
+
+/** Expected empty-install state, never a fallback to sample data. */
+export async function familyResponse(work: () => Promise<Response>): Promise<Response> {
+  try { return await work(); }
+  catch (error) {
+    if (error instanceof Error && error.name === "SetupRequiredError") return Response.json({ error: error.message, code: "setup_required" }, { status: 409 });
+    console.error("Family request failed", error instanceof Error ? error.name : "unknown");
+    return Response.json({ error: "Recall could not complete this request. Please reload before making another change." }, { status: 503 });
+  }
+}

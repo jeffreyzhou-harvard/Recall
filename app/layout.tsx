@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
 import "./recall.css";
-import { PreviewProvider } from "@/components/recall/PreviewProvider";
-import previewData from "@/fixtures/recall-preview.json";
+import { LiveProvider } from "@/components/live/LiveProvider";
 
 export const metadata: Metadata = {
   title: "Recall",
@@ -13,7 +12,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body className="min-h-screen font-sans antialiased"><PreviewProvider data={previewData}>{children}</PreviewProvider></body>
+      <body className="min-h-screen font-sans antialiased"><LiveProvider>{children}</LiveProvider></body>
     </html>
   );
 }

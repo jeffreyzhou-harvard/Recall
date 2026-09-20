@@ -377,7 +377,9 @@ describe("the live server runs for an onboarded household", () => {
       await expect(createLiveRecall(config)).rejects.toThrow(/joint setup/); // nothing agreed yet: nothing to run on
 
       await onboarding.recordJointSetup(hid, setupFor(hid, her, maya, (p) => (p.attestations.saved_contact_photo = false)), [her, maya], maya);
-      await expect(createLiveRecall(config)).rejects.toThrow(/has not finished onboarding: contact_saved_and_recall_introduced/);
+      const beforeIntroduction = await createLiveRecall(config);
+      expect(beforeIntroduction.callMode).toBe("none"); // family setup can continue; calls remain unavailable
+      expect(await beforeIntroduction.tick()).toBeNull();
 
       await onboarding.recordJointSetup(hid, setupFor(hid, her, maya), [her, maya], maya);
       const live = await createLiveRecall(config);

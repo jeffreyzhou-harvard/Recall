@@ -1,3 +1,5 @@
+> Superseded for live routes: see [backend integration](backend-integration.md). The document below records the original isolated frontend handoff; its mock flows are no longer the application entry points.
+
 # Recall frontend preview
 
 Built on branch `designs`, merged with main through `00a823b`, and prepared for the shared frontend handoff. The latest AGENTS.md and SPECS.md were reviewed before integration.

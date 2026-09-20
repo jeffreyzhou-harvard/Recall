@@ -1,3 +1,4 @@
+import { dataDirectory } from "./data-directory";
 /**
  * The onboarding database, held for the life of the server. LIVE ONLY: nothing on the judged path opens a
  * database file (AGENTS.md section 9).
@@ -16,7 +17,7 @@ import { SqliteOnboardingStore } from "@/lib/onboarding/sqlite-store";
 
 export const DEFAULT_ONBOARDING_DB = join(".data", "onboarding.db");
 
-export function openOnboarding(root: string, file: string = DEFAULT_ONBOARDING_DB): Onboarding {
+export function openOnboarding(root: string, file: string = join(dataDirectory(root), "onboarding.db")): Onboarding {
   const path = isAbsolute(file) ? file : join(root, file);
   mkdirSync(dirname(path), { recursive: true });
   return new Onboarding(SqliteOnboardingStore.open(path), new SystemClock());
@@ -24,7 +25,7 @@ export function openOnboarding(root: string, file: string = DEFAULT_ONBOARDING_D
 
 const cache = globalThis as unknown as { __recallOnboarding?: Onboarding };
 export function getOnboarding(): Onboarding {
-  cache.__recallOnboarding ??= openOnboarding(process.cwd(), process.env.RECALL_ONBOARDING_DB || DEFAULT_ONBOARDING_DB);
+  cache.__recallOnboarding ??= openOnboarding(process.cwd(), process.env.RECALL_ONBOARDING_DB || join(dataDirectory(process.cwd()), "onboarding.db"));
   return cache.__recallOnboarding;
 }
 

@@ -2,15 +2,15 @@
 
 import { type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
-import { usePreview } from "./PreviewProvider";
+import { useLive } from "@/components/live/LiveProvider";
 
 export function RecallFrame({ children, family = false }: { children: ReactNode; family?: boolean }) {
-  const { largeText, dark } = usePreview();
+  const { largeText, dark } = useLive();
   return <div className={`recall-workspace ${family ? "recall-family-workspace" : ""}`} data-large-text={largeText} data-dark={dark}>{children}</div>;
 }
 
 export function RecallHeader({ family = false, compact = false }: { family?: boolean; compact?: boolean }) {
-  const { largeText, setLargeText, dark, setDark } = usePreview();
+  const { largeText, setLargeText, dark, setDark } = useLive();
   return <>
     <header className={`recall-masthead${compact ? " recall-masthead-compact" : ""}`}>
       <span className="recall-wordmark">Recall</span>
@@ -23,6 +23,6 @@ export function RecallHeader({ family = false, compact = false }: { family?: boo
         </fieldset>
       </details>}
     </header>
-    {!compact && <div className="recall-familiar">{family ? "Maya’s family view" : "Set up by Maya, your daughter"}</div>}
+    {!compact && <div className="recall-familiar">{family ? "Your family view" : "Familiar conversations, in your own words"}</div>}
   </>;
 }

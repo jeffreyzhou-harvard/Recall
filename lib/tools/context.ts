@@ -35,6 +35,8 @@ export interface AccessibilityTelemetry {
 
 /** Layer 3: ephemeral session state. Discarded at call end except what she confirmed. */
 export interface SessionRecord {
+  /** Original final audio for the separate share question; private confirmation evidence only. */
+  share_audio_window?: import("@/lib/providers/transcription").AudioWindow | null;
   session_id: string;
   call_asset_id: string | null;
   started_at: string | null;
@@ -106,6 +108,10 @@ export interface ScaffoldChoice {
 export type ScaffoldAdvisor = (advice: ScaffoldAdvice) => Promise<ScaffoldChoice>;
 
 export interface ToolContext {
+  /** Live transport stop, checked inside the atomic commit boundary. */
+  isCallStopped?: () => boolean;
+  onContributionCommitted?: () => Promise<void>;
+  callAttempts?: () => Array<{ session_id: string; at: string }>;
   graph: GraphStore;
   setup: SetupStore;
   assets: AssetIndex;

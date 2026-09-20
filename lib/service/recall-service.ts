@@ -40,6 +40,10 @@ import { createRecallStore } from "@/lib/state/store";
 import { GateKeeper, TOOL_IMPLS, ToolRuntime, dashboardAccess, newSession, type FamilyToolContext, type Fault, type ScaffoldAdvisor, type SetupStore, type ToolContext, type ToolInput, type ToolName, type ToolOutput } from "@/lib/tools";
 
 export interface RecallDeps {
+  isCallStopped?: () => boolean;
+  callAttempts?: () => Array<{ session_id: string; at: string }>;
+  onContributionCommitted?: (ctx: ToolContext) => Promise<void>;
+  onCallSession?: (sessionId: string) => void;
   graph: GraphStore;
   /** The live joint setup. Read fresh at every call and every dashboard load, so a revocation is in force before the next one. */
   setup: SetupStore;
@@ -53,7 +57,7 @@ export interface RecallDeps {
   safetyThresholds: SafetyThresholds;
   alerts: AlertChannel;
   /** Places the call once the policy has granted it. Never invoked before that. Null means this deployment cannot call. */
-  callDriver: (() => CallDriver) | null;
+  callDriver: ((topicLabel?: string) => CallDriver) | null;
   /** Reads facts out of an answer. It only proposes: applyAnswer decides what is grounded enough to keep. */
   answerInterpreter?: AnswerInterpreter;
   /** Live only (Muse Spark). May pick WHICH cue where the retrieval layer has no preference; see select_scaffold. */
@@ -125,9 +129,12 @@ export class RecallService {
    */
   async runScheduledCall(sessionId: string): Promise<SessionRun | null> {
     const { deps } = this;
+    deps.onCallSession?.(sessionId);
     const store = createRecallStore();
     const personId = deps.setup.current().person_id;
     const ctx: ToolContext = {
+      isCallStopped: deps.isCallStopped,
+      callAttempts: deps.callAttempts,
       graph: deps.graph,
       setup: deps.setup,
       assets: deps.assets,
@@ -144,6 +151,7 @@ export class RecallService {
       machine: () => store.getState().machine,
       scaffoldAdvisor: deps.scaffoldAdvisor,
     };
+    if (deps.onContributionCommitted) ctx.onContributionCommitted = () => deps.onContributionCommitted!(ctx);
     const runtime = new ToolRuntime({ clock: deps.clock, call: ctx }, TOOL_IMPLS, deps.runtime ?? {});
     const startedAt = deps.clock.iso();
     const { machine, receipt } = await runRecallCall({ person_id: personId, ctx, runtime, store, callDriver: deps.callDriver });
@@ -210,7 +218,9 @@ export class RecallService {
    */
   private familyQueue: Promise<unknown> = Promise.resolve();
   private family<T extends FamilyTool>(tool: T, input: ToolInput<T>): Promise<ToolOutput<T>> {
-    const next = this.familyQueue.then(() => this.familyRuntime.call(tool, input));
+    const next = this.familyQueue.then(() => this.deps.graph.atomic
+      ? this.deps.graph.atomic(() => this.familyRuntime.call(tool, input))
+      : this.familyRuntime.call(tool, input));
     this.familyQueue = next.catch(() => undefined);
     return next;
   }
@@ -236,6 +246,26 @@ export class RecallService {
 
   exportRecord(requesterId: string): Promise<ToolOutput<"export_record_for_clinician">> {
     return this.family("export_record_for_clinician", { requester_id: requesterId });
+  }
+
+  /** Names and per-topic event counts only; the same whitelist as the record, with its access gate. */
+  async dashboardInfo(memberId: string) {
+    const policy = this.deps.setup.current();
+    if (!policy.approved_people.includes(memberId)) return null;
+    const view = new FamilyView(this.deps.graph, policy.person_id);
+    const detail = dashboardAccess(policy, memberId);
+    const rows = detail === "weekly_note_and_record" ? await view.outcomeRows() : [];
+    const ordered = rows.sort((a, b) => a.at.localeCompare(b.at) || a.topic_key.localeCompare(b.topic_key));
+    const sessions = ordered.map((row, i) => {
+      const window = ordered.slice(0, i + 1).filter((r) => r.topic_key === row.topic_key).slice(-this.deps.thresholds.record_window_calls);
+      return {
+        id: `${row.topic_key}:${row.at}:${i}`, date: row.at.slice(0, 10), topicId: row.topic_key, topicName: row.topic_name,
+        outcome: row.reached_at_rung === 1 ? "unaided" as const : row.reached_at_rung === 2 || row.reached_at_rung === 3 ? "cue" as const : row.reached_at_rung === 4 ? "recognition" as const : "unreached" as const,
+        recentCalls: window.length,
+        unaidedCalls: window.length >= this.deps.thresholds.min_calls_to_show ? window.filter((r) => r.reached_at_rung === 1).length : null,
+      };
+    });
+    return { person_name: await view.herName(), member_name: await view.memberName(memberId), detail_level: detail, record_window_calls: this.deps.thresholds.record_window_calls, min_calls_to_show: this.deps.thresholds.min_calls_to_show, sessions, contributions: await view.ownContributions(memberId) };
   }
 
   // --- caregiver controls (rule 12; section 6.3) ----------------------------------------------------------------

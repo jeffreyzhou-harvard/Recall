@@ -235,6 +235,7 @@ export const confirm_share: ToolImpl<"confirm_share"> = async (input, ctx) => {
   const confirmation: ToolOutput<"confirm_share"> = { share_confirmation_id: `share-confirmation:${ctx.session.session_id}`, ...body, stop_requested: stopRequested, response_format: "yes_no", confirmation_hash: await contentHash(body) };
   ctx.gate.recordShareConfirmation(input.contribution_hash, decision);
   ctx.session.share_confirmation = confirmation;
+  ctx.session.share_audio_window = input.audio_window;
   return confirmation;
 };
 
