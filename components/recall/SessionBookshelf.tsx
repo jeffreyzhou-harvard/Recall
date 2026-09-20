@@ -5,11 +5,12 @@ import { ArrowLeft, ArrowRight, MoveHorizontal } from "lucide-react";
 import { sessionSupport, type SessionSummary } from "@/lib/family/session-summary";
 
 const envelope = [.12, .21, .32, .27, .46, .58, .49, .73, .86, 1, .82, .69, .77, .51, .43, .32, .38, .21, .12];
-// A closed spine reads its unaided count as height. The shortest measured book keeps
-// most of the tallest one's height, so the shelf stays legible without exaggerating
-// a difference of one or two calls. A topic without enough history sits just below.
-const MEASURED_FLOOR = .6;
-const UNMEASURED_SCALE = .55;
+// A closed spine reads its unaided count as height, across a narrow band well under
+// the opened cover's full height: the shelf stays legible without exaggerating a
+// difference of one or two calls. A topic without enough history sits just below.
+const MEASURED_FLOOR = .5;
+const MEASURED_CEILING = .82;
+const UNMEASURED_SCALE = .45;
 const shortDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 const fullDate = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
 const dateLabel = (date: string, full = false) => (full ? fullDate : shortDate).format(new Date(date + "T12:00:00Z"));
@@ -78,7 +79,7 @@ export function SessionBookshelf({ sessions: allSessions, children, contribution
         const closed = Math.min(1, Math.abs(distance));
         const openness = 1 - closed * closed * (3 - 2 * closed);
         const count = sessions[index]?.unaidedCalls;
-        const restingScale = count === null || count === undefined ? UNMEASURED_SCALE : MEASURED_FLOOR + (1 - MEASURED_FLOOR) * Math.min(1, Math.max(0, count / Math.max(1, recordWindow)));
+        const restingScale = count === null || count === undefined ? UNMEASURED_SCALE : MEASURED_FLOOR + (MEASURED_CEILING - MEASURED_FLOOR) * Math.min(1, Math.max(0, count / Math.max(1, recordWindow)));
         const heightScale = restingScale + (1 - restingScale) * openness;
         // Keep the snap target untransformed; only its visual child moves.
         if (placements.current[index]) placements.current[index]!.style.transform = reduced.current ? "none" : `translateX(${Math.sign(distance) * closed * 112 + shelfOffset}px)`;
