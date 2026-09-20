@@ -1,0 +1,61 @@
+.circle-graph-questions {
+  min-width: 0;
+  margin-bottom: 28px;
+  padding: 24px;
+  border: 1px solid var(--recall-line);
+  border-radius: 14px;
+  background: #fffefa;
+}
+.circle-graph-question-heading { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 20px; }
+.circle-graph-question-heading > svg { flex: 0 0 auto; margin-top: 4px; color: var(--recall-focus); }
+.circle-app .circle-graph-question-heading h2 { margin: 0 0 7px; font-size: 28px; }
+.circle-graph-question-heading p { color: var(--recall-muted); max-width: 68ch; }
+.circle-graph-questions label { display: block; margin-bottom: 8px; font-weight: 600; }
+.circle-graph-question-field { display: flex; align-items: flex-end; gap: 12px; }
+.circle-graph-question-field textarea { flex: 1; width: 100%; min-width: 0; min-height: 78px; max-height: 220px; padding: 12px 14px; border: 1px solid var(--recall-muted); border-radius: 8px; background: var(--recall-bg); color: var(--recall-ink); resize: vertical; caret-color: var(--recall-focus); }
+.circle-graph-question-field textarea::placeholder { color: var(--recall-muted); opacity: 1; }
+.circle-graph-question-field .circle-button { flex: 0 0 auto; min-height: 46px; }
+.circle-graph-question-hint { color: var(--recall-muted); font-size: 13px; line-height: 1.6; }
+.circle-graph-questions form > .circle-graph-question-hint { margin-top: 9px; }
+.circle-graph-question-suggestions { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 16px; }
+.circle-graph-question-suggestions button { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 4px 0; border: 0; background: none; color: var(--recall-focus); text-align: left; text-decoration: underline; text-underline-offset: 4px; text-decoration-color: var(--recall-line); }
+.circle-graph-question-suggestions button:hover { text-decoration-color: currentColor; }
+.circle-graph-question-status:empty { display: none; }
+.circle-graph-question-status { margin-top: 16px; color: var(--recall-muted); }
+.circle-graph-questions .circle-graph-question-error { margin-top: 16px; padding: 12px 14px; background: var(--recall-tint); border-radius: 8px; }
+.circle-graph-question-result { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(220px, 1fr); gap: 24px 32px; margin-top: 20px; padding-top: 24px; border-top: 1px solid var(--recall-line); }
+.circle-graph-answer { min-width: 0; }
+.circle-graph-answer-heading { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.circle-app .circle-graph-answer-heading h3 { flex: 1 1 220px; margin: 0; font-size: 24px; overflow-wrap: anywhere; }
+.circle-graph-answer-heading .circle-text-button { flex: 0 0 auto; min-height: 32px; font-size: 13px; }
+.circle-graph-answer > p { margin-top: 12px; max-width: 70ch; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.circle-graph-citation { display: inline; padding: 3px 5px; margin-left: 2px; border: 0; background: none; color: var(--recall-focus); font-size: 13px !important; font-weight: 600 !important; text-decoration: underline; text-underline-offset: 3px; }
+.circle-graph-citation:hover { background: var(--recall-tint); }
+.circle-graph-questions h4 { margin: 0 0 12px; font-family: inherit; font-size: 15px; font-weight: 600; }
+.circle-graph-ideas { margin-top: 28px; }
+.circle-graph-ideas ul { margin: 0; padding-left: 20px; }
+.circle-graph-ideas li { padding-left: 3px; margin: 10px 0; line-height: 1.6; overflow-wrap: anywhere; }
+.circle-graph-sources { min-width: 0; }
+.circle-graph-sources details { border-bottom: 1px solid var(--recall-line); }
+.circle-graph-sources summary { display: flex; align-items: baseline; gap: 10px; padding: 12px 0; cursor: pointer; color: var(--recall-focus); list-style: none; }
+.circle-graph-sources summary::-webkit-details-marker { display: none; }
+.circle-graph-sources summary::after { content: "+"; margin-left: auto; }
+.circle-graph-sources details[open] summary::after { content: "−"; }
+.circle-graph-sources summary:focus-visible { outline: 3px solid var(--recall-focus); outline-offset: 3px; }
+.circle-graph-sources summary strong { font-weight: 500; text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.circle-graph-sources summary small { display: block; margin-top: 3px; color: var(--recall-muted); font-size: 12px; }
+.circle-graph-source-number { color: var(--recall-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.circle-graph-source-detail { padding: 0 0 16px 20px; }
+.circle-graph-source-detail p { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
+.circle-graph-source-detail time { display: block; margin-top: 10px; color: var(--recall-muted); font-size: 12px; }
+.circle-graph-source-detail .circle-text-button { min-height: 36px; margin-top: 8px; font-size: 13px; }
+.circle-graph-answer-credit { grid-column: 1 / -1; color: var(--recall-muted); font-size: 12px; }
+@media (max-width: 900px) {
+  .circle-graph-question-result { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .circle-graph-questions { padding: 18px; }
+  .circle-graph-question-field { align-items: stretch; flex-direction: column; }
+  .circle-graph-question-field .circle-button { align-self: flex-start; }
+  .circle-app .circle-graph-question-heading h2 { font-size: 25px; }
+}

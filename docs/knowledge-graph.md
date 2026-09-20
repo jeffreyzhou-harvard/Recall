@@ -30,7 +30,21 @@ Topic ranking still starts with the longest-unvisited approved topic, then the e
 
 Every call still opens with free recall. Follow-up selection does not add a quiz or change the ladder, stop handling, safety handoff or confirmation sequence. Later calls can offer a cited person or place cue such as “You mentioned Maya. What comes to mind?” The retrieval layer records which cue was used and selects among those on offer. A mere mention is excluded from recognition choices that would otherwise assert participation or a relationship.
 
-The question plan is private call-planning data, not a family analytics surface. Family queries still return only the fixed redirect. No model can freely choose a topic, widen approval, store unconfirmed words, or overwrite a person's account.
+The question plan is private call-planning data, not a family analytics surface. The original `handle_family_query` tool still returns its fixed redirect. The separately authorized Connections search below can answer questions from shared sources. No model can freely choose a call topic, widen approval, store unconfirmed words, or overwrite a person's account.
+
+## Family search and Q&A
+
+Open **Connections → Ask your family's stories** in the caregiver workspace. Ask about a person, place, or story, then follow numbered citations to the original words and contributor. Sources associated with a moment can open that photo group. Muse Spark also suggests open questions to ask a family member directly.
+
+`POST /api/circle/graph-query` accepts only `{ "question": "…" }` (2–600 characters). The signed-in family account determines the household and member; patient accounts cannot use this endpoint. The server builds a whitelist projection of shared collection labels/stories, the member's own approved graph contributions, approved joint-setup relationships, and patient call stories with valid share-confirmation and current dashboard access. Call records, drafts, unshared words, other households, blocked topics, disputed or expired evidence, and revoked graph access are excluded. Deleted published call stories cannot reappear through their private originals. Sample connections are explicitly attributed as fictional.
+
+Set the existing server-only `MUSE_API_KEY` on Railway or in `.env.local` for generated answers and ideas. The existing Muse client calls `muse-spark-1.3` with a strict response schema. Each answer paragraph needs a recognized source ID and an exact evidence quote; invalid citations or disallowed generated language reject the response. Quotes provide traceable evidence, not a guarantee that every interpretation is correct. No model tool can write a memory or place a call from this endpoint.
+
+Retrieval ranks lexical matches and sends up to 70 sources, at most 48,000 source-text characters, with a 25-second provider timeout. Larger collections show a selection notice. Without a key, the endpoint returns original matching sources only and the UI states that AI answers are not connected. A configured provider failure returns an error rather than a fabricated answer. Requests are limited to 30 per member per 15 minutes.
+
+Recall does not persist questions or generated answers. Requests send only the authorized text projection to Meta; photo binaries, audio, face descriptors, and account fields are excluded. Access and sources are checked again after generation. `/api/circle/state` supplies a source revision so the UI clears results after permission or source changes on its next refresh; unchanged polls preserve the answer. Responses use `Cache-Control: no-store`.
+
+`tests/family-graph-query.test.ts` checks source isolation, confirmation chains, revocation during generation, client revisions, citation validation, and missing/failed provider behavior. `node --env-file=.env.local --import tsx scripts/verify-family-query.ts` checks the live provider using fictional sources only, without opening a household or saving graph data.
 
 ## Selective onboarding imports
 

@@ -24,6 +24,7 @@ import { publicBase, sendText } from "@/server/circle/messages";
 import { transcribeAudio } from "@/server/circle/ai";
 import { discardAudio, expireAudioDrafts } from "@/server/circle/audio";
 import { deleteCollectionItem, deleteStory } from "@/server/circle/delete";
+import { askFamilyGraph, familyQueryRevision } from "@/server/circle/graph-query";
 import { loadSampleFamily, sampleFamilyConnections } from "@/server/circle/sample";
 import { editPeople, faceThumbnail, getPeople, saveFaceScan } from "@/server/circle/people";
 import { sameOrigin, sessionCookie, browserPrincipal } from "@/server/session";
@@ -229,6 +230,7 @@ async function handle(request: Request, context: Context): Promise<Response> {
     }
     const identity = await circleIdentity(request),
       { household, person, people, canManage } = identity;
+    if (action === "graph-query" && isPost) return reply(await askFamilyGraph(request, body));
     if (["people", "face-scan", "face"].includes(action)) {
       if (person.role === "participant") throw new CircleError("Open People from a family contributor account.", 403);
       if (action === "face" && !isPost) return new Response(await faceThumbnail(household, parts[1] || ""), { headers: { "Content-Type": "image/jpeg", "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } });
@@ -267,6 +269,7 @@ async function handle(request: Request, context: Context): Promise<Response> {
         photos: state.photos.map(({ hash, owner, namedPeople, ...p }) => p),
         moments: state.moments,
         stories: await visibleSampleStories(household, person.person_id, state),
+        graphQueryRevision: await familyQueryRevision(identity),
         imports: state.imports.slice(-8).map(({ id, at, added, duplicates, moments }) => ({ id, at, added, duplicates, moments })),
         demo: state.demo,
         ...(state.demo ? { connections: sampleFamilyConnections(state.moments) } : {}),
