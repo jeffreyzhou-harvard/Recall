@@ -44,8 +44,9 @@ export const dateLabel = (date: string | null) =>
 export const post = async <T = Record<string, unknown>>(
   action: string,
   body: unknown,
+  apiBase = "/api/circle",
 ): Promise<T> => {
-  const response = await fetch("/api/circle/" + action, {
+  const response = await fetch(apiBase + "/" + action, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

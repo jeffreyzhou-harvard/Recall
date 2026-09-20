@@ -4,16 +4,18 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Heart, Phone } from "lucide-react";
 import { AccessGate, SignOut } from "@/components/live/AccessGate";
+import { LiveProvider } from "@/components/live/LiveProvider";
 import { StoryRecorder } from "./StoryRecorder";
 import { post, type CircleView } from "./types";
 import "./circle.css";
-function Remember() {
+function Remember({ sample = false }: { sample?: boolean }) {
+  const apiBase = sample ? "/api/circle/sample-patient" : "/api/circle";
   const [data, setData] = useState<CircleView | null>(null),
     [error, setError] = useState(""),
     [index, setIndex] = useState(0),
     [photoIndex, setPhotoIndex] = useState(0);
   async function refresh() {
-    const r = await fetch("/api/circle/state", { cache: "no-store" });
+    const r = await fetch(apiBase + "/state", { cache: "no-store" });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error);
     setData(d);
@@ -60,12 +62,12 @@ function Remember() {
           <RecallWordmark />
         </Link>
         <span>A little time for you, {data.name}.</span>
-        <SignOut />
+        {sample ? <Link className="circle-text-button" href="/caregiver">Back to collection<ArrowRight size={18} aria-hidden="true" /></Link> : <SignOut />}
       </header>
       <nav className="circle-patient-navigation" aria-label="Your Recall">
         <Link className="circle-button secondary" href="/"><ArrowLeft size={20} aria-hidden="true" />Back to home</Link>
         {data.people.find((p) => p.id === data.member)?.role === "participant" ? (
-          <Link className="circle-button primary" href="/conversations/call"><Phone size={20} aria-hidden="true" />Your Recall call</Link>
+          <Link className="circle-button primary" href={sample ? "/demo/call" : "/conversations/call"}><Phone size={20} aria-hidden="true" />Your Recall call</Link>
         ) : (
           <Link className="circle-text-button" href="/caregiver">Back to collection<ArrowRight size={18} aria-hidden="true" /></Link>
         )}
@@ -109,6 +111,7 @@ function Remember() {
                 There’s no right answer. Share as much or as little as you like.
               </p>
               <StoryRecorder
+                apiBase={apiBase}
                 momentId={moment.id}
                 name={data.name}
                 onSaved={async () => {
@@ -156,7 +159,7 @@ function Remember() {
                     ?.reminders === 1
                 }
                 onChange={(e) => {
-                  void post("preferences", { reminders: e.target.checked })
+                  void post("preferences", { reminders: e.target.checked }, apiBase)
                     .then(refresh)
                     .catch((e) => setError(e.message));
                 }}
@@ -174,7 +177,8 @@ function Remember() {
     </main>
   );
 }
-export function PhotoRemember() {
+export function PhotoRemember({ sample = false }: { sample?: boolean }) {
+  if (sample) return <LiveProvider sessionEndpoint="/api/demo/session"><AccessGate patient><Remember sample /></AccessGate></LiveProvider>;
   return (
     <AccessGate anyRole>
       <Remember />
