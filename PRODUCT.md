@@ -17,11 +17,11 @@ Recall invites a person to revisit their own memories with source-backed cues, a
 - `/sign-in`: existing private access keys, not public email/password signup.
 - `/onboarding` and `/onboarding/manage`: connected joint setup, household permissions, topics, invitations and call access.
 - `/join`: one-time invitation acceptance.
-- `/caregiver` and `/family`: authorized persisted Weekly Note, session bookshelf, per-topic records, exports and real attributed memory/media contributions.
+- `/caregiver` and `/family`: authorized contributor-owned Moments, Places, Connections and Stories, plus persisted Weekly Note, session bookshelf, per-topic records, exports and real attributed memory/media contributions.
 - `/revisit`: patient-only scheduled browser calls, microphone input, Recall speech and original-audio confirmation playback.
 - `/design/*`: redirects to `/`. `/present` remains a separate fixture-based engine harness.
 
-New household setup requires an operator setup key or explicitly available local development access. There is no unrestricted public signup. Live deployment needs configured persistence, access, scheduling and audio providers; see `docs/backend-integration.md`. Browser audio and deployment readiness require their own verification.
+The first household on an empty configured installation can complete setup without an existing access key; its browser session is bound to that household. Subsequent household creation and management remain protected. Returning sign-in uses the current private access-key system, not email/password registration. Live deployment needs configured persistence, access, scheduling and audio providers; see `docs/backend-integration.md`. Browser audio and deployment readiness require their own verification.
 
 ## Product constraints
 
@@ -37,8 +37,8 @@ The caregiver shelf uses neutral dated counts, bottom-aligned spines, a reading-
 
 ## Accessibility
 
-Preserve large direct actions, visible focus, readable dark and large-text preferences, native form labels and reduced-motion shelf behavior. End call remains available during an active call. Keep account errors and loading states explicit. Do not hide a permission decision in pursuit of visual simplicity.
+Preserve large direct actions, visible focus, native form labels and reduced-motion behavior. Shared dark and large-text preference styles remain; the caregiver workspace uses readable defaults without the former Text & contrast menu. End call remains available during an active call. Keep account errors and loading states explicit. Do not hide a permission decision in pursuit of visual simplicity.
 
 ## Integration boundaries
 
-Real JPEG/PNG photo and WAV voice contributions are connected through the memory form. The earlier album/contact/calendar selection and question-request prototypes are no longer live UI. `fixtures/preview` and preview test helpers may remain for development; primary routes do not mount them. No generated preview image is real household evidence.
+Real JPEG/PNG photo and WAV voice contributions remain connected. The collection accepts up to 20 JPEG/PNG photos at 6 MB each through the existing private media API; HEIC conversion and automatic EXIF import are not implemented. Family settings exposes the existing invitation, contact and calendar import flows. Collection labels and historical pins remain audit metadata rather than edits to call evidence. Patient and other contributors’ private words are excluded from the signed-in contributor’s collection. No question-request queue is mounted. `fixtures/preview` and preview test helpers may remain for development; primary routes do not mount them. No generated preview image is real household evidence.

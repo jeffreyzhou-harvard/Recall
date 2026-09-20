@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-20T01:15:44.206945+00:00",
+  "generatedAt": "2026-09-20T02:56:53.878359+00:00",
   "title": "Design System: Recall",
   "extensions": {
     "colorMeta": {
@@ -169,9 +169,24 @@
       "headline": {
         "displayName": "Live setup title",
         "purpose": "clamp(36px, 5vw, 48px), weight 650, line-height 1.13."
+      },
+      "archive-title": {
+        "displayName": "Moment title",
+        "purpose": "Contributor collection photo card heading."
       }
     },
-    "shadows": [],
+    "shadows": [
+      {
+        "name": "photo-pin",
+        "value": "0 3px 12px #18201c35",
+        "purpose": "Original photo pins over a basemap."
+      },
+      {
+        "name": "upload-photo",
+        "value": "0 8px 18px rgb(0 0 0 / .15)",
+        "purpose": "Overlapping photographs during upload progress."
+      }
+    ],
     "motion": [
       {
         "name": "button-fill",
@@ -200,6 +215,14 @@
       {
         "name": "caregiver-stack",
         "value": "800px"
+      },
+      {
+        "name": "caregiver-mobile",
+        "value": "760px"
+      },
+      {
+        "name": "caregiver-aside",
+        "value": "1200px"
       }
     ]
   },
@@ -221,11 +244,11 @@
       "css": ".ds-field{font-family:\"Atkinson Hyperlegible Next\",\"Atkinson Hyperlegible\",sans-serif;display:grid;gap:8px;font-size:20px;color:var(--recall-ink,#242c28);}.ds-field input{font-family:\"Atkinson Hyperlegible Next\",\"Atkinson Hyperlegible\",sans-serif;min-width:0;min-height:60px;border:2px solid #242c28;border-radius:6px;padding:12px;background:var(--recall-bg,#fafaf7);color:var(--recall-ink,#242c28);font-size:22px;}.ds-field input::placeholder{color:var(--recall-muted,#535e57);opacity:1;}.ds-field input:focus-visible{outline:3px solid #354f43;outline-offset:5px;}"
     },
     {
-      "name": "Caregiver navigation",
+      "name": "Caregiver section navigation",
       "kind": "nav",
-      "description": "Underlined destinations with generous targets.",
-      "html": "<nav class=\"ds-nav\" aria-label=\"Caregiver sections\"><a href=\"#topic-record\">Recall sessions</a><a href=\"#suggestions\">Share a memory</a><a href=\"/onboarding\">Setup</a></nav>",
-      "css": ".ds-nav{font-family:\"Atkinson Hyperlegible Next\",\"Atkinson Hyperlegible\",sans-serif;display:flex;flex-wrap:wrap;gap:8px 28px;border-bottom:1px solid var(--recall-line, #bdc5bd);padding-block:18px;margin-bottom:30px;font-size:18px;}.ds-nav a{display:inline-flex;align-items:center;min-height:44px;color:var(--recall-ink, #242c28);text-decoration:underline;}.ds-nav a:hover{text-decoration-thickness:2px;}.ds-nav a:focus-visible{outline:3px solid var(--recall-focus, #354f43);outline-offset:5px;}"
+      "description": "Desktop rail; the mounted mobile workspace uses a native section picker.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Caregiver\"><a href=\"#moments\" aria-current=\"page\">Moments</a><a href=\"#places\">Places</a><a href=\"#connections\">Connections</a><a href=\"#stories\">Stories</a><a href=\"#sessions\">Recall sessions</a></nav>",
+      "css": ".ds-nav{font:400 18px/1.3 \"Atkinson Hyperlegible Next\",\"Atkinson Hyperlegible\",sans-serif;display:grid;gap:8px;background:var(--recall-tint,#f0f2ec);padding:16px;color:var(--recall-ink,#242c28)}.ds-nav a{display:flex;align-items:center;min-height:52px;padding:12px;border:1px solid transparent;border-radius:8px;color:inherit;text-decoration:none}.ds-nav a[aria-current=\"page\"]{background:var(--recall-bg,#fafaf7);border-color:var(--recall-line,#bdc5bd);font-weight:650}.ds-nav a:hover{background:var(--recall-soft,#e9ece6)}.ds-nav a:focus-visible{outline:3px solid var(--recall-focus,#354f43);outline-offset:5px}"
     },
     {
       "name": "Selected session receipt",
@@ -266,7 +289,7 @@
   ],
   "narrative": {
     "northStar": "A familiar photograph, one spoken thought",
-    "overview": "Recall uses warm paper, dark readable words, quiet sage surfaces and a small clay connected path. Self-hosted Atkinson Hyperlegible Next carries identity and reading. The approved `BRAND_BOOK.md` remains the direction; this document records the current connected application rather than the retired scripted preview.\n\nSource evidence: `app/recall.css`, `app/globals.css`, `app/welcome.css`, `app/onboarding-live.css`, `components/live`, `RecallFrame` and `SessionBookshelf`. Welcome, access, household setup, invitations, caregiver records and patient web calls share the identity. The photo-led patient composition remains a brand target: the mounted live call currently displays prompts and audio status, without a photo or paginated captions. `/present` is a separate engine harness.\n",
+    "overview": "Recall uses warm paper, dark readable words, quiet sage surfaces and a small clay connected path. Self-hosted Atkinson Hyperlegible Next carries identity and reading. The approved `BRAND_BOOK.md` remains the direction; this document records the current connected application rather than the retired scripted preview.\n\nSource evidence: `app/caregiver.css`, `app/family-archive.css`, `app/archive-visualizations.css`, `components/archive`, `app/recall.css`, `app/globals.css`, `app/welcome.css`, `app/onboarding-live.css`, `components/live`, `RecallFrame` and `SessionBookshelf`. Welcome, access, household setup, invitations, caregiver records and patient web calls share the identity. The photo-led patient composition remains a brand target: the mounted live call currently displays prompts and audio status, without a photo or paginated captions. `/present` is a separate engine harness.",
     "keyCharacteristics": [
       "Warm neutral surfaces with restrained clay identity.",
       "One exact font family and generous actions.",
@@ -286,7 +309,7 @@
       },
       {
         "name": "The Flat Surface Rule",
-        "body": "Use no elevated shadows; preserve the bookshelf\u2019s scoped geometric depth.",
+        "body": "Keep workspace panels flat; reserve depth for bookshelf geometry and the soft shadows of overlapping map/upload photographs.",
         "section": "elevation"
       }
     ],
@@ -299,8 +322,8 @@
     "donts": [
       "Don't present fixture identities, sample history or generated images as a live household.",
       "Don't turn counts into clinical scores or expose patient quotations in this caregiver frontend.",
-      "Don't restore bright accent fields, elevated shadows or a competing waveform logo.",
-      "Don't describe planned photo-led calls or rich imports as implemented live features."
+      "Don't restore bright accent fields, elevated workspace cards or a competing waveform logo.",
+      "Don't describe planned photo-led calls, automatic photo metadata import or generated stories as implemented live features."
     ]
   }
 }

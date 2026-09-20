@@ -1,17 +1,19 @@
 # Connected caregiver overview
 
-Mode: Operate. This contract replaces the local sample-family overview. The detailed shelf geometry is recorded in `caregiver-waveform.md`.
+Mode: Operate. The detailed shelf geometry is recorded in `caregiver-waveform.md`.
 
-THESIS: Give an authorized family member a quiet account of calls and a way to contribute their own memories, while encouraging direct contact.
+THESIS: Bring the family's own photographs and attributed accounts together, with a separate, quiet record of Recall calls that encourages direct contact.
 
-OWN-WORLD: Self-hosted Atkinson Hyperlegible Next; paper, ink and sage; the shared static clay connected-path mark. Plain counts and dates, no clinical colors, scores or inferred emotional state.
+OWN-WORLD: Self-hosted Atkinson Hyperlegible Next; paper, ink and sage; the shared static clay connected-path Recall mark. Eighteen-pixel card corners. Plain counts and dates, no clinical colors, scores or inferred emotional state. Readable defaults replace the removed Text & contrast menu.
 
-STORY: A private-key session opens the actual household’s family view. Persisted call metadata appears in the shelf and per-topic records only when the member has access. The Weekly Note omits all patient share lines. Family members contribute their own attributed account through the real backend.
+FIRST VIEWPORT: The supplied caregiver template and screenshots are the layout authority. Quiet left rail with Recall brand and real family identity; a thin breadcrumb bar; generous heading and Add photos action; two photographic columns and a supporting contribution panel. No placeholder household is installed in a real account. Moments, Places, Connections, Stories and Recall sessions remain separate destinations.
 
-FIRST VIEWPORT: Actual household/member names, underlined Recall sessions and Share a memory navigation, the record’s required context, a closed Weekly Note, then the dated bookshelf when permitted. Empty history is explicit; no default Susan/Maya or sample calls fill the gaps.
+FORM: Desktop photographic cards, large muted map with photograph pins, dotted graph with family initials and circular photo nodes. Curved edges show contributor-named relationships, never inferred patient state. Graph neighborhoods limit visual density while preserving access to all contributed moments. Mobile has a native section picker and one photo column. Upload and detail dialogs protect focused tasks, with Escape, focus return, keyboard controls and reduced motion.
 
-FORM: A 1080px maximum content width, full-width shelf, selected receipt and tinted contribution panel that stack below 800px. Topic details use native disclosures. Previous/next, keyboard, text filters and a noninteractive elapsed-date timeline support shelf browsing.
+INTERACTION: Multi-photo uploads save one attributed memory with optional date, named historical place and a manually chosen pin. Gallery and lightbox show original uploads; a detail drawer offers collection metadata editing and additional original text or audio. Additions use the current backend's contributor, topic and privacy gates. Existing knowledge review stays connected. Family settings contains the existing invitation, contacts and calendar import flows. Recall sessions preserves the waveform bookshelf, mandatory count context, privacy-limited weekly note, export, pause and safety notices. Switching destinations preserves the contribution form draft.
 
-INTERACTION: MemoryForm accepts attributed text with optional private JPEG/PNG or WAV media, including explicitly initiated voice recording. The backend rejects questions and redirects toward direct contact. Saving creates no scheduled call. Exports, pause, reload and sign-out use the actual APIs and authorization. No local suggestion queue or selected-source preview remains mounted.
+BOUNDARIES: The collection and its search, map and connections show only the signed-in contributor's own material. Patient words and other contributors' private accounts never enter it. Collection labels/pins do not rewrite original evidence used in calls. The photo map uses external basemap tiles; the deterministic judged route does not depend on it. No spontaneous family messaging, no per-memory question relaying, no location tracking or automatic identity recognition. Visual integration does not establish clinical, browser-audio or deployment readiness.
 
-BOUNDARIES: SessionSummary excludes personal words and graph claims. Server record windows and minimum-history counts govern the shelf. Safety alerts remain separate fixed-text notices under backend rules. No final browser-audio or deployment-readiness claim follows from this visual documentation.
+REFERENCE AUTHORITY: User-pinned integration, not a generated concept. FORM is corroborated by the supplied Moments, Places and Connections screenshots dated 2026-09-19 and the attached `components/archive` implementation. The user explicitly requested this composition with Recall's established brand book. No generated seed or approved image-generation comp is claimed for this preservation task.
+
+QUALITY BAR: Match the reference's photographic scale, quiet family rail, readable map/photo pins and spaced circular graph nodes. Keep all section destinations functional under real account gates. Essential connections must remain visible; labels and controls cannot collide with the map's attribution. Phone upload and section navigation must work without horizontal overflow or a separate display-settings menu.

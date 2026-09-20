@@ -5,13 +5,29 @@ import { KnowledgeReview } from "./KnowledgeReview";
 import { Plus } from "lucide-react";
 import { api } from "@/client/api";
 import type { ToolOutput } from "@/lib/tools/contracts";
-export function MemoryForm({ member, name, person, onSaved }: { member: string; name: string; person: string; onSaved: () => void }) {
+export function MemoryForm({ member, name, person, onSaved, openRequest = 0, active = true }: { member: string; name: string; person: string; onSaved: () => void; openRequest?: number; active?: boolean }) {
   const [open, setOpen] = useState(false), [who, setWho] = useState(""), [text, setText] = useState(""), [whenWhere, setWhenWhere] = useState("");
+  const whoInput = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!openRequest) return;
+    setOpen(true);
+    const frame = requestAnimationFrame(() => {
+      whoInput.current?.focus({ preventScroll: true });
+      whoInput.current?.closest("aside")?.scrollIntoView({ block: "nearest", behavior: "instant" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [openRequest]);
   const [topics, setTopics] = useState<Array<{ id: string; label: string }>>([]), [topic, setTopic] = useState("");
   useEffect(() => { const controller = new AbortController(); void api<Array<{ id: string; label: string }>>(`/api/family/topics?member=${encodeURIComponent(member)}`, { signal: controller.signal }).then(setTopics).catch(() => undefined); return () => controller.abort(); }, [member]);
   const [attachment, setAttachment] = useState<{ asset_id: string; medium: string } | null>(null), [recording, setRecording] = useState(false);
   const microphone = useRef<Microphone | null>(null);
-  useEffect(() => () => microphone.current?.close(), []);
+  useEffect(() => () => { microphone.current?.close(); microphone.current = null; }, []);
+  useEffect(() => {
+    if (active) return;
+    microphone.current?.close();
+    microphone.current = null;
+    setRecording(false);
+  }, [active]);
   async function upload(bytes: Blob | Uint8Array, type: string) {
     setPending(true); setError("");
     try {
@@ -22,8 +38,20 @@ export function MemoryForm({ member, name, person, onSaved }: { member: string; 
   }
   async function record() {
     setRecording(true);
-    try { const mic = new Microphone(); microphone.current = mic; await mic.open(); setRecording(true); mic.listen((bytes) => { mic.close(); setRecording(false); void upload(bytes, "audio/wav"); }); }
-    catch { microphone.current?.close(); setRecording(false); setError("Microphone access is unavailable. You can type your memory."); }
+    const mic = new Microphone();
+    microphone.current = mic;
+    try {
+      await mic.open();
+      if (microphone.current !== mic) { mic.close(); return; }
+      setRecording(true);
+      mic.listen((bytes) => {
+        if (microphone.current !== mic) return;
+        mic.close(); setRecording(false); void upload(bytes, "audio/wav");
+      });
+    } catch {
+      if (microphone.current !== mic) return;
+      mic.close(); setRecording(false); setError("Microphone access is unavailable. You can type your memory.");
+    }
   }
   function finishRecording() { const bytes = microphone.current?.finish(); microphone.current?.close(); setRecording(false); if (bytes) void upload(bytes, "audio/wav"); }
   const [pending, setPending] = useState(false), [error, setError] = useState(""), [status, setStatus] = useState("");
@@ -41,7 +69,7 @@ export function MemoryForm({ member, name, person, onSaved }: { member: string; 
   return <aside className="care-contribute" id="suggestions"><h2>For your next conversation</h2><p>Share a memory you have with {person}.</p><button className="care-action care-action-primary" aria-expanded={open} disabled={pending || recording} onClick={() => setOpen(!open)}><Plus size={20} aria-hidden="true" />Share a memory</button>
     {open && <form className="care-suggestion-form" onSubmit={save}><p>Contributing as <strong>{name}</strong></p>
       {topics.length > 0 && <label>Conversation topic (optional)<select value={topic} onChange={(e) => setTopic(e.target.value)}><option value="">No topic selected</option>{topics.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}</select></label>}
-      <label>Who was there?<input value={who} onChange={(e) => setWho(e.target.value)} maxLength={200} required /></label>
+      <label>Who was there?<input ref={whoInput} value={who} onChange={(e) => setWho(e.target.value)} maxLength={200} required /></label>
       <label>What do you remember?<textarea value={text} onChange={(e) => setText(e.target.value)} maxLength={2000} rows={5} required /></label>
       <p className="care-caption">Tell it in your own words. This stays your account.</p>
       <label>Add a photo or WAV voice note (optional)<input type="file" accept="image/jpeg,image/png,audio/wav" disabled={pending || recording} onChange={(e) => { const file = e.target.files?.[0]; if (file) void upload(file, /\.wav$/i.test(file.name) ? "audio/wav" : file.type); e.target.value = ""; }} /></label>
