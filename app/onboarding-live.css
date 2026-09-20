@@ -13,7 +13,18 @@
 .live-setup-steps span { display: grid; place-items: center; width: 26px; height: 26px; border: 1px solid currentColor; border-radius: 50%; flex: none; font-size: 16px; text-decoration: none; }
 .live-setup-steps [aria-current="step"] span { background: var(--recall-soft); }
 .live-setup-fields { display: grid; gap: 24px; min-width: 0; }
-.live-setup-fields > label, .live-setup-pair > label { display: grid; gap: 8px; font-size: var(--recall-body-size); font-weight: 500; }
+.live-setup-fields > label, .live-setup-pair > label, .live-setup-phone-country, .live-setup-phone-number { display: grid; gap: 8px; font-size: var(--recall-body-size); font-weight: 500; }
+.live-setup-phone-country > label, .live-setup-phone-number > label { font: inherit; }
+.live-setup-phone { display: grid; gap: 12px; min-width: 0; }
+.live-setup-phone-heading { font-size: var(--recall-body-size); font-weight: 500; }
+.live-setup-phone-controls { display: grid; gap: 12px; min-width: 0; }
+.live-setup-phone-country select { text-overflow: ellipsis; }
+.live-setup-phone-number-row { display: flex; align-items: stretch; min-height: 54px; border: 1.5px solid var(--recall-ink); border-radius: 6px; background: var(--recall-bg); }
+.live-setup-phone-code { display: grid; place-items: center; flex: none; padding: 0 14px; color: var(--recall-muted); border-right: 1px solid var(--recall-line); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.live-setup-phone-number-row input { border: none; min-height: 51px; font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+.live-setup-phone-number-row input:focus-visible { outline: none; }
+.live-setup-phone-number-row:focus-within { outline: 3px solid var(--recall-ink); outline-offset: 3px; }
+.live-setup-phone-number-row:has(input:disabled) { background: var(--recall-tint); border-color: var(--recall-muted); color: var(--recall-muted); }
 .live-setup input:not([type="checkbox"]), .live-setup select, .live-setup textarea { width: 100%; min-width: 0; max-width: 100%; min-height: 54px; padding: 12px; border: 1.5px solid var(--recall-ink); border-radius: 6px; background: var(--recall-bg); color: var(--recall-ink); font: inherit; font-weight: 400; caret-color: var(--recall-ink); }
 .live-setup textarea { resize: vertical; line-height: 1.45; }
 .live-setup input::placeholder, .live-setup textarea::placeholder { color: var(--recall-muted); opacity: 1; }
