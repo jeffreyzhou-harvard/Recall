@@ -1,5 +1,6 @@
 /** Persistent graph for one household. Node's built-in SQLite; never imported by the offline demo. */
 import { DatabaseSync } from "node:sqlite";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { chmodSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { createHash } from "node:crypto";
@@ -34,14 +35,27 @@ export class SqliteGraphStore implements GraphStore {
   }
   private readonly db: DatabaseSync;
   private queue: Promise<unknown> = Promise.resolve();
-  atomic<T>(work: () => Promise<T>): Promise<T> {
-    const next = this.queue.then(async () => {
-      this.db.exec("BEGIN IMMEDIATE");
-      try { const result = await work(); this.db.exec("COMMIT"); return result; }
-      catch (error) { this.db.exec("ROLLBACK"); throw error; }
-    });
+  private transaction = new AsyncLocalStorage<{ active: boolean }>();
+  private enqueue<T>(work: () => T | Promise<T>): Promise<T> {
+    const next = this.queue.then(work);
     this.queue = next.catch(() => undefined);
     return next;
+  }
+  /** Only the transaction's own async chain may use its connection before commit. */
+  private access<T>(work: () => T): Promise<T> {
+    return this.transaction.getStore()?.active ? Promise.resolve().then(work) : this.enqueue(work);
+  }
+  atomic<T>(work: () => Promise<T>): Promise<T> {
+    if (this.transaction.getStore()?.active) return work();
+    return this.enqueue(async () => {
+      this.db.exec("BEGIN IMMEDIATE");
+      const owner = { active: true };
+      try {
+        const result = await this.transaction.run(owner, work);
+        this.db.exec("COMMIT"); return result;
+      } catch (error) { this.db.exec("ROLLBACK"); throw error; }
+      finally { owner.active = false; }
+    });
   }
   constructor(path: string, private readonly household: string, private readonly nativeReads = false) {
     mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
@@ -59,51 +73,49 @@ export class SqliteGraphStore implements GraphStore {
     const row = this.db.prepare("SELECT data FROM graph_edges WHERE household=? AND id=?").get(this.household, id);
     return row ? JSON.parse(String(row.data)) as GraphEdge : null;
   }
-  async getNode(id: string) { return this.node(id); }
-  async getEdge(id: string) { return this.edge(id); }
+  async getNode(id: string) { return this.access(() => this.node(id)); }
+  async getEdge(id: string) { return this.access(() => this.edge(id)); }
   async nodesOfType<T extends NodeType>(type: T): Promise<Array<NodeOf<T>>> {
-    return this.db.prepare("SELECT data FROM graph_nodes WHERE household=? AND type=? ORDER BY id").all(this.household, type).map((r) => JSON.parse(String(r.data)) as NodeOf<T>);
+    return this.access(() => this.db.prepare("SELECT data FROM graph_nodes WHERE household=? AND type=? ORDER BY id").all(this.household, type).map((r) => JSON.parse(String(r.data)) as NodeOf<T>));
   }
   async edgesOf(id: string): Promise<GraphEdge[]> {
-    return this.db.prepare("SELECT data FROM graph_edges WHERE household=? AND (src=? OR dst=?) ORDER BY id").all(this.household, id, id).map((r) => JSON.parse(String(r.data)) as GraphEdge);
+    return this.access(() => this.db.prepare("SELECT data FROM graph_edges WHERE household=? AND (src=? OR dst=?) ORDER BY id").all(this.household, id, id).map((r) => JSON.parse(String(r.data)) as GraphEdge));
   }
   async putNode(node: GraphNode): Promise<void> {
-    this.db.prepare("INSERT INTO graph_nodes VALUES (?,?,?,?)").run(this.household, node.id, node.type, JSON.stringify(node));
+    await this.access(() => { this.db.prepare("INSERT INTO graph_nodes VALUES (?,?,?,?)").run(this.household, node.id, node.type, JSON.stringify(node)); });
   }
   async putEdge(edge: GraphEdge): Promise<void> {
-    if (!this.node(edge.from) || !this.node(edge.to)) throw new Error("The edge references a missing node");
-    this.db.prepare("INSERT INTO graph_edges VALUES (?,?,?,?,?)").run(this.household, edge.id, edge.from, edge.to, JSON.stringify(edge));
+    await this.access(() => {
+      if (!this.node(edge.from) || !this.node(edge.to)) throw new Error("The edge references a missing node");
+      this.db.prepare("INSERT INTO graph_edges VALUES (?,?,?,?,?)").run(this.household, edge.id, edge.from, edge.to, JSON.stringify(edge));
+    });
   }
   async confirm(id: string, confirmation: Confirmation): Promise<Provenance> {
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
+    return this.atomic(async () => {
       const node = this.node(id);
       const target = node ?? this.edge(id);
       if (!target || !this.node(confirmation.source_id)) throw new Error("Confirmation requires a target and a source");
       target.prov = withConfirmation(target.prov, confirmation);
       this.db.prepare(`UPDATE ${node ? "graph_nodes" : "graph_edges"} SET data=? WHERE household=? AND id=?`).run(JSON.stringify(target), this.household, id);
-      this.db.exec("COMMIT");
       return target.prov;
-    } catch (error) { this.db.exec("ROLLBACK"); throw error; }
+    });
   }
   async removeNodesOfType(type: ErasableNodeType): Promise<number> {
     assertErasable(type);
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
+    return this.atomic(async () => {
       const rows = this.db.prepare("SELECT id FROM graph_nodes WHERE household=? AND type=?").all(this.household, type);
       for (const row of rows) {
         this.db.prepare("DELETE FROM graph_edges WHERE household=? AND (src=? OR dst=?)").run(this.household, String(row.id), String(row.id));
         this.db.prepare("DELETE FROM graph_nodes WHERE household=? AND id=?").run(this.household, String(row.id));
       }
-      this.db.exec("COMMIT");
       return rows.length;
-    } catch (error) { this.db.exec("ROLLBACK"); throw error; }
+    });
   }
   async snapshot(): Promise<GraphData> {
-    return {
+    return this.access(() => ({
       nodes: this.db.prepare("SELECT data FROM graph_nodes WHERE household=?").all(this.household).map((r) => JSON.parse(String(r.data)) as GraphNode).sort(byId),
       edges: this.db.prepare("SELECT data FROM graph_edges WHERE household=?").all(this.household).map((r) => JSON.parse(String(r.data)) as GraphEdge).sort(byId),
-    };
+    }));
   }
   /** Seed identities once; add later approved people without overwriting existing evidence. */
   async seed(data: GraphData): Promise<void> {

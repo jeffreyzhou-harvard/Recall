@@ -120,6 +120,38 @@ describe("evidence-bounded speech (rule 6)", () => {
   });
 });
 
+describe("graph cue edges must carry their own evidence", () => {
+  it.each(["inferred", "expired", "revoked", "other_audience", "unpermitted"] as const)("does not use a %s link between independently verified nodes", async (problem) => {
+    const b = await bench();
+    const original = await b.graph.getNode("claim:cape-may-with-maya");
+    if (original?.type !== "EpisodicClaim") throw new Error("missing fixture");
+    const source = await b.graph.getNode(original.prov.source_id);
+    if (source?.type !== "Artifact") throw new Error("missing source");
+    const id = "claim:aaa-waves", sourceId = "artifact:waves", prov = { ...original.prov, source_id: sourceId };
+    await b.graph.putNode({ ...source, id: sourceId, props: { ...source.props, text: "We watched the waves." }, prov });
+    await b.graph.putNode({ ...original, id, props: { text: "We watched the waves." }, prov });
+    for (const [type, from, to] of [["EVIDENCE_FOR", sourceId, id], ["PERMITTED_IN", sourceId, b.setup.current().policy_id], ["SPOKEN_BY", id, "person:susan"], ["ABOUT", id, b.topicId]] as const) {
+      await b.graph.putEdge({ id: `${type}:waves`, type, from, to, props: {}, prov });
+    }
+    const bad = { ...prov };
+    if (problem === "inferred") bad.status = "inferred";
+    if (problem === "expired") bad.expires_at = "2000-01-01T00:00:00.000Z";
+    if (problem === "revoked") { bad.source_class = "family_contribution"; bad.author = "person:revoked"; }
+    if (problem === "other_audience") bad.audience_scope = ["person:someone-else"];
+    if (problem === "unpermitted") bad.source_id = "artifact:unpermitted";
+    await b.graph.putEdge({ id: "ABOUT:unsupported-cue", type: "ABOUT", from: id, to: "person:maya", props: { mention_only: true }, prov: bad });
+    const query = await b.runtime.call("query_context_graph", { topic_id: b.topicId, max_hops: 2, policy_token_id: b.tokenId });
+    const support = await b.runtime.call("verify_claim_support", { topic_id: b.topicId, claim_ids: [b.topicId, ...query.candidates.map((c) => c.root_id), ...query.relations.map((r) => r.edge_id)], policy_token_id: b.tokenId });
+    const verified = support.verified.map((c) => c.claim_id);
+    expect(verified).toContain(id); expect(verified).toContain("person:maya");
+    const machine = b.ctx.machine(); b.ctx.machine = () => ({ ...machine, context: { ...machine.context, rungs_fired: [1, 2] } });
+    b.ctx.knowledgeQuestions = true;
+    const selected = await b.runtime.call("select_scaffold", { topic_id: b.topicId, state: "no_answer", rungs_fired: [1, 2], verified_ids: verified });
+    expect(selected.citations).not.toContain(id);
+    expect(await gateOf(b.runtime.call("render_prompt", { topic_id: b.topicId, scaffold_id: "LADDER-3-KNOWLEDGE", slot_ids: { cue: "person:maya" }, citations: [b.topicId, id, "person:maya"] }))).toBe("evidence");
+  });
+});
+
 describe("the ladder cannot be talked up", () => {
   it("select_scaffold refuses a caller's account of which rungs have fired", async () => {
     const b = await bench();

@@ -1,3 +1,4 @@
+import { contextExclusion } from "@/lib/graph/retrieval";
 /**
  * Tools 5-7: assess one turn, choose the least support, and say only a
  * reviewed line filled with cited facts.
@@ -137,13 +138,18 @@ interface Material {
 }
 
 async function gather(ctx: ToolContext, topicId: string, verifiedIds: readonly string[]): Promise<Material> {
-  const personId = ctx.setup.current().person_id;
+  const policy = ctx.setup.current(), personId = policy.person_id;
+  const edgeAllowed = async (edge: GraphEdge) => await contextExclusion(ctx.graph, {
+    policy_id: policy.policy_id, audience: personId, allowed_sources: policy.allowed_source_classes,
+    approved_authors: [personId, ...policy.approved_people], now_iso: ctx.clock.iso(),
+  }, edge.prov) === null;
   const verified = new Map(ctx.gate.requireVerifiedEvidence(verifiedIds).map((v) => [v.id, v]));
   const topic = await ctx.graph.getNode(topicId);
   if (!topic || !verified.has(topicId)) throw new GateError("evidence", "the topic itself has not been verified");
 
   const material: Material = { topic, personId, verified, claims: [], place: topic.type === "Place" ? topic : null, relations: [], photos: [] };
   for (const edge of await ctx.graph.edgesOf(topicId)) {
+    if (!await edgeAllowed(edge)) continue;
     const otherId = edge.from === topicId ? edge.to : edge.from;
     if (!verified.has(otherId)) continue;
     const other = await ctx.graph.getNode(otherId);
@@ -152,7 +158,7 @@ async function gather(ctx: ToolContext, topicId: string, verifiedIds: readonly s
       const about: GraphNode[] = [];
       let mentionsOnly = false;
       for (const e of await ctx.graph.edgesOf(other.id)) {
-        if (e.type !== "ABOUT" || e.from !== other.id || e.to === topicId || !verified.has(e.to)) continue;
+        if (e.type !== "ABOUT" || e.from !== other.id || e.to === topicId || !verified.has(e.to) || !await edgeAllowed(e)) continue;
         const n = await ctx.graph.getNode(e.to);
         if (n) { about.push(n); if (e.props.mention_only === true) mentionsOnly = true; }
       }
@@ -369,6 +375,15 @@ export const render_prompt: ToolImpl<"render_prompt"> = async (input, ctx) => {
     if (!hers && author !== speaker) throw new GateError("evidence", `${id} is ${speaker}'s account, so it can only be said attributed to them`);
     if (hers && author !== null) throw new GateError("evidence", `${id} is her own account; it cannot be attributed to ${author}`);
     if (!hers && containsPhrase(line.text, "you told me")) throw new GateError("evidence", `"You told me" is said only of her own words; ${id} is ${speaker}'s`);
+  }
+  // A verified person/place and a verified account do not by themselves prove that she mentioned
+  // that entity in this memory. Recheck the actual connecting edges, including for direct tool calls.
+  if (line.id === ctx.script.ladder.knowledge_association?.id || line.id === ctx.script.ladder.knowledge_place_association?.id) {
+    const cueId = input.slot_ids.cue ?? input.slot_ids.place;
+    const material = await gather(ctx, input.topic_id, input.citations);
+    if (!material.claims.some((c) => isHers(material, c.claim) && c.about.some((n) => n.id === cueId))) {
+      throw new GateError("evidence", "the cited account does not support this cue for this topic");
+    }
   }
   if (author !== null && !endsInOpenQuestion(line.text)) throw new GateError("evidence", "a family-sourced cue ends in an open question, never a yes/no one (rule 13)");
 

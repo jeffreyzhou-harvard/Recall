@@ -124,6 +124,19 @@ describe("source-backed incremental graph updates", () => {
     expect(await r.graph.snapshot()).toEqual(before);
   });
 
+  it.each(["conflict", "identity_collision"] as const)("discards a model proposal when a %s arrives during extraction", async (change) => {
+    const r = await rig(); await markSeed(r);
+    const imported = await importKnowledge(r, draft("Maya visited Boston.")), claimId = `claim:${imported.topics[0]!.id}`;
+    const extractor: GraphExtractor = { name: "concurrent-update", extract: async () => {
+      if (change === "conflict") await r.graph.putEdge({ id: "conflict:during-model", type: "CONTRADICTS", from: claimId, to: "claim:maya-remembers-cape-may", props: {}, prov: (await r.graph.getNode(claimId))!.prov });
+      else { const maya = (await r.graph.getNode("person:maya"))!; await r.graph.putNode({ ...maya, id: "person:another-maya" }); }
+      return { entities: [{ key: "m", type: "Person", name: "Maya", start: 0, end: 4 }, { key: "b", type: "Place", name: "Boston", start: 13, end: 19 }], relations: [] };
+    } };
+    expect((await new KnowledgeUpdater(r.graph, () => r.setup.current(), extractor, r.refreshSetup, r.clock).process()).processed).toBe(0);
+    expect(await r.graph.getNode(updateId(claimId))).toBeNull();
+    expect((await r.graph.nodesOfType("Place")).some((n) => n.label === "Boston")).toBe(false);
+  });
+
   it("never enriches a patient claim without a committed contribution", async () => {
     const r = await rig(); await markSeed(r);
     const input = draft(), imported = await importKnowledge(r, input);
@@ -193,5 +206,57 @@ describe("graph-driven question planning and native reads", () => {
     const body: Extraction = { entities: [{ key: "m", type: "Person", name: "Maya", start: 0, end: 4 }], relations: [] };
     const fetcher: MuseFetch = async (_url, init) => { expect(JSON.parse(init.body as string).response_format.json_schema.name).toBe("graph_episode"); return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: JSON.stringify(body) } }] }), text: async () => "" }; };
     expect(await new MuseGraphExtractor(new MuseSpark("test", fetcher)).extract({ claim_id: "claim:test", source_id: "artifact:test", author: "person:susan", text: "Maya", known: [] })).toEqual(body);
+  });
+});
+
+describe("live graph transaction isolation", () => {
+  it("does not enlist an unrelated write in a graph update that rolls back", async () => {
+    const r = await rig();
+    const source = (await r.graph.getNode("person:maya"))!;
+    let entered!: () => void, release!: () => void;
+    const ready = new Promise<void>((resolve) => { entered = resolve; });
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    const transaction = r.graph.atomic(async () => {
+      await r.graph.putNode({ ...source, id: "person:rollback" });
+      entered(); await held;
+      throw new Error("update failed");
+    });
+    const rejected = expect(transaction).rejects.toThrow("update failed");
+    await ready;
+    const independent = r.graph.putNode({ ...source, id: "person:independent" });
+    release();
+    await rejected; await independent;
+    expect(await r.graph.getNode("person:rollback")).toBeNull();
+    expect(await r.graph.getNode("person:independent")).not.toBeNull();
+  });
+
+  it("keeps readers on committed data and allows confirmation inside the owning transaction", async () => {
+    const r = await rig(), source = (await r.graph.getNode("person:maya"))!;
+    let entered!: () => void, release!: () => void;
+    const ready = new Promise<void>((resolve) => { entered = resolve; });
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    const transaction = r.graph.atomic(async () => {
+      await r.graph.putNode({ ...source, id: "person:transient" });
+      await r.graph.confirm("person:transient", { by: "person:susan", role: "participant", at: r.clock.iso(), stance: "confirms", source_id: "artifact:setup-record" });
+      expect((await r.graph.getNode("person:transient"))?.prov.patient_confirmed).toBe(true);
+      entered(); await held; throw new Error("cancelled");
+    });
+    const rejected = expect(transaction).rejects.toThrow("cancelled");
+    await ready;
+    const read = r.graph.getNode("person:transient");
+    release(); await rejected;
+    expect(await read).toBeNull();
+  });
+
+  it("queues confirmations behind an active graph transaction", async () => {
+    const r = await rig();
+    let entered!: () => void, release!: () => void;
+    const ready = new Promise<void>((resolve) => { entered = resolve; });
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    const transaction = r.graph.atomic(async () => { entered(); await held; });
+    await ready;
+    const confirmation = r.graph.confirm("person:maya", { by: "person:susan", role: "participant", at: r.clock.iso(), stance: "confirms", source_id: "artifact:setup-record" });
+    const result = expect(confirmation).resolves.toMatchObject({ patient_confirmed: true });
+    release(); await transaction; await result;
   });
 });
