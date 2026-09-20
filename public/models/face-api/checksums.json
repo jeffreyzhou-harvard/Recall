@@ -1,0 +1,8 @@
+{
+  "ssd_mobilenetv1_model.bin": "2835640602d53718aa6ae9a42896327eaa21beefed056c218d32ca7d79e1e2f8",
+  "ssd_mobilenetv1_model-weights_manifest.json": "888f744dffbc84f5f060d1f8427d9742341943a2dfaaf9205d10029b7e7a2955",
+  "face_landmark_68_model.bin": "4611ef65c87d836d03d684b30eec4d195d8b219fa1dd58fc58945831c6b9299b",
+  "face_landmark_68_model-weights_manifest.json": "ca4886639f86e99b39fed0c155f81b63317225773bd9616716e887b0153389c9",
+  "face_recognition_model.bin": "b413e420d6840b2775fba32008db6f3cddb07d485967fb42cfcf379c16a8c589",
+  "face_recognition_model-weights_manifest.json": "cbaffa501b0b9275a12b63357a6843e7e30c054e1c9151e1a5f879b26e32986b"
+}

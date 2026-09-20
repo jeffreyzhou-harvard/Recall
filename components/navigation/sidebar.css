@@ -1,0 +1,38 @@
+.sidebar-toggle { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 36px; height: 44px; border: 0; border-radius: 7px; background: transparent; color: inherit; cursor: pointer; }
+.sidebar-toggle:hover { background: var(--recall-soft, #dfe4d4); }
+.sidebar-resizer { position: absolute; top: 0; bottom: 0; right: -5px; width: 10px; z-index: 35; cursor: col-resize; touch-action: none; }
+.sidebar-resizer::after { content: ""; position: absolute; inset: 0 4px; background: transparent; }
+.sidebar-resizer:hover::after, .sidebar-resizer:focus-visible::after, [data-sidebar-resizing="true"] .sidebar-resizer::after { background: var(--recall-focus, #3c5944); }
+.sidebar-resizer:focus-visible { outline: 2px solid var(--recall-focus, #3c5944); outline-offset: -2px; }
+[data-sidebar-resizing="true"], [data-sidebar-resizing="true"] * { cursor: col-resize !important; user-select: none !important; }
+@media (min-width: 761px) {
+  .circle-app[data-sidebar-collapsed], .care-portal-layout[data-sidebar-collapsed] { grid-template-columns: var(--sidebar-size) minmax(0, 1fr); }
+  .circle-rail-header, .care-rail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 4px; }
+  .circle-rail-header .circle-brand { padding-left: 0; padding-right: 0; }
+  .care-rail-header .care-rail-brand { padding-inline: 0; }
+  .care-rail-header .recall-wordmark { font-size: 27px; gap: 8px; }
+  .care-rail-header .recall-brand-mark { width: 26px; height: 26px; }
+  .circle-app[data-sidebar-collapsed="true"] .circle-rail, .care-portal-layout[data-sidebar-collapsed="true"] .care-portal-rail { padding-inline: 12px; }
+  [data-sidebar-collapsed="true"] .sidebar-resizer { display: none; }
+  [data-sidebar-collapsed="true"] .circle-rail-header, [data-sidebar-collapsed="true"] .care-rail-header { flex-direction: column; align-items: center; gap: 12px; margin-bottom: 22px; }
+  [data-sidebar-collapsed="true"] .circle-rail-header .circle-brand, [data-sidebar-collapsed="true"] .care-rail-brand .recall-wordmark { font-size: 0 !important; gap: 0; padding: 0; }
+  [data-sidebar-collapsed="true"] .circle-brand > span,
+  [data-sidebar-collapsed="true"] .circle-family-badge,
+  [data-sidebar-collapsed="true"] .circle-nav-label,
+  [data-sidebar-collapsed="true"] .circle-rail-note,
+  [data-sidebar-collapsed="true"] .circle-rail nav a > span,
+  [data-sidebar-collapsed="true"] .circle-rail nav a > small,
+  [data-sidebar-collapsed="true"] .circle-family-button > span,
+  [data-sidebar-collapsed="true"] .circle-family-button > svg:last-child,
+  [data-sidebar-collapsed="true"] .circle-user > div,
+  [data-sidebar-collapsed="true"] .circle-user > i,
+  [data-sidebar-collapsed="true"] .care-family-identity,
+  [data-sidebar-collapsed="true"] .care-rail-account { display: none; }
+  [data-sidebar-collapsed="true"] .circle-rail nav a, [data-sidebar-collapsed="true"] .circle-family-button { justify-content: center; padding-inline: 0; }
+  [data-sidebar-collapsed="true"] .circle-user { justify-content: center; padding-inline: 0; }
+  .care-portal-layout[data-sidebar-collapsed="true"] .care-portal-rail .care-portal-nav a { font-size: 0; gap: 0; justify-content: center; padding-inline: 0; }
+  .care-portal-rail > .sidebar-resizer { right: 0; width: 8px; }
+}
+@media (max-width: 760px) {
+  .sidebar-toggle, .sidebar-resizer, .circle-rail-header { display: none; }
+}

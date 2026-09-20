@@ -45,6 +45,8 @@ Node 22.13+. No keys, no database, and no network are needed for any of the abov
 
 Photos retain their originals and available capture dates/GPS. OpenAI optionally groups and describes them and transcribes recordings for review. Email/password, single-use invitation links and existing access keys work for sign-in. Family invitations and explicitly opted-in photo reminders use Linq; copyable links work without messaging. Set the optional variables in `.env.example`. See [the collection guide](docs/PHOTO_FIRST_DEMO.md) and [its authorized scope](docs/PHOTO_FIRST_SCOPE.md).
 
+The sidebar can be resized or collapsed and remembers its setting. **People** (`/caregiver#people`) groups similar faces when you choose **Find people**, using self-hosted open-source models in your browser, with no API key. Family members name and correct the suggestions. See [People and model limitations](docs/PEOPLE.md).
+
 ## How it fits together
 
 Recall places a scheduled recall call to her, climbs a five-rung support ladder, captures her exact words, and stores them only after she hears the line played back and says yes. A second question asks whether to share that line with family. Family never trigger a same-moment call, and Recall never answers them from the graph.

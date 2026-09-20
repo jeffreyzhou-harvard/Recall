@@ -1591,7 +1591,7 @@
   }
   .circle-rail nav {
     display: flex;
-    flex: 3;
+    flex: 4;
     gap: 4px;
   }
   .circle-rail nav a {

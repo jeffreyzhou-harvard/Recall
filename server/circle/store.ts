@@ -3,6 +3,7 @@ import { mkdirSync, chmodSync } from "node:fs";
 import path from "node:path";
 import { dataDirectory } from "../data-directory";
 import type { Moment, Photo, Story } from "@/lib/archive/types";
+import type { FaceIndex } from "@/lib/people/types";
 export type CirclePhoto = Photo & {
   hash: string;
   latitude: number | null;
@@ -19,6 +20,7 @@ export type CircleMoment = Moment & {
   evidence: string[];
 };
 export type CircleState = {
+  faceIndex?: FaceIndex;
   photos: CirclePhoto[];
   moments: CircleMoment[];
   stories: (Story & { owner: string; requestId: string })[];

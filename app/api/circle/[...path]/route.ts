@@ -23,6 +23,7 @@ import { uploadPhotos, reanalyze, mediaFolder } from "@/server/circle/photos";
 import { publicBase, sendText } from "@/server/circle/messages";
 import { transcribeAudio } from "@/server/circle/ai";
 import { discardAudio, expireAudioDrafts } from "@/server/circle/audio";
+import { editPeople, faceThumbnail, getPeople, saveFaceScan } from "@/server/circle/people";
 import { sameOrigin, sessionCookie, browserPrincipal } from "@/server/session";
 import { getOnboarding, newInvitationToken } from "@/server/onboarding";
 import { accountForMember, issueAccount, revokeAccount } from "@/server/accounts";
@@ -247,6 +248,15 @@ async function handle(request: Request, context: Context): Promise<Response> {
     }
     const identity = await circleIdentity(request),
       { household, person, people, canManage } = identity;
+    if (["people", "face-scan", "face"].includes(action)) {
+      if (person.role === "participant") throw new CircleError("Open People from a family contributor account.", 403);
+      if (action === "face" && !isPost) return new Response(await faceThumbnail(household, parts[1] || ""), { headers: { "Content-Type": "image/jpeg", "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } });
+      if (action === "people" && !isPost) return reply(getPeople(household));
+      if (isPost && action !== "face") {
+        limit("people:" + person.person_id, 200, 3600_000);
+        return reply(action === "face-scan" ? saveFaceScan(household, body) : editPeople(household, person.person_id, canManage, body));
+      }
+    }
     if (["state", "audio", "media", "story"].includes(action)) await expireAudioDrafts(household);
     if (action === "state" && !isPost) {
       const state = readCircle(household);

@@ -17,12 +17,14 @@ import { StoryRecorder } from "./StoryRecorder";
 import { dateLabel, post, type CircleView } from "./types";
 export function MomentPanel({
   id,
+  initialPhotoId,
   data,
   onClose,
   onChanged,
   onFamily,
 }: {
   id: string;
+  initialPhotoId?: string;
   data: CircleView;
   onClose: () => void;
   onChanged: () => Promise<void>;
@@ -33,7 +35,7 @@ export function MomentPanel({
       .map((id) => data.photos.find((p) => p.id === id))
       .filter((p) => !!p),
     stories = data.stories.filter((s) => s.eventId === id);
-  const [index, setIndex] = useState(0),
+  const [index, setIndex] = useState(() => Math.max(0, photos.findIndex(p => p.id === initialPhotoId))),
     [lightbox, setLightbox] = useState(false),
     [editing, setEditing] = useState(false),
     [title, setTitle] = useState(m.title),

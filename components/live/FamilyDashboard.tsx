@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowUpRight, AudioLines, BookOpen, ChevronDown, Images, LockKeyhole, MapPin, Network, Plus, Settings } from "lucide-react";
+import { ArrowUpRight, AudioLines, BookOpen, ChevronDown, Images, LockKeyhole, MapPin, Network, Plus, Settings, UsersRound } from "lucide-react";
 import { api, ApiError } from "@/client/api";
 import type { ToolOutput } from "@/lib/tools/contracts";
 import type { RecallService } from "@/lib/service/recall-service";
@@ -12,6 +12,7 @@ import { SignOut } from "./AccessGate";
 import { MemoryForm } from "./MemoryForm";
 import { FamilyArchive, type ArchiveSection } from "@/components/archive/FamilyArchive";
 import { RecallWordmark } from "@/components/recall/RecallFrame";
+import { SidebarResizeHandle, SidebarToggle, useResizableSidebar } from "@/components/navigation/ResizableSidebar";
 import { RecordPrintout } from "@/components/recall/RecordPrintout";
 import { SessionBookshelf } from "@/components/recall/SessionBookshelf";
 
@@ -28,6 +29,7 @@ type Section = ArchiveSection | "sessions";
 type FamilyMember = { person_id: string; display_name: string; role: string; removed_at?: string | null };
 
 export function FamilyDashboard({ initialSection = "moments" }: { initialSection?: Section }) {
+  const sidebar = useResizableSidebar();
   const { session, member, setMember } = useLive();
   const [people, setPeople] = useState<FamilyMember[]>([]);
   const [loaded, setLoaded] = useState<{ member: string; data: Dashboard } | null>(null);
@@ -140,25 +142,30 @@ export function FamilyDashboard({ initialSection = "moments" }: { initialSection
   }, [printJob]);
 
   return <>
-    <div className="care-portal-layout">
+    <div className="care-portal-layout" {...sidebar.layoutProps}>
     <a className="care-skip-link" href="#caregiver-content">Skip to content</a>
-    <aside className="care-portal-rail">
+    <aside className="care-portal-rail" id="conversation-sidebar">
+      <div className="care-rail-header">
       <Link href="/" className="care-rail-brand" aria-label="Recall home"><RecallWordmark /></Link>
+      <SidebarToggle sidebar={sidebar} controls="conversation-sidebar" />
+      </div>
       <div className="care-family-identity">
         <span className="care-family-initial" aria-hidden="true">{data?.info.person_name.trim().slice(0, 1) || <Images size={18} />}</span>
         <strong>{data ? `${data.info.person_name}’s family` : "Your family"}</strong>
       </div>
-      <label className="care-mobile-navigation"><span className="archive-viz-sr">Caregiver section</span><select value={section} onChange={(event) => { if (event.target.value === "collection") window.location.assign("/caregiver"); else if (event.target.value === "settings") window.location.assign("/onboarding/manage"); else navigate(event.target.value as Section); }}><option value="collection">Photo collection</option>{([ ["moments", "Moments"], ["places", "Places"], ["connections", "Connections"], ["stories", "Stories"], ["sessions", "Recall sessions"] ] as const).map(([value, label]) => <option value={value} key={value}>{label}</option>)}{canManage && <option value="settings">Family settings</option>}</select></label>
+      <label className="care-mobile-navigation"><span className="archive-viz-sr">Caregiver section</span><select value={section} onChange={(event) => { if (event.target.value === "collection") window.location.assign("/caregiver"); else if (event.target.value === "people") window.location.assign("/caregiver#people"); else if (event.target.value === "settings") window.location.assign("/onboarding/manage"); else navigate(event.target.value as Section); }}><option value="collection">Photo collection</option><option value="people">People</option>{([ ["moments", "Moments"], ["places", "Places"], ["connections", "Connections"], ["stories", "Stories"], ["sessions", "Recall sessions"] ] as const).map(([value, label]) => <option value={value} key={value}>{label}</option>)}{canManage && <option value="settings">Family settings</option>}</select></label>
       <nav className="care-portal-nav" aria-label="Caregiver sections">
-        <Link href="/caregiver"><Images size={22} aria-hidden="true" />Photo collection</Link>
-        {([{ id: "moments", label: "Moments", icon: Images }, { id: "places", label: "Places", icon: MapPin }, { id: "connections", label: "Connections", icon: Network }, { id: "stories", label: "Stories", icon: AudioLines }] as const).map((item) => <a key={item.id} href={`#${item.id}`} aria-current={section === item.id ? "page" : undefined} onClick={(event) => { event.preventDefault(); navigate(item.id); }}><item.icon size={22} aria-hidden="true" />{item.label}</a>)}
-        <a href="#sessions" aria-current={section === "sessions" ? "page" : undefined} onClick={(event) => { event.preventDefault(); navigate("sessions"); }}><BookOpen size={22} aria-hidden="true" />Recall sessions</a>
-        {canManage && <Link href="/onboarding/manage"><Settings size={22} aria-hidden="true" />Family settings</Link>}
+        <Link href="/caregiver" title="Photo collection" aria-label="Photo collection"><Images size={22} aria-hidden="true" />Photo collection</Link>
+        <Link href="/caregiver#people" title="People" aria-label="People"><UsersRound size={22} aria-hidden="true" />People</Link>
+        {([{ id: "moments", label: "Moments", icon: Images }, { id: "places", label: "Places", icon: MapPin }, { id: "connections", label: "Connections", icon: Network }, { id: "stories", label: "Stories", icon: AudioLines }] as const).map((item) => <a key={item.id} href={`#${item.id}`} title={item.label} aria-label={item.label} aria-current={section === item.id ? "page" : undefined} onClick={(event) => { event.preventDefault(); navigate(item.id); }}><item.icon size={22} aria-hidden="true" />{item.label}</a>)}
+        <a href="#sessions" title="Recall sessions" aria-label="Recall sessions" aria-current={section === "sessions" ? "page" : undefined} onClick={(event) => { event.preventDefault(); navigate("sessions"); }}><BookOpen size={22} aria-hidden="true" />Recall sessions</a>
+        {canManage && <Link href="/onboarding/manage" title="Family settings" aria-label="Family settings"><Settings size={22} aria-hidden="true" />Family settings</Link>}
       </nav>
       <div className="care-rail-account">
         {operator && people.length > 1 ? <label className="care-member-choice">Family view<select value={member} onChange={(e) => setMember(e.target.value)}>{people.map((person) => <option key={person.person_id} value={person.person_id}>{person.display_name}</option>)}</select></label> : data && <p>{data.info.member_name}’s account</p>}
         <details><summary>Account options</summary><div><button className="care-text-action" disabled={loading || !member} onClick={refresh}>{loading ? "Reloading…" : "Reload"}</button><Link className="care-text-action" href="/">Home</Link><SignOut /></div></details>
       </div>
+      <SidebarResizeHandle sidebar={sidebar} controls="conversation-sidebar" />
     </aside>
 
     <div className="care-portal-workspace">

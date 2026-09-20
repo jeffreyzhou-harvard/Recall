@@ -16,12 +16,15 @@ import {
   ShieldCheck,
   Sparkles,
   Users,
+  UsersRound,
   X,
 } from "lucide-react";
 import { MemoryGraph } from "@/components/archive/MemoryGraph";
 import { PhotoUpload } from "./PhotoUpload";
 import { FamilyPanel } from "./FamilyPanel";
 import { MomentPanel } from "./MomentPanel";
+import { PeoplePanel } from "./PeoplePanel";
+import { SidebarResizeHandle, SidebarToggle, useResizableSidebar } from "@/components/navigation/ResizableSidebar";
 import { dateLabel, type CircleView } from "./types";
 import "./circle.css";
 const MemoryMap = dynamic(
@@ -35,7 +38,7 @@ const MemoryMap = dynamic(
     ),
   },
 );
-type Section = "moments" | "places" | "connections";
+type Section = "moments" | "people" | "places" | "connections";
 export function CircleApp() {
   const [data, setData] = useState<CircleView | null>(null),
     [error, setError] = useState(""),
@@ -44,8 +47,10 @@ export function CircleApp() {
     [filter, setFilter] = useState<"all" | "stories">("all"),
     [modal, setModal] = useState<"upload" | "sample" | "family" | null>(null),
     [momentId, setMomentId] = useState<string | null>(null),
+    [photoId, setPhotoId] = useState<string | undefined>(),
     [toast, setToast] = useState("");
   const reduced = useReducedMotion();
+  const sidebar = useResizableSidebar();
   const heading = useRef<HTMLHeadingElement>(null);
   const refresh = useCallback(async () => {
     const r = await fetch("/api/circle/state", { cache: "no-store" });
@@ -70,7 +75,7 @@ export function CircleApp() {
   useEffect(() => {
     const update = () => {
       const h = location.hash.slice(1);
-      if (["moments", "places", "connections"].includes(h))
+      if (["moments", "people", "places", "connections"].includes(h))
         setSection(h as Section);
       else if (!h) setSection("moments");
     };
@@ -110,15 +115,17 @@ export function CircleApp() {
         (filter === "all" || data.stories.some((s) => s.eventId === m.id)),
     ) || [];
   const openMoment = (id: string) => {
+    setPhotoId(undefined);
     setMomentId(id);
     setModal(null);
   };
   return (
-    <div className="circle-app">
+    <div className="circle-app" {...sidebar.layoutProps}>
       <a href="#circle-main" className="care-skip-link">
         Skip to your collection
       </a>
-      <aside className="circle-rail">
+      <aside className="circle-rail" id="collection-sidebar">
+        <div className="circle-rail-header">
         <Link
           className="circle-brand"
           aria-label="Recall home"
@@ -127,6 +134,8 @@ export function CircleApp() {
           <Flower2 />
           recall<span>·</span>
         </Link>
+        <SidebarToggle sidebar={sidebar} controls="collection-sidebar" />
+        </div>
         <div className="circle-family-badge">
           <span className="circle-family-symbol">
             {data?.personName[0] || "R"}
@@ -144,6 +153,7 @@ export function CircleApp() {
           {(
             [
               { id: "moments", name: "Moments", Icon: Images },
+              { id: "people", name: "People", Icon: UsersRound },
               { id: "places", name: "Places", Icon: MapPin },
               { id: "connections", name: "Connections", Icon: Network },
             ] as const
@@ -151,6 +161,8 @@ export function CircleApp() {
             <a
               key={id}
               href={`#${id}`}
+              aria-label={name}
+              title={name}
               aria-current={section === id ? "page" : undefined}
               onClick={(event) => {
                 if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -180,9 +192,9 @@ export function CircleApp() {
           <span>Make room for the stories.</span>
         </div>
         <div className="circle-rail-bottom">
-          <button onClick={() => setModal("family")}>
+          <button className="circle-family-button" aria-label="Your family" title="Your family" onClick={() => setModal("family")}>
             <Users size={19} />
-            Your family
+            <span>Your family</span>
             <Plus size={16} />
           </button>
           <div className="circle-user">
@@ -194,6 +206,7 @@ export function CircleApp() {
             <i />
           </div>
         </div>
+        <SidebarResizeHandle sidebar={sidebar} controls="collection-sidebar" />
       </aside>
       <div className="circle-workspace">
         <header className="circle-topbar">
@@ -243,16 +256,18 @@ export function CircleApp() {
             <>
               <header className="circle-heading">
                 <div>
-                  <p className="circle-eyebrow">
+                  {section !== "people" && <p className="circle-eyebrow">
                     {section === "moments"
                       ? "THE LITTLE THINGS, KEPT CLOSE"
                       : section === "places"
                         ? "A LIFE HAS A GEOGRAPHY"
                         : "EVERY STORY BRINGS US CLOSER"}
-                  </p>
+                  </p>}
                   <h1 ref={heading} tabIndex={-1}>
                     {section === "moments"
                       ? "A life, in moments."
+                      : section === "people"
+                        ? "The people in your photographs."
                       : section === "places"
                         ? "The places that stay."
                         : "Everything is connected."}
@@ -260,6 +275,8 @@ export function CircleApp() {
                   <p>
                     {section === "moments"
                       ? "You bring the photos. We find the moments."
+                      : section === "people"
+                        ? "Familiar faces, gathered together."
                       : section === "places"
                         ? "A familiar place. A hundred stories waiting."
                         : "People, places, and all the little things in between."}
@@ -273,7 +290,10 @@ export function CircleApp() {
                   Add photos
                 </button>
               </header>
-              {data.moments.length === 0 ? (
+              {section === "people" ? <PeoplePanel data={data} onOpenPhoto={id => {
+                const moment = data.moments.find(m => m.photoIds.includes(id));
+                if (moment) { openMoment(moment.id); setPhotoId(id); }
+              }} /> : data.moments.length === 0 ? (
                 <section className="circle-first-moment">
                   <div className="circle-empty-collage" aria-hidden="true">
                     {[
@@ -641,6 +661,7 @@ export function CircleApp() {
           <MomentPanel
             key={momentId}
             id={momentId}
+            initialPhotoId={photoId}
             data={data}
             onClose={() => setMomentId(null)}
             onChanged={refresh}
