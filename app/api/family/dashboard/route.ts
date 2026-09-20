@@ -3,6 +3,8 @@
  * the per-topic record if their detail level includes it, and - for a designated caregiver only - any
  * safety alert. Nothing here is pushed; it exists when it is opened (AGENTS.md rule 5). LIVE ONLY.
  */
+import { activeHousehold } from "@/server/active-household";
+import { getOnboarding } from "@/server/onboarding";
 import { guard, liveRecall, familyResponse } from "../shared";
 
 export const runtime = "nodejs";
@@ -20,7 +22,10 @@ export async function GET(request: Request): Promise<Response> {
   const designated = recall.setup.current().safety.designated_caregivers.some((c) => c.person_id === member);
   const info = await recall.service.dashboardInfo(member);
   if (!info) return Response.json({ error: "Your access is no longer approved." }, { status: 403 });
+  const household = activeHousehold();
+  const canPause = household ? (await getOnboarding().people(household)).some((p) => p.person_id === member && p.role === "caregiver" && !p.removed_at) : false;
   return Response.json({
+    can_pause: canPause, calls_paused: recall.setup.current().calls_paused,
     info,
     weekly_note: await recall.service.weeklyNote(member),
     topic_record: await recall.service.topicRecord(member),

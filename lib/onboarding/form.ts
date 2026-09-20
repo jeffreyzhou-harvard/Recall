@@ -21,6 +21,7 @@ export function setupFromPreferences(input: Preferences, identity: { household: 
   return policySchema.parse({
     ...previous,
     policy_id: `policy:${household}`, version: 2, description: "Joint setup", person_id: participant,
+    call_transport: "web",
     established_by: [participant, caregiver], established_at: at, recall_set_up_by: caregiver,
     approved_people: previous?.approved_people ?? [caregiver], approved_audiences: [participant],
     timezone: p.timezone, call_windows: [{ days: p.days, start: p.start, end: p.end }],

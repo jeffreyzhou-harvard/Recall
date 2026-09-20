@@ -122,7 +122,10 @@ export const place_recall_call: ToolImpl<"place_recall_call"> = async (input, ct
   // The topic is the one the ranking chose - not one a caller, a model, or a family member would like.
   if (!topic || topic.topic_id !== input.topic_id) throw new GateError("policy", "a call is placed only for the topic get_next_recall_topic chose");
 
-  const earlier = (await ctx.graph.nodesOfType("Session")).map((s) => s.props.started_at);
+  const recorded = await ctx.graph.nodesOfType("Session");
+  const attempts = ctx.callAttempts?.() ?? [];
+  const attempted = new Set(attempts.map((a) => a.session_id));
+  const earlier = [...recorded.filter((s) => !attempted.has(s.id)).map((s) => s.props.started_at), ...attempts.map((a) => a.at)];
   const decision = evaluateCallPolicy(policy, { person_id: input.person_id, topic_id: input.topic_id, topic_type: topic.topic_type, now_iso: input.window.now, earlier_call_starts: earlier });
   if (decision.decision === "denied") return decision;
 

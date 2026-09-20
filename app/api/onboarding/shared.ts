@@ -18,7 +18,7 @@ const STATUS: Record<OnboardingErrorCode, number> = { not_found: 404, not_a_memb
 /** Runs one onboarding action and turns a refusal into its status code. Anything else is a real fault. */
 export async function respond(work: () => Promise<unknown>, created = false): Promise<Response> {
   try {
-    return Response.json(await work(), { status: created ? 201 : 200 });
+    return Response.json(await work(), { status: created ? 201 : 200, headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     if (e instanceof OnboardingError) return Response.json({ error: e.code, detail: e.message }, { status: STATUS[e.code] });
     throw e;

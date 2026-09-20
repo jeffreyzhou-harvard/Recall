@@ -10,7 +10,7 @@ import { useLive } from "./LiveProvider";
 import { SignOut } from "./AccessGate";
 import { MemoryForm } from "./MemoryForm";
 import { SessionWaveform } from "@/components/recall/SessionWaveform";
-type Dashboard = { info: NonNullable<Awaited<ReturnType<RecallService["dashboardInfo"]>>>; weekly_note: ToolOutput<"build_weekly_note">; topic_record: ToolOutput<"get_topic_record">; safety_alerts: SafetyAlert[] };
+type Dashboard = { can_pause: boolean; calls_paused: boolean; info: NonNullable<Awaited<ReturnType<RecallService["dashboardInfo"]>>>; weekly_note: ToolOutput<"build_weekly_note">; topic_record: ToolOutput<"get_topic_record">; safety_alerts: SafetyAlert[] };
 export function FamilyDashboard() {
   const { session, member, setMember } = useLive();
   const [draftMember, setDraftMember] = useState(member), [data, setData] = useState<Dashboard | null>(null), [error, setError] = useState("");
@@ -40,6 +40,7 @@ export function FamilyDashboard() {
     {loading && <p role="status">Loading your family view…</p>}
     {error && <div role="alert" className="setup-error"><p>{error}</p>{session?.principal?.role === "operator" && <Link href="/onboarding">Open joint setup</Link>}</div>}
     {data && <>
+      {data.can_pause && <button className="care-text-action" disabled={data.calls_paused || loading} onClick={() => { void api("/api/family/pause", { method: "POST" }).then(refresh).catch(() => setError("Calls could not be paused. Please reload.")); }}>{data.calls_paused ? "Calls are paused" : "Pause Recall calls"}</button>}
       <header className="care-page-heading"><div><h1>{data.info.person_name}, this week.</h1><p>A little context for your next conversation.</p></div><p className="care-dateline"><span>{data.info.member_name}’s family view</span></p></header>
       <nav className="care-nav" aria-label="Caregiver sections"><a href="#topic-record">Recall sessions</a><a href="#suggestions">Share a memory</a>{session?.principal?.role === "operator" && <Link href="/onboarding">Setup</Link>}</nav>
       {data.safety_alerts.map((alert) => <section key={alert.alert_id} className="care-overview"><p>{alert.text}</p></section>)}
@@ -54,7 +55,7 @@ export function FamilyDashboard() {
         </>}
       </section>}
       {(!showRecord || data.topic_record.status !== "ok") && <MemoryForm member={member} name={data.info.member_name} person={data.info.person_name} onSaved={refresh} />}
-      {data.info.contributions.length > 0 && <section className="care-saved-suggestions"><h2>Your contributions</h2><ul>{data.info.contributions.map((item, i) => <li key={i}><p>{item.text}</p><p className="care-caption">{data.info.member_name}’s account · {item.at.slice(0, 10)}</p></li>)}</ul></section>}
+      {data.info.contributions.length > 0 && <section className="care-saved-suggestions"><h2>Your contributions</h2><ul>{data.info.contributions.map((item, i) => <li key={i}><p>{item.text}</p>{item.media && (item.media.kind === "photo" ? <img src={`/api/family/media?member=${encodeURIComponent(member)}&asset=${encodeURIComponent(item.media.asset_id)}`} alt="Your contributed photo" loading="lazy" style={{ maxWidth: "100%", maxHeight: 280, objectFit: "contain" }} /> : <audio controls preload="none" aria-label="Your original voice note" src={`/api/family/media?member=${encodeURIComponent(member)}&asset=${encodeURIComponent(item.media.asset_id)}`} />)}<p className="care-caption">{data.info.member_name}’s account · {item.at.slice(0, 10)}</p></li>)}</ul></section>}
       <p className="care-privacy"><LockKeyhole size={18} aria-hidden="true" /><span>Private memories and unshared words stay out of this view.</span></p>
     </>}
   </>;

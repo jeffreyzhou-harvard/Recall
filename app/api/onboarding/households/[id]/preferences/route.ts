@@ -18,6 +18,6 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if ((previous?.version ?? 0) !== parsed.data.expected_version) throw new OnboardingError("already_exists", "Setup changed in another window. Reload before saving.");
     if (previous && previous.document.safety.emergency_number !== parsed.data.emergency_number) throw new OnboardingError("invalid", "Use the existing emergency number. Safety changes require the full joint setup review.");
     const doc = setupFromPreferences(parsed.data, { household: id, participant: participant.person_id, caregiver: caregiver.person_id }, new Date().toISOString(), previous?.document);
-    return onboarding.recordJointSetup(id, doc, [participant.person_id, caregiver.person_id], caregiver.person_id);
+    return onboarding.recordJointSetup(id, doc, [participant.person_id, caregiver.person_id], caregiver.person_id, null, parsed.data.expected_version);
   });
 }

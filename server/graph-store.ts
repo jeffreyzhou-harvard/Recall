@@ -86,5 +86,7 @@ export class SqliteGraphStore implements GraphStore {
       for (const edge of data.edges) if (!this.edge(edge.id)) this.db.prepare("INSERT INTO graph_edges VALUES (?,?,?,?,?)").run(this.household, edge.id, edge.from, edge.to, JSON.stringify(edge));
     });
   }
+  /** Private media uses this connection so audio receipts and graph claims commit together. */
+  mediaDatabase(): DatabaseSync { return this.db; }
   close(): void { this.db.close(); }
 }

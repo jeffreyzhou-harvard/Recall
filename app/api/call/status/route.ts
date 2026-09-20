@@ -1,5 +1,11 @@
-/** Public capability only. No household identity, graph data, or call initiation is exposed. */
+import { patientCall } from "@/server/patient";
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export async function GET(): Promise<Response> {
-  return Response.json({ status: "unavailable", message: "There is no call to answer right now." }, { headers: { "Cache-Control": "no-store" } });
+export async function GET(request: Request) {
+  try {
+    const live = await patientCall(request);
+    if (!live) return Response.json({ status: "unavailable", message: "Sign in to receive your Recall call.", command: null }, { headers: { "Cache-Control": "no-store" } });
+    const call = live.currentCall();
+    return Response.json({ status: call ? "active" : "waiting", message: call ? "Recall is here." : "There is no call to answer right now.", command: call?.command ?? null, topic: call?.topicLabel ?? null, display_name: live.setup.current().attestations.saved_contact_name }, { headers: { "Cache-Control": "no-store" } });
+  } catch { return Response.json({ error: "Recall is unavailable right now." }, { status: 503 }); }
 }

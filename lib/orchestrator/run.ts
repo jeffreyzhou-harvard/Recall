@@ -32,7 +32,7 @@ export interface RunEnv {
   runtime: ToolRuntime;
   store: StoreApi<RecallStore>;
   /** Called exactly once, and only after the policy has granted the call: no grant, no call. */
-  callDriver: (() => CallDriver) | null;
+  callDriver: ((topicLabel?: string) => CallDriver) | null;
 }
 
 export interface RunResult {
@@ -148,7 +148,7 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
     const invitation = await runtime.call("render_prompt", { topic_id: topicId, scaffold_id: opening.scaffold_id, slot_ids: opening.slot_ids, citations: opening.citations });
 
     if (!env.callDriver) throw new Error("the policy granted the call but this deployment has no way to place one");
-    driver = env.callDriver();
+    driver = env.callDriver(topic.label);
     openLine.attach(driver);
     try {
       await driver.connect();
@@ -183,7 +183,10 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
       // A turn is never let through unchecked, and a match is never dropped: each safety tool gets a second try,
       // and whatever the alert tool does, the flow is dropped and she hears the safety line (rule 15).
       const safety = await twice(() => runtime.call("check_safety_phrases", { audio_window: window }));
-      if (safety.category === null) return window;
+      if (safety.category === null) {
+        if (driver!.stopped) throw new CallUnavailableError("The call ended.");
+        return window;
+      }
       let alertFailure: unknown = null;
       await twice(() => runtime.call("send_safety_alert", { category: safety.category!, caregiver_ids: ctx.setup.current().safety.designated_caregivers.map((c) => c.person_id) }), true).catch((e: unknown) => void (alertFailure = e));
       dispatch({ type: "SAFETY_MATCHED", category: safety.category });
@@ -310,6 +313,7 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
       }
       if (!machine().context.share_resolved) dispatch({ type: "SHARE_CONFIRMATION_RECORDED", confirmation_id: share.share_confirmation_id, decision: share.decision, contribution_hash: share.contribution_hash });
 
+      if (driver.stopped || ctx.setup.current().calls_paused) { await stop(); break; }
       const committed = await runtime.call("confirm_and_store", { step: "commit", contribution_hash: captured.content_hash, policy_token_id: tokenId });
       if (committed.step !== "commit") throw new Error("unreachable");
       dispatch({ type: "CONTRIBUTION_STORED", claim_id: committed.claim_id, contribution_hash: committed.contribution_hash, shared: committed.shared });
@@ -319,7 +323,7 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
     if (ended()) {
       // The run already ended safely (for instance the call length ran out mid-step). Nothing more to decide.
       if (!(e instanceof GateError) && !(e instanceof ToolTimeoutError) && !isDropped(e) && !(e instanceof Error && e.name === "InvalidTransitionError")) throw e;
-    } else if (isDropped(e)) {
+    } else if (isDropped(e) || driver?.stopped) {
       // She hung up. That is a stop like any other: nothing is stored beyond metadata, and nobody calls back.
       dispatch({ type: "STOP", how: "hang_up" }, false);
     } else if (e instanceof GateError) {
@@ -342,7 +346,7 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
         await speakIfThere(fixed.close_kind);
         // The agreed call length may have run out while the question was being restated; the run has then already ended kindly.
         if (!ended()) dispatch({ type: "CALL_CLOSED" }, false);
-      } else if (inCall && connected && machine().state === "no_answer_today") {
+      } else if (inCall && connected && ["no_answer_today", "not_stored"].includes(machine().state)) {
         await speakIfThere(fixed.close_kind); // the call length ran out at the same moment: still a kind close
       }
     } else throw e;
@@ -384,6 +388,7 @@ async function finish(env: RunEnv, hangUp: (() => Promise<void>) | null, attempt
       ctx.session.contribution = null;
       ctx.session.store_confirmation = null;
       ctx.session.share_confirmation = null;
+      ctx.session.share_audio_window = null;
       ctx.session.unconfirmed_audio_discarded = true;
     }
     runtime.forgetHerWords();

@@ -2,7 +2,7 @@
 import { useState, type ReactNode, type FormEvent } from "react";
 import { api } from "@/client/api";
 import { useLive } from "./LiveProvider";
-export function AccessGate({ children, operator = false }: { children: ReactNode; operator?: boolean }) {
+export function AccessGate({ children, operator = false, patient = false }: { children: ReactNode; operator?: boolean; patient?: boolean }) {
   const { session, refreshSession, sessionError } = useLive();
   const [key, setKey] = useState(""), [error, setError] = useState(""), [pending, setPending] = useState(false);
   async function signIn(local = false) {
@@ -12,10 +12,10 @@ export function AccessGate({ children, operator = false }: { children: ReactNode
     finally { setPending(false); }
   }
   if (!session) return <section className="care-overview" aria-live="polite"><p>{sessionError || "Opening Recall…"}</p>{sessionError && <button className="care-action" onClick={() => void refreshSession()}>Reload</button>}</section>;
-  if (session.principal && (!operator || session.principal.role === "operator")) return children;
+  if (session.principal && (patient ? session.principal.role === "patient" : operator ? session.principal.role === "operator" : session.principal.role !== "patient")) return children;
   return <section className="care-overview">
-    <h1>{operator ? "Open joint setup" : "Open your family view"}</h1>
-    <p>{operator ? "An operator access key is needed to record the choices you agree together." : "Use the access key provided for your approved family account."}</p>
+    <h1>{patient ? "Open your Recall calls" : operator ? "Open joint setup" : "Open your family view"}</h1>
+    <p>{patient ? "Use the call access key your caregiver set up with you." : operator ? "An operator access key is needed to record the choices you agree together." : "Use the access key provided for your approved family account."}</p>
     <form className="care-suggestion-form" onSubmit={(e: FormEvent) => { e.preventDefault(); void signIn(); }}>
       <label>Access key<input type="password" autoComplete="current-password" value={key} onChange={(e) => setKey(e.target.value)} maxLength={512} required /></label>
       <button className="care-action care-action-primary" disabled={pending}>{pending ? "Opening…" : "Open Recall"}</button>

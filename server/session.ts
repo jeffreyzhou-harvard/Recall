@@ -1,6 +1,7 @@
 /** Short-lived signed browser sessions. Credentials remain on the server and are rechecked on every request. */
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-export type Principal = { role: "operator"; member_id: null } | { role: "family"; member_id: string };
+import { accountForKey, accountForMember } from "./accounts";
+export type Principal = { role: "operator"; member_id: null } | { role: "family" | "patient"; member_id: string };
 export const SESSION_COOKIE = "recall_session";
 const lifetime = 8 * 60 * 60;
 const local = globalThis as typeof globalThis & { __recallLocalKey?: string };
@@ -32,12 +33,13 @@ export function principalForKey(key: string): Principal | null {
   if (!c || !key) return null;
   if (equal(key, c.operator)) return { role: "operator", member_id: null };
   for (const [id, secret] of Object.entries(c.members)) if (equal(key, secret)) return { role: "family", member_id: id };
-  return null;
+  const account = accountForKey(key);
+  return account ? { role: account.role, member_id: account.member_id } : null;
 }
 function signingKey(principal: Principal, request: Request): string | undefined {
   const c = credentials();
   if (!c) return;
-  return principal.role === "operator" ? c.operator || (localSetupAvailable(request) ? localKey() : undefined) : Object.hasOwn(c.members, principal.member_id) ? c.members[principal.member_id] : undefined;
+  return principal.role === "operator" ? c.operator || (localSetupAvailable(request) ? localKey() : undefined) : principal.role === "family" && Object.hasOwn(c.members, principal.member_id) ? c.members[principal.member_id] : (() => { const a = accountForMember(principal.member_id); return a?.role === principal.role ? a.verifier : undefined; })();
 }
 export function sessionCookie(principal: Principal, request: Request): string {
   const key = signingKey(principal, request);
@@ -54,7 +56,7 @@ export function browserPrincipal(request: Request): Principal | null {
     const [payload, signature, extra] = value.split(".");
     if (!payload || !signature || extra) return null;
     const data = JSON.parse(Buffer.from(payload, "base64url").toString());
-    if ((data.role !== "operator" && data.role !== "family") || (data.role === "family" && typeof data.member_id !== "string") || (data.role === "operator" && data.member_id !== null) || !Number.isFinite(data.exp) || data.exp <= Date.now() / 1000 || data.exp > Date.now() / 1000 + lifetime) return null;
+    if ((data.role !== "operator" && data.role !== "family" && data.role !== "patient") || (data.role !== "operator" && typeof data.member_id !== "string") || (data.role === "operator" && data.member_id !== null) || !Number.isFinite(data.exp) || data.exp <= Date.now() / 1000 || data.exp > Date.now() / 1000 + lifetime) return null;
     const principal = { role: data.role, member_id: data.member_id } as Principal;
     const key = signingKey(principal, request);
     return key && equal(signature, createHmac("sha256", key).update(payload).digest("base64url")) ? principal : null;

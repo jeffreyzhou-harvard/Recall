@@ -206,9 +206,10 @@ describe("a tool does not respond", () => {
   });
 
   it("at the commit: nothing is stored", async () => {
-    const r = await run([...RECALLED, ["her", HER_LINE], ["playback"], ["recall", SAID.storeQuestion], ["her", "Yes."], ["recall", SAID.shareQuestion], ["her", "Yes."]], { faults: [{ tool: "confirm_and_store", on_call: 2, kind: "timeout" }] });
+    const r = await run([...RECALLED, ["her", HER_LINE], ["playback"], ["recall", SAID.storeQuestion], ["her", "Yes."], ["recall", SAID.shareQuestion], ["her", "Yes."], ["recall", SAID.closeKind]], { faults: [{ tool: "confirm_and_store", on_call: 2, kind: "timeout" }] });
     expect(r.recording.final_state).toBe("not_stored");
     expect(await newClaims(r)).toEqual([]);
+    expect(spokenText(r).at(-1)).toBe(SAID.closeKind);
   });
 });
 

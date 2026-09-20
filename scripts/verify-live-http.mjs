@@ -15,7 +15,7 @@ const base = `http://localhost:${port}`;
 const operator = randomBytes(32).toString("hex"), family = randomBytes(32).toString("hex");
 let child, logs = "";
 async function start(member) {
-  child = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "-p", String(port)], { env: { ...process.env, NODE_ENV: "production", RECALL_DATA_DIR: dir, RECALL_ONBOARDING_DB: join(dir, "onboarding.db"), RECALL_HOUSEHOLD: "", RECALL_POLICY_FILE: "", RECALL_CALL: "none", RECALL_OPERATOR_SECRET: operator, RECALL_FAMILY_SECRET: "", RECALL_FAMILY_CREDENTIALS: JSON.stringify(member ? { [member]: family } : {}), MUSE_API_KEY: "" }, stdio: ["ignore", "pipe", "pipe"] });
+  child = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "-p", String(port)], { env: { ...process.env, NODE_ENV: "production", RECALL_DATA_DIR: dir, RECALL_ONBOARDING_DB: join(dir, "onboarding.db"), RECALL_HOUSEHOLD: "", RECALL_POLICY_FILE: "", RECALL_CALL: "none", RECALL_SCHEDULER: "0", DEEPGRAM_API_KEY: "", RECALL_SAFETY_WEBHOOKS: "{}", RECALL_OPERATOR_SECRET: operator, RECALL_FAMILY_SECRET: "", RECALL_FAMILY_CREDENTIALS: JSON.stringify(member ? { [member]: family } : {}), MUSE_API_KEY: "" }, stdio: ["ignore", "pipe", "pipe"] });
   child.stdout.on("data", (chunk) => { logs += chunk; }); child.stderr.on("data", (chunk) => { logs += chunk; });
   for (let i = 0; i < 100; i++) {
     if (child.exitCode !== null) throw new Error("Test server exited unexpectedly");
@@ -31,7 +31,7 @@ async function request(path, body, headers = { "x-recall-operator": operator }) 
 async function json(response, expected = 200) { const text = await response.text(); assert.equal(response.status, expected, text); return JSON.parse(text); }
 try {
   await start();
-  for (const path of ["/", "/caregiver", "/onboarding", "/revisit"]) assert.equal((await fetch(base + path)).status, 200);
+  for (const path of ["/", "/caregiver", "/onboarding", "/revisit", "/join", "/onboarding/manage"]) assert.equal((await fetch(base + path)).status, 200);
   assert.equal((await json(await request("/api/call/status"))).status, "unavailable");
   assert.equal((await request("/api/family/dashboard?member=unknown", undefined, {})).status, 403);
   const made = await json(await request("/api/onboarding/households", { participant: { display_name: "HTTP test participant", phone: "+16095550123" }, caregiver: { display_name: "HTTP test caregiver" } }), 201);
@@ -57,12 +57,39 @@ try {
   assert.equal(csrf.status, 403);
   const exported = await request("/api/family/export", { member }, { cookie });
   assert.equal(exported.status, 200); assert.doesNotMatch(await exported.text(), /tulips|Susan|Maya/);
+  const invitation = await json(await request(`/api/onboarding/households/${hid}/invitations`, { display_name: "Invited relative", role: "family", invited_by: member }), 201);
+  const joined = await json(await request("/api/onboarding/invitations/accept", { token: invitation.token }, {}), 201);
+  assert.equal((await request("/api/onboarding/invitations/accept", { token: invitation.token }, {})).status, 404);
+  const relativeLogin = await request("/api/session", { key: joined.key }, {});
+  assert.equal(relativeLogin.status, 200); const relativeCookie = relativeLogin.headers.get("set-cookie").split(";")[0];
+  assert.equal((await request(`/api/family/dashboard?member=${joined.person_id}`, undefined, { cookie: relativeCookie })).status, 403);
+  const topic = await json(await request("/api/onboarding/topics", { contributor_id: member, label: "planting tulips", story: "We planted tulips together." }), 201);
+  const choices = { expected_version: saved.version, patient_agreed: true, caregiver_agreed: true, members: [{ id: member, approved: true, detail: "weekly_note_and_record" }, { id: joined.person_id, approved: true, detail: "weekly_note" }], topics: [topic.id], web_calls_enabled: false, alert_channel: "dashboard" };
+  await json(await request(`/api/onboarding/households/${hid}/choices`, choices));
+  assert.equal((await request(`/api/onboarding/households/${hid}/choices`, choices)).status, 409);
+  assert.equal((await request(`/api/family/dashboard?member=${joined.person_id}`, undefined, { cookie: relativeCookie })).status, 200);
+  assert.equal((await request("/api/family/pause", {}, { cookie: relativeCookie })).status, 403);
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jhfcAAAAASUVORK5CYII=", "base64");
+  const uploaded = await json(await fetch(base + `/api/family/media?member=${joined.person_id}`, { method: "POST", headers: { cookie: relativeCookie, origin: base, "Content-Type": "image/png" }, body: png }));
+  await json(await request("/api/family/memory", { member: joined.person_id, who: "Our family", what_happened: "We planted daffodils.", asset_id: uploaded.asset_id, about_topic_id: topic.id }, { cookie: relativeCookie }));
+  const own = await json(await request(`/api/family/dashboard?member=${joined.person_id}`, undefined, { cookie: relativeCookie }));
+  assert.equal(own.info.contributions[0].media.kind, "photo");
+  const photoPath = `/api/family/media?member=${joined.person_id}&asset=${uploaded.asset_id}`;
+  assert.equal((await request(photoPath, undefined, { cookie: relativeCookie })).status, 200);
+  assert.equal((await request(photoPath, undefined, { cookie })).status, 403);
+  assert.equal((await request(`/api/family/media?member=${member}&asset=${uploaded.asset_id}`, undefined, { cookie })).status, 404);
+  const patientKey = await json(await request(`/api/onboarding/households/${hid}/accounts`, { member_id: made.participant_id }));
+  const patientLogin = await request("/api/session", { key: patientKey.key }, {});
+  assert.equal(patientLogin.status, 200); const patientCookie = patientLogin.headers.get("set-cookie").split(";")[0];
+  assert.equal((await request(`/api/family/dashboard?member=${member}`, undefined, { cookie: patientCookie })).status, 403);
+  assert.equal((await request("/api/call/action?action=ack", {}, { cookie })).status, 403);
+  assert.equal((await json(await request("/api/call/status", undefined, { cookie: patientCookie }))).status, "waiting");
   const current = await json(await request(`/api/onboarding/households/${hid}`));
-  const doc = current.setup.document; doc.dashboard.grants[0].revoked_at = new Date().toISOString();
+  const doc = current.setup.document; doc.dashboard.grants = doc.dashboard.grants.map((g) => g.member_id === member && !g.revoked_at ? { ...g, revoked_at: new Date().toISOString() } : g);
   await json(await request(`/api/onboarding/households/${hid}/setup`, { kind: "tightening", document: doc, by: member }), 201);
   dashboard = await json(await request(`/api/family/dashboard?member=${member}`, undefined, { cookie }));
   assert.equal(dashboard.weekly_note.status, "no_access"); assert.equal(dashboard.topic_record.status, "no_access");
   assert.equal((await request("/api/family/export", { member }, { cookie })).status, 403);
-  console.log("Live HTTP verification passed: setup, consent, persistence across restart, sessions, member isolation, CSRF, export and revocation.");
+  console.log("Live HTTP verification passed: setup, consent, persistence across restart, sessions, member isolation, CSRF, export, invitations, topic approval, patient isolation and revocation.");
 } catch (error) { console.error(error); process.exitCode = 1; }
 finally { await stop(); rmSync(dir, { recursive: true, force: true }); }

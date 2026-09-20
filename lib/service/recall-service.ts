@@ -37,6 +37,10 @@ import { createRecallStore } from "@/lib/state/store";
 import { GateKeeper, TOOL_IMPLS, ToolRuntime, newSession, type FamilyToolContext, type Fault, type ScaffoldAdvisor, type SetupStore, type ToolContext, type ToolInput, type ToolName, type ToolOutput } from "@/lib/tools";
 
 export interface RecallDeps {
+  isCallStopped?: () => boolean;
+  callAttempts?: () => Array<{ session_id: string; at: string }>;
+  onContributionCommitted?: (ctx: ToolContext) => Promise<void>;
+  onCallSession?: (sessionId: string) => void;
   graph: GraphStore;
   /** The live joint setup. Read fresh at every call and every dashboard load, so a revocation is in force before the next one. */
   setup: SetupStore;
@@ -49,7 +53,7 @@ export interface RecallDeps {
   safetyPhrases: SafetyPhrases;
   alerts: AlertChannel;
   /** Places the call once the policy has granted it. Never invoked before that. Null means this deployment cannot call. */
-  callDriver: (() => CallDriver) | null;
+  callDriver: ((topicLabel?: string) => CallDriver) | null;
   /** Reads facts out of an answer. It only proposes: applyAnswer decides what is grounded enough to keep. */
   answerInterpreter?: AnswerInterpreter;
   /** Live only (Muse Spark). May pick WHICH cue where the retrieval layer has no preference; see select_scaffold. */
@@ -97,9 +101,12 @@ export class RecallService {
    */
   async runScheduledCall(sessionId: string): Promise<SessionRun | null> {
     const { deps } = this;
+    deps.onCallSession?.(sessionId);
     const store = createRecallStore();
     const personId = deps.setup.current().person_id;
     const ctx: ToolContext = {
+      isCallStopped: deps.isCallStopped,
+      callAttempts: deps.callAttempts,
       graph: deps.graph,
       setup: deps.setup,
       assets: deps.assets,
@@ -115,6 +122,7 @@ export class RecallService {
       machine: () => store.getState().machine,
       scaffoldAdvisor: deps.scaffoldAdvisor,
     };
+    if (deps.onContributionCommitted) ctx.onContributionCommitted = () => deps.onContributionCommitted!(ctx);
     const runtime = new ToolRuntime({ clock: deps.clock, call: ctx }, TOOL_IMPLS, deps.runtime ?? {});
     const startedAt = deps.clock.iso();
     const { machine, receipt } = await runRecallCall({ person_id: personId, ctx, runtime, store, callDriver: deps.callDriver });

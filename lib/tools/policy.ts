@@ -34,6 +34,8 @@ export const policySchema = z
     version: z.literal(2),
     description: z.string(),
     person_id: z.string().min(1),
+    /** Web calls use the saved web-call name and introduction; no telephone contact is required. */
+    call_transport: z.enum(["phone", "web"]).optional(),
     established_by: z.array(z.string().min(1)).min(1),
     established_at: iso,
     /** The family member named in the first line of every call, and in the identity line (rule 16). */
@@ -150,9 +152,9 @@ const HOUR_MS = 3_600_000;
 export function attestationsMissing(policy: AccessPolicy): string[] {
   const a = policy.attestations;
   const missing: string[] = [];
-  if (!a.number_saved_in_her_phone) missing.push("the number is not saved in her phone");
+  if (policy.call_transport !== "web" && !a.number_saved_in_her_phone) missing.push("the number is not saved in her phone");
   if (a.saved_contact_name.trim() === "") missing.push("the saved contact has no family-chosen name");
-  if (!a.saved_contact_photo) missing.push("the saved contact has no family-chosen photo");
+  if (policy.call_transport !== "web" && !a.saved_contact_photo) missing.push("the saved contact has no family-chosen photo");
   if (!a.recall_introduced_to_her || a.introduced_by === null) missing.push("no family member has introduced Recall to her");
   else if (!policy.approved_people.includes(a.introduced_by) && !policy.formerly_approved.includes(a.introduced_by)) missing.push("Recall was introduced by someone who is not an approved person");
   return missing;

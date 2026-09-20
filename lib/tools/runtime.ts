@@ -170,12 +170,19 @@ export class ToolRuntime {
 
       const impl = this.impls[tool] as ToolImpl<T>;
       const context = this.contextForExecution(tool);
-      const execute = () => impl(input.data as ToolParsedInput<T>, context);
+      const execute = async () => {
+        if (commit && call?.isCallStopped?.()) throw new GateError("confirmation", "the call was stopped");
+        const result = await impl(input.data as ToolParsedInput<T>, context);
+        if (commit) await call?.onContributionCommitted?.();
+        if (commit && call?.isCallStopped?.()) { call.session.stored = null; throw new GateError("confirmation", "the call was stopped"); }
+        return result;
+      };
       const call = !isFamilyTool(tool) ? context as ToolContext : null;
       const commit = tool === "confirm_and_store" && (input.data as { step: string }).step === "commit";
-      const raw = call?.graph.atomic && (commit || tool === "record_retrieval_outcome")
-        ? await call.graph.atomic(execute)
-        : await execute();
+      let raw;
+      try {
+        raw = call?.graph.atomic && (commit || tool === "record_retrieval_outcome") ? await call.graph.atomic(execute) : await execute();
+      } catch (error) { if (commit && call) call.session.stored = null; throw error; }
 
       const output = contracts[tool].output.safeParse(raw);
       if (!output.success) throw new ToolContractError(tool, "output", output.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
