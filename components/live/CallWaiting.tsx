@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Phone, PhoneOff } from "lucide-react";
 import { RecallFrame, RecallHeader } from "@/components/recall/RecallFrame";
 import { api } from "@/client/api";
@@ -74,6 +75,7 @@ function WebCallView() {
     <div className="recall-call-actions">
     {incoming && <button className="recall-button recall-primary" onClick={() => void answer()} disabled={answering}><Phone aria-hidden="true" />{answering ? "Opening microphone…" : "Answer call"}</button>}
     {active && <button className="recall-button recall-secondary" onClick={() => void stop()}><PhoneOff aria-hidden="true" />End call</button>}
+    {!active && <Link className="recall-button recall-secondary" href="/revisit">Back to photographs</Link>}
     </div>
     {!active && <p>You can put your device down.</p>}{error && <p role="alert">{error}</p>}
   </section>;

@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode } from "react";
+import Link from "next/link";
 import { useLive } from "@/components/live/LiveProvider";
 
 export function RecallFrame({ children, family = false }: { children: ReactNode; family?: boolean }) {
@@ -14,7 +15,7 @@ export function RecallWordmark() {
 
 export function RecallHeader({ family = false, compact = false }: { family?: boolean; compact?: boolean }) {
   return <>
-    <header className={`recall-masthead${compact ? " recall-masthead-compact" : ""}`}><RecallWordmark /></header>
+    <header className={`recall-masthead${compact ? " recall-masthead-compact" : ""}`}><Link href="/" className="recall-home-link" aria-label="Recall home"><RecallWordmark /></Link></header>
     {!compact && <div className="recall-familiar">{family ? "Your family view" : "Familiar conversations, in your own words"}</div>}
   </>;
 }

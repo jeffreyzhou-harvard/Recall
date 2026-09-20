@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { RecallFrame, RecallHeader } from "@/components/recall/RecallFrame";
-import { accountDestination, SessionLoading } from "./AccessGate";
+import { accountDestination, SessionLoading, SignOut } from "./AccessGate";
 import { useLive } from "./LiveProvider";
 import "@/app/welcome.css";
 import "@/components/circle/circle.css";
@@ -25,7 +25,7 @@ export function WelcomeLayout({
         <main className="recall-welcome-main" id="main-content">
           {back && (
             <Link className="recall-welcome-back" href="/">
-              Back
+              Back to home
             </Link>
           )}
           {children}
@@ -58,6 +58,7 @@ export function ContinueToAccount() {
 
 export function Welcome() {
   const { session, refreshSession } = useLive();
+  const router = useRouter();
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   async function demo() {
@@ -66,10 +67,12 @@ export function Welcome() {
     try {
       await post("demo", {});
       await refreshSession();
+      router.push("/caregiver");
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "Could not open the sample family.",
       );
+    } finally {
       setBusy(false);
     }
   }
@@ -79,21 +82,18 @@ export function Welcome() {
         <SessionLoading />
       </WelcomeLayout>
     );
-  if (session.principal)
-    return (
-      <WelcomeLayout>
-        <ContinueToAccount />
-      </WelcomeLayout>
-    );
+  const role = session.principal?.role;
+  const destination = role ? accountDestination(role) : null;
+  const returnLabel = role === "patient" ? "Your photographs" : role === "operator" ? "Joint setup" : "Your collection";
   return (
     <main className="circle-landing">
       <header>
-        <Link className="circle-entry-brand" href="/">
+        <Link className="circle-entry-brand" href="/" aria-label="Recall home">
           <Flower2 />
           recall<span>·</span>
         </Link>
-        <Link className="circle-button secondary" href="/sign-in">
-          Sign in
+        <Link className="circle-button secondary" href={destination || "/sign-in"}>
+          {destination ? returnLabel : "Sign in"}
           <ArrowRight size={16} />
         </Link>
       </header>
@@ -110,11 +110,12 @@ export function Welcome() {
             Add your family’s photographs. Recall gathers them into moments, so
             the stories behind them have a place to live.
           </p>
-          <Link href="/onboarding" className="circle-button primary">
-            Start your family
+          <Link href={destination || "/onboarding"} className="circle-button primary">
+            {destination ? `Open ${returnLabel.toLowerCase()}` : "Start your family"}
             <ArrowRight size={19} />
           </Link>
-          {process.env.NODE_ENV === "development" && (
+          {destination && <div className="circle-home-account"><SignOut /></div>}
+          {!destination && process.env.NODE_ENV === "development" && (
             <button
               className="circle-text-button"
               onClick={() => void demo()}
