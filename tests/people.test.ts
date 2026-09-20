@@ -8,10 +8,13 @@ import { GET, POST } from "@/app/api/circle/[...path]/route";
 import { getOnboarding } from "@/server/onboarding";
 import { issueAccount, revokeAccount } from "@/server/accounts";
 import { sessionCookie } from "@/server/session";
-import { readCircle } from "@/server/circle/store";
+import { readCircle, updateCircle, emptyCircle } from "@/server/circle/store";
 import { uploadPhotos } from "@/server/circle/photos";
 import { editPeople, getPeople, saveFaceScan } from "@/server/circle/people";
 import { FACE_MODEL, type FaceDetection } from "@/lib/people/types";
+import kit from "@/fixtures/sample-family.json";
+import { samplePeopleView } from "@/server/circle/sample-people";
+import { removeCollectionItems } from "@/server/circle/delete";
 
 let root: string, household: string, owner: string, cookie: string, patientCookie: string, photoIds: string[];
 const context = (action: string) => ({ params: Promise.resolve({ path: action.split("/") }) });
@@ -59,6 +62,56 @@ afterEach(() => {
 });
 
 describe("private People photo grouping", () => {
+  it("replaces old sample detections with four stable groups and private face crops", async () => {
+    const old = saveFaceScan(household, batch([[face(1)], [face(2)], [face(3)], [face(4)]]));
+    const files = ["acadia-01.jpg", "birthday-02.jpg", "beach-02.jpg"];
+    updateCircle(household, state => {
+      state.demo = true;
+      files.forEach((file, i) => { state.photos[i]!.hash = kit.find(photo => photo.file === file)!.sha256; state.photos[i]!.name = `Renamed ${i}.jpg`; });
+    });
+    const before = readCircle(household);
+    const response = await get("people"), view = await response.json();
+    expect(response.status).toBe(200);
+    expect(view.groups.map((group: any) => group.name)).toEqual(["Grandmother", "Mother", "Daughter 1", "Daughter 2"]);
+    expect(view.groups.map((group: any) => group.photoIds.length)).toEqual([3, 2, 1, 1]);
+    expect(view.groups.flatMap((group: any) => group.photoIds)).not.toContain(photoIds[3]);
+    for (const group of view.groups) {
+      const crop = await get(`face/${group.faces[0].id}`);
+      expect(crop.status).toBe(200);
+      expect(await sharp(Buffer.from(await crop.arrayBuffer())).metadata()).toMatchObject({ width: 240, height: 240 });
+    }
+    expect((await get(`face/${old.groups[0]!.faces[0]!.id}`)).status).toBe(404);
+    expect(saveFaceScan(household, batch([[face(5), face(6)]], old.generation))).toEqual(view);
+    expect((await post("people", { action: "separate", faceId: view.groups[0].faces[0].id, revision: view.revision })).status).toBe(409);
+    expect(readCircle(household)).toEqual(before);
+  });
+
+  it("shows only uploaded sample people and removes their last photo without stale groups", async () => {
+    updateCircle(household, state => { state.demo = true; });
+    expect(getPeople(household).groups).toEqual([]);
+    const hash = kit.find(photo => photo.file === "birthday-02.jpg")!.sha256;
+    updateCircle(household, state => { state.photos[0]!.hash = hash; });
+    const view = getPeople(household);
+    expect(view.groups.map(group => group.name)).toEqual(["Grandmother", "Daughter 1"]);
+    const thumb = view.groups[0]!.faces[0]!.id;
+    updateCircle(household, state => { removeCollectionItems(state, new Set([photoIds[0]!]), new Set()); });
+    expect(getPeople(household).groups).toEqual([]);
+    expect((await get(`face/${thumb}`)).status).toBe(404);
+  });
+
+  it("maps the whole fictional kit to four groups, independently of upload order", () => {
+    const template = readCircle(household).photos[0]!;
+    const state = { ...emptyCircle(), demo: true, photos: kit.map(photo => ({ ...template, id: randomUUID(), hash: photo.sha256, name: photo.file })) };
+    const view = samplePeopleView(state);
+    expect(view.groups.map(group => [group.name, group.photoIds.length])).toEqual([["Grandmother", 12], ["Mother", 11], ["Daughter 1", 2], ["Daughter 2", 3]]);
+    expect(samplePeopleView({ ...state, photos: [...state.photos].reverse() }).groups).toEqual(view.groups);
+    for (const group of view.groups) for (const face of group.faces) {
+      expect(face.box.x).toBeGreaterThanOrEqual(0); expect(face.box.y).toBeGreaterThanOrEqual(0);
+      expect(face.box.x + face.box.width).toBeLessThanOrEqual(1); expect(face.box.y + face.box.height).toBeLessThanOrEqual(1);
+    }
+    updateCircle(household, circle => { circle.photos = state.photos; });
+    expect(getPeople(household).groups).toEqual([]); // Regular families still use their own face scans.
+  });
   it("adds similar faces across photos without changing photos, stories or graph identities", async () => {
     const before = readCircle(household);
     const remote = vi.fn(); vi.stubGlobal("fetch", remote);

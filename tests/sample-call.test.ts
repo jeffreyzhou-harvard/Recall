@@ -203,6 +203,22 @@ describe("paired local caregiver and patient demos", () => {
     expect((await getOnboarding().currentSetup(b.household))!.document.calls_paused).toBe(false);
     expect(activeHousehold()).toBeUndefined();
   });
+  it("keeps deleted shared stories out of the collection after call sync without removing the private confirmed memory", async () => {
+    const pair = await openPair(), text = "I watered the flowers with Maya every morning.";
+    const { live } = await completeCall(pair.patientCookie, pair.household, [text, "Yes.", "Yes."]);
+    const before = await state(pair.familyCookie), contributions = await live.graph.nodesOfType("Contribution");
+    expect(before.stories).toHaveLength(1);
+    const response = await circlePost(request("/api/circle/delete-story", pair.familyCookie, { id: before.stories[0]!.id }), { params: Promise.resolve({ path: ["delete-story"] }) });
+    expect(response.status).toBe(200);
+    for (let i = 0; i < 2; i++) {
+      await syncSampleSharedMemories(pair.household);
+      const after = await state(pair.familyCookie);
+      expect(after.stories).toEqual([]);
+      expect(after.photos).toEqual(before.photos);
+      expect(after.moments.map(m => m.id)).toEqual(before.moments.map(m => m.id));
+    }
+    expect(await live.graph.nodesOfType("Contribution")).toEqual(contributions);
+  });
   it("keeps a stopped confirmation out of both the graph and caregiver memories", async () => {
     const pair = await openPair();
     const { live } = await completeCall(pair.patientCookie, pair.household, ["I watered the flowers with Maya every morning.", "Yes.", "I have to go."]);

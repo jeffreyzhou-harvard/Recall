@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { ArchiveDialog } from "@/components/archive/ArchiveDialog";
 import { StoryRecorder } from "./StoryRecorder";
+import { DeleteStory } from "./DeleteStory";
 import { dateLabel, post, type CircleView } from "./types";
 export function MomentPanel({
   id,
@@ -308,6 +309,7 @@ export function MomentPanel({
                         </span>
                       </div>
                     </footer>
+                    {data.canManage && <DeleteStory story={s} onDeleted={async warning => { await onChanged(); if (warning) setError(warning); }} />}
                   </article>
                 ))}
               </section>

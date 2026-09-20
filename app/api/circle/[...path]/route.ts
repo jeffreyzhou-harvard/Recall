@@ -23,7 +23,7 @@ import { uploadPhotos, reanalyze, mediaFolder } from "@/server/circle/photos";
 import { publicBase, sendText } from "@/server/circle/messages";
 import { transcribeAudio } from "@/server/circle/ai";
 import { discardAudio, expireAudioDrafts } from "@/server/circle/audio";
-import { deleteCollectionItem } from "@/server/circle/delete";
+import { deleteCollectionItem, deleteStory } from "@/server/circle/delete";
 import { loadSampleFamily, sampleFamilyConnections } from "@/server/circle/sample";
 import { editPeople, faceThumbnail, getPeople, saveFaceScan } from "@/server/circle/people";
 import { sameOrigin, sessionCookie, browserPrincipal } from "@/server/session";
@@ -326,6 +326,7 @@ async function handle(request: Request, context: Context): Promise<Response> {
     }
     if (!isPost) throw new CircleError("Page not found.", 404);
     if (action === "delete") return reply(await deleteCollectionItem(household, canManage, body));
+    if (action === "delete-story") return reply(await deleteStory(household, canManage, body));
     if (action === "register") {
       await saveLogin(
         person.person_id,

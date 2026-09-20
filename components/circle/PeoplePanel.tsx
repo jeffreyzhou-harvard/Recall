@@ -24,7 +24,7 @@ export function PeoplePanel({ data, onOpenPhoto }: { data: CircleView; onOpenPho
   }, [load]);
   const pending = data.photos.filter(p => !view?.scannedPhotoIds.includes(p.id));
   async function findPeople() {
-    if (scan.current || busy) return;
+    if (data.demo || scan.current || busy) return;
     const controller = new AbortController(); scan.current = controller;
     setScanning(true); setError(""); setNotice(""); setConfirmClear(false);
     const failed: string[] = [];
@@ -74,9 +74,9 @@ export function PeoplePanel({ data, onOpenPhoto }: { data: CircleView; onOpenPho
   const group = view?.groups.find(g => g.id === selected);
   return <section className="circle-people" aria-label="People in your photos">
     <div className="circle-people-toolbar">
-      <p>Suggested groups of familiar faces. Names come from you.</p>
-      {scanning ? <button className="circle-button secondary" onClick={() => scan.current?.abort()}><X size={17} />Stop scanning</button> :
-        <button className="circle-button primary" disabled={!view || !pending.length || busy} onClick={() => void findPeople()}><ScanFace size={19} />{view?.scannedPhotoIds.length ? pending.length ? `Find in ${pending.length} new ${pending.length === 1 ? "photo" : "photos"}` : "All photos checked" : "Find people"}</button>}
+      <p>{data.demo ? "A grandmother, a mother, and two daughters. Their photographs, together." : "Suggested groups of familiar faces. Names come from you."}</p>
+      {!data.demo && (scanning ? <button className="circle-button secondary" onClick={() => scan.current?.abort()}><X size={17} />Stop scanning</button> :
+        <button className="circle-button primary" disabled={!view || !pending.length || busy} onClick={() => void findPeople()}><ScanFace size={19} />{view?.scannedPhotoIds.length ? pending.length ? `Find in ${pending.length} new ${pending.length === 1 ? "photo" : "photos"}` : "All photos checked" : "Find people"}</button>)}
     </div>
     {scanning && <div className="circle-people-progress" role="status"><p>{progress.stage}</p><progress aria-label="Photos checked" max={Math.max(1, progress.total)} value={progress.done} /></div>}
     {error && <p className="circle-error" role="alert">{error} <button className="circle-text-button" onClick={() => void load().then(() => setError("")).catch(e => setError(e.message))}>Refresh People</button></p>}
@@ -86,10 +86,10 @@ export function PeoplePanel({ data, onOpenPhoto }: { data: CircleView; onOpenPho
       view?.groups.length ? <div className="circle-people-grid">{view.groups.map((person, i) => <button key={person.id} className="circle-person" onClick={() => setSelected(person.id)}>
         <img src={`/api/circle/face/${person.faces[0]!.id}`} alt="" loading="lazy" />
         <strong>{person.name || `Person ${i + 1}`}</strong><span>{person.photoIds.length} {person.photoIds.length === 1 ? "photo" : "photos"}</span>
-        <small>{person.name ? "Named by family" : "Add a name"}<ArrowRight size={14} aria-hidden="true" /></small>
-      </button>)}</div> : <div className="circle-people-empty"><UsersRound size={42} aria-hidden="true" /><h2>{data.photos.length ? view?.scannedPhotoIds.length ? "No clear faces found yet." : "Find the faces in your collection." : "People starts with your photographs."}</h2><p>{data.photos.length ? pending.length ? "Choose Find people to group similar faces. Clear, front-facing photographs work best." : "Add more photographs to find people. Clear, front-facing photographs work best." : "Add photos, then come here to bring photographs of the same people together."}</p></div>}
-    <footer className="circle-people-footer"><p>Face detection runs on this device. Groups are suggestions; review them before adding a name.</p>
-      {!!view?.scannedPhotoIds.length && data.canManage && (confirmClear ? <div className="circle-people-clear"><span>Clear names and face groups? Your photos and stories stay.</span><button className="circle-text-button" disabled={busy || scanning} onClick={() => void edit({ action: "clear" })}>Clear groups</button><button className="circle-text-button" onClick={() => setConfirmClear(false)}>Cancel</button></div> : <button className="circle-text-button" disabled={busy || scanning} onClick={() => setConfirmClear(true)}>Clear face groups</button>)}
+        <small>{data.demo ? "View photos" : person.name ? "Named by family" : "Add a name"}<ArrowRight size={14} aria-hidden="true" /></small>
+      </button>)}</div> : <div className="circle-people-empty"><UsersRound size={42} aria-hidden="true" /><h2>{data.demo ? "People starts with your photographs." : data.photos.length ? view?.scannedPhotoIds.length ? "No clear faces found yet." : "Find the faces in your collection." : "People starts with your photographs."}</h2><p>{data.demo ? "Upload the family photo kit to see the grandmother, mother, and two daughters here." : data.photos.length ? pending.length ? "Choose Find people to group similar faces. Clear, front-facing photographs work best." : "Add more photographs to find people. Clear, front-facing photographs work best." : "Add photos, then come here to bring photographs of the same people together."}</p></div>}
+    <footer className="circle-people-footer"><p>{data.demo ? "These people and photographs are part of the fictional sample family." : "Face detection runs on this device. Groups are suggestions; review them before adding a name."}</p>
+      {!data.demo && !!view?.scannedPhotoIds.length && data.canManage && (confirmClear ? <div className="circle-people-clear"><span>Clear names and face groups? Your photos and stories stay.</span><button className="circle-text-button" disabled={busy || scanning} onClick={() => void edit({ action: "clear" })}>Clear groups</button><button className="circle-text-button" onClick={() => setConfirmClear(false)}>Cancel</button></div> : <button className="circle-text-button" disabled={busy || scanning} onClick={() => setConfirmClear(true)}>Clear face groups</button>)}
     </footer>
   </section>;
 }
@@ -99,12 +99,12 @@ function PersonDetail({ group, groups, data, busy, onBack, onEdit, onOpenPhoto }
   return <div className="circle-person-detail">
     <button className="circle-text-button" onClick={onBack}><ArrowLeft size={18} />All people</button>
     <div className="circle-person-heading"><img src={`/api/circle/face/${group.faces[0]!.id}`} alt="" /><div><h2>{group.name || "Who is this?"}</h2><p>{group.photoIds.length} {group.photoIds.length === 1 ? "photo" : "photos"} in this group</p></div></div>
-    <form className="circle-person-name" onSubmit={event => { event.preventDefault(); void onEdit({ action: "name", id: group.id, name }); }}><label>A name you know<input value={name} onChange={e => setName(e.target.value)} maxLength={80} placeholder="Add a name" disabled={busy} autoComplete="off" /></label><button className="circle-button secondary" disabled={busy || name.trim() === group.name}>Save name</button></form>
-    {groups.length > 1 && <details className="circle-person-merge"><summary>Same person in another group?</summary><div><label>Combine with<select value={target} onChange={e => setTarget(e.target.value)} disabled={busy}><option value="">Choose a group</option>{groups.map((g, i) => g.id !== group.id && <option key={g.id} value={g.id}>{g.name || `Person ${i + 1}`} · {g.photoIds.length} photos</option>)}</select></label><button className="circle-button secondary" disabled={busy || !target} onClick={() => void onEdit({ action: "merge", id: group.id, targetId: target })}>Combine groups</button></div></details>}
+    {!data.demo && <form className="circle-person-name" onSubmit={event => { event.preventDefault(); void onEdit({ action: "name", id: group.id, name }); }}><label>A name you know<input value={name} onChange={e => setName(e.target.value)} maxLength={80} placeholder="Add a name" disabled={busy} autoComplete="off" /></label><button className="circle-button secondary" disabled={busy || name.trim() === group.name}>Save name</button></form>}
+    {!data.demo && groups.length > 1 && <details className="circle-person-merge"><summary>Same person in another group?</summary><div><label>Combine with<select value={target} onChange={e => setTarget(e.target.value)} disabled={busy}><option value="">Choose a group</option>{groups.map((g, i) => g.id !== group.id && <option key={g.id} value={g.id}>{g.name || `Person ${i + 1}`} · {g.photoIds.length} photos</option>)}</select></label><button className="circle-button secondary" disabled={busy || !target} onClick={() => void onEdit({ action: "merge", id: group.id, targetId: target })}>Combine groups</button></div></details>}
     <div className="circle-person-photos">{group.faces.map(face => {
       const photo = data.photos.find(p => p.id === face.photoId);
       if (!photo) return null;
-      return <article key={face.id}><button className="circle-person-photo" onClick={() => onOpenPhoto(photo.id)} aria-label={`Open ${photo.caption || photo.name}`}><img src={photo.url} alt={photo.caption || photo.name} loading="lazy" /><span>Open photo<ArrowRight size={17} /></span></button><div className="circle-face-match"><img src={`/api/circle/face/${face.id}`} alt="Matched face" loading="lazy" /><span>Match in this photo</span></div><div className="circle-face-corrections">{group.faces.length > 1 && <button disabled={busy} onClick={() => void onEdit({ action: "separate", faceId: face.id })}>Different person</button>}<button disabled={busy} onClick={() => void onEdit({ action: "dismiss", faceId: face.id })}>Not a face</button></div></article>;
+      return <article key={face.id}><button className="circle-person-photo" onClick={() => onOpenPhoto(photo.id)} aria-label={`Open ${photo.caption || photo.name}`}><img src={photo.url} alt={photo.caption || photo.name} loading="lazy" /><span>Open photo<ArrowRight size={17} /></span></button><div className="circle-face-match"><img src={`/api/circle/face/${face.id}`} alt={data.demo ? group.name : "Matched face"} loading="lazy" /><span>{data.demo ? "In this photo" : "Match in this photo"}</span></div>{!data.demo && <div className="circle-face-corrections">{group.faces.length > 1 && <button disabled={busy} onClick={() => void onEdit({ action: "separate", faceId: face.id })}>Different person</button>}<button disabled={busy} onClick={() => void onEdit({ action: "dismiss", faceId: face.id })}>Not a face</button></div>}</article>;
     })}</div>
   </div>;
 }

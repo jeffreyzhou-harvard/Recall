@@ -27,6 +27,7 @@ import { PhotoUpload } from "./PhotoUpload";
 import { FamilyPanel } from "./FamilyPanel";
 import { MomentPanel } from "./MomentPanel";
 import { PeoplePanel } from "./PeoplePanel";
+import { DeleteStory } from "./DeleteStory";
 import { RecallSessions } from "./RecallSessions";
 import { SidebarResizeHandle, SidebarToggle, useResizableSidebar } from "@/components/navigation/ResizableSidebar";
 import { dateLabel, type CircleView } from "./types";
@@ -307,7 +308,7 @@ export function CircleApp({ initialSection = "moments" }: { initialSection?: Sec
                   const photo = data.photos.find(p => p.id === moment?.coverId);
                   return <article key={story.id}>
                     {photo && <button className="circle-story-thumbnail" onClick={() => openMoment(story.eventId)} aria-label={`Open ${moment?.title}`}><img src={photo.url} alt={photo.caption || moment?.title || "Family photograph"} loading="lazy" /></button>}
-                    <div><p className="circle-story-attribution">{story.author} · <time dateTime={story.createdAt}>{dateLabel(story.createdAt)}</time></p><blockquote>{story.text}</blockquote>{moment && <button className="circle-text-button" onClick={() => openMoment(moment.id)}>Open {moment.title}<ArrowRight size={16} aria-hidden="true" /></button>}</div>
+                    <div><p className="circle-story-attribution">{story.author} · <time dateTime={story.createdAt}>{dateLabel(story.createdAt)}</time></p><blockquote>{story.text}</blockquote>{moment && <button className="circle-text-button" onClick={() => openMoment(moment.id)}>Open {moment.title}<ArrowRight size={16} aria-hidden="true" /></button>}{data.canManage && <DeleteStory story={story} onDeleted={async warning => { await refresh(); setToast(warning || "Story deleted."); }} />}</div>
                   </article>;
                 }) : <div className="circle-record-empty"><p>No shared stories yet.</p><button className="circle-text-button" onClick={() => navigate("moments")}>Start with a moment<ArrowRight size={16} aria-hidden="true" /></button></div>}
               </div> : section === "people" ? <PeoplePanel key={data.photos.map(photo => photo.id).join("|")} data={data} onOpenPhoto={id => {

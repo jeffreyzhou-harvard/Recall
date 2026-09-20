@@ -230,6 +230,61 @@ describe("photo collection integration regressions", () => {
     expect(readdirSync(mediaFolder(household))).toEqual([]);
     expect((await GET(request(`media/${audioId}`), context(`media/${audioId}`))).status).toBe(404);
   });
+  it("deletes one written story without removing its photos, group or other stories", async () => {
+    await uploadPhotos(household, owner, "Maya", [await photo()], "story-delete");
+    const momentId = readCircle(household).moments[0]!.id;
+    for (const text of ["We planted tomatoes together.", "The flowers grew by the window."]) {
+      expect((await post("story", { momentId, text, requestId: text, confirmed: true })).status).toBe(200);
+    }
+    const before = readCircle(household), id = before.stories[0]!.id;
+    const response = await post("delete-story", { id });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ deletedStoryId: id, warning: null });
+    const after = readCircle(household);
+    expect(after.photos).toEqual(before.photos);
+    expect(after.moments).toEqual([{ ...before.moments[0], revision: before.moments[0]!.revision + 1 }]);
+    expect(after.stories).toEqual([before.stories[1]]);
+    expect((await (await GET(request("state"), context("state"))).json()).stories.map((s: { id: string }) => s.id)).toEqual([before.stories[1]!.id]);
+    expect((await post("delete-story", { id })).status).toBe(404);
+    expect((await post("delete", { kind: "moment", id: momentId, momentId, revision: before.moments[0]!.revision, storyCount: 1 })).status).toBe(409);
+  });
+  it("keeps a recording until its last story is deleted, then removes the draft and media access", async () => {
+    await uploadPhotos(household, owner, "Maya", [await photo()], "story-audio-delete");
+    const momentId = readCircle(household).moments[0]!.id, audioId = randomUUID();
+    const bytes = Buffer.from("test story recording");
+    writeFileSync(path.join(mediaFolder(household), audioId + ".audio"), bytes);
+    updateCircle(household, s => { s.drafts = [{ id: audioId, owner, mime: "audio/wav", text: "We grew flowers together.", createdAt: new Date().toISOString() }]; });
+    for (const requestId of ["first-audio-story", "second-audio-story"]) {
+      expect((await post("story", { momentId, text: "We grew flowers together.", audioId, audioReviewed: true, requestId, confirmed: true })).status).toBe(200);
+    }
+    const [first, second] = readCircle(household).stories;
+    expect((await post("delete-story", { id: first!.id })).status).toBe(200);
+    expect(readFileSync(path.join(mediaFolder(household), audioId + ".audio"))).toEqual(bytes);
+    expect((await GET(request(`media/${audioId}`), context(`media/${audioId}`))).status).toBe(200);
+    expect((await post("delete-story", { id: second!.id })).status).toBe(200);
+    expect(readCircle(household)).toMatchObject({ stories: [], drafts: [] });
+    expect(readdirSync(mediaFolder(household))).toHaveLength(2);
+    expect((await GET(request(`media/${audioId}`), context(`media/${audioId}`))).status).toBe(404);
+    expect((await post("story", { momentId, text: "We grew flowers together.", audioId, audioReviewed: true, requestId: "deleted-audio", confirmed: true })).status).toBe(400);
+  });
+  it("requires same-origin caregiver access to the story's own household", async () => {
+    await uploadPhotos(household, owner, "Maya", [await photo()], "story-delete-access");
+    const momentId = readCircle(household).moments[0]!.id;
+    await post("story", { momentId, text: "We grew flowers together.", requestId: "protected-story", confirmed: true });
+    const before = readCircle(household), edit = { id: before.stories[0]!.id };
+    const patient = (await getOnboarding().people(household)).find(p => p.role === "participant")!;
+    issueAccount(household, patient.person_id, "patient");
+    const patientCookie = sessionCookie({ role: "patient", member_id: patient.person_id }, request("state")).split(';')[0]!;
+    expect((await post("delete-story", edit, patientCookie)).status).toBe(403);
+    expect((await post("delete-story", edit, "")).status).toBe(401);
+    const crossOrigin = request("delete-story", edit); crossOrigin.headers.set("Origin", "https://elsewhere.test");
+    expect((await POST(crossOrigin, context("delete-story"))).status).toBe(403);
+    const other = await getOnboarding().createHousehold({ participant: { display_name: "Other participant", phone: "+15555550102" }, caregiver: { display_name: "Other caregiver" } });
+    issueAccount(other.household.household_id, other.caregiver.person_id, "family");
+    const otherCookie = sessionCookie({ role: "family", member_id: other.caregiver.person_id }, request("state")).split(';')[0]!;
+    expect((await post("delete-story", edit, otherCookie)).status).toBe(404);
+    expect(readCircle(household)).toEqual(before);
+  });
   it("deletes a photo group while preserving photographs also kept in another group", async () => {
     const a = await photo("red"), b = new File([await photo("blue")], "shared.jpg", { type: "image/jpeg" });
     const metadata = Object.fromEntries([a, b].map(f => [f.name, { date: "2025-08-16T14:00:00Z", latitude: 38.935, longitude: -74.906 }]));

@@ -5,6 +5,22 @@ import { z } from "zod";
 import { mediaFolder } from "./photos";
 import { CircleError, updateCircle, type CircleState } from "./store";
 
+/** Drop collection stories and only recordings that no remaining story uses. */
+function removeStories(state: CircleState, ids: Set<string>) {
+  const removed = state.stories.filter(story => ids.has(story.id));
+  state.stories = state.stories.filter(story => !ids.has(story.id));
+  for (const story of removed) {
+    // Keep the publication receipt, so a later call sync cannot recreate a deleted shared story.
+    if (story.sharedFromCall && state.demoCall && !state.demoCall.sharedContributions.includes(story.sharedFromCall)) state.demoCall.sharedContributions.push(story.sharedFromCall);
+  }
+  const audioIds = new Set(removed.flatMap(story => {
+    const id = story.audioUrl?.match(/^\/api\/circle\/media\/([a-f0-9-]{36})$/)?.[1];
+    return id && !state.stories.some(kept => kept.audioUrl === story.audioUrl) ? [id] : [];
+  }));
+  state.drafts = state.drafts?.filter(draft => !audioIds.has(draft.id));
+  return [...audioIds];
+}
+
 /** Prune all derived references in the same transaction as the collection edit. */
 export function removeCollectionItems(state: CircleState, photoIds: Set<string>, momentIds: Set<string>) {
   state.photos = state.photos.filter((photo) => !photoIds.has(photo.id));
@@ -21,13 +37,7 @@ export function removeCollectionItems(state: CircleState, photoIds: Set<string>,
     moment.revision++;
   }
   state.moments = state.moments.filter((moment) => !momentIds.has(moment.id));
-  const removedStories = state.stories.filter((story) => momentIds.has(story.eventId));
-  state.stories = state.stories.filter((story) => !momentIds.has(story.eventId));
-  const audioIds = new Set(removedStories.flatMap((story) => {
-    const id = story.audioUrl?.match(/^\/api\/circle\/media\/([a-f0-9-]{36})$/)?.[1];
-    return id && !state.stories.some((kept) => kept.audioUrl === story.audioUrl) ? [id] : [];
-  }));
-  state.drafts = state.drafts?.filter((draft) => !audioIds.has(draft.id));
+  const audioIds = removeStories(state, new Set(state.stories.filter(story => momentIds.has(story.eventId)).map(story => story.id)));
   for (const receipt of state.imports) receipt.momentIds = receipt.momentIds?.filter((id) => !momentIds.has(id));
   if (state.faceIndex) {
     const index = state.faceIndex;
@@ -63,4 +73,19 @@ export async function deleteCollectionItem(household: string, canManage: boolean
   });
   const warning = await removeCollectionFiles(household, result);
   return { removedPhotoIds: result.removedPhotoIds, removedMomentIds: result.removedMomentIds, warning };
+}
+
+export async function deleteStory(household: string, canManage: boolean, input: unknown) {
+  if (!canManage) throw new CircleError("Only a caregiver can delete stories.", 403);
+  const { id } = z.object({ id: z.string().min(1).max(200) }).parse(input);
+  const result = updateCircle(household, state => {
+    const story = state.stories.find(story => story.id === id);
+    if (!story) throw new CircleError("This story is no longer in your family collection.", 404);
+    const audioIds = removeStories(state, new Set([id]));
+    const moment = state.moments.find(moment => moment.id === story.eventId);
+    if (moment) moment.revision++;
+    return { removedPhotoIds: [] as string[], removedMomentIds: [] as string[], audioIds };
+  });
+  const warning = await removeCollectionFiles(household, result);
+  return { deletedStoryId: id, warning };
 }

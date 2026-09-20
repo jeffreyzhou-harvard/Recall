@@ -5,6 +5,7 @@ import path from "node:path";
 import { mediaFolder } from "./photos";
 import { emptyFaceIndex, FACE_MODEL, type FaceIndex, type PeopleView } from "@/lib/people/types";
 import { CircleError, readCircle, updateCircle, type CircleState } from "./store";
+import { samplePeopleView } from "./sample-people";
 
 // A larger descriptor distance permits slightly more variation between photos.
 const FACE_MATCH_DISTANCE = 0.52;
@@ -16,6 +17,7 @@ const scanSchema = z.object({
   photos: z.array(z.object({ photoId: z.string().uuid(), faces: z.array(z.object({ box, score: z.number().min(0.5).max(1), descriptor: z.array(z.number().min(-10).max(10)).length(128).refine(v => v.some(n => n !== 0), "Empty face descriptor.") })).max(30) })).min(1).max(8),
 });
 export function peopleView(state: CircleState): PeopleView {
+  if (state.demo) return samplePeopleView(state);
   const index = state.faceIndex ?? emptyFaceIndex();
   return {
     generation: index.generation, revision: index.revision, scannedPhotoIds: index.scannedPhotoIds,
@@ -28,7 +30,7 @@ export function peopleView(state: CircleState): PeopleView {
 export const getPeople = (household: string) => peopleView(readCircle(household));
 export async function faceThumbnail(household: string, id: string) {
   if (!z.string().uuid().safeParse(id).success) throw new CircleError("Face unavailable.", 404);
-  const state = readCircle(household), face = state.faceIndex?.faces.find(f => f.id === id);
+  const state = readCircle(household), face = peopleView(state).groups.flatMap(group => group.faces).find(face => face.id === id);
   if (!face || !state.photos.some(p => p.id === face.photoId)) throw new CircleError("Face unavailable.", 404);
   const image = sharp(path.join(mediaFolder(household), face.photoId + ".jpg"));
   const meta = await image.metadata(), width = meta.width!, height = meta.height!;
@@ -40,6 +42,8 @@ export async function faceThumbnail(household: string, id: string) {
 export function faceDistance(a: number[], b: number[]) { return Math.sqrt(a.reduce((sum, n, i) => sum + (n - b[i]!) ** 2, 0)); }
 
 export function saveFaceScan(household: string, input: unknown) {
+  const current = readCircle(household);
+  if (current.demo) return peopleView(current);
   const batch = scanSchema.parse(input);
   return updateCircle(household, state => {
     const index = state.faceIndex ??= emptyFaceIndex();
@@ -79,6 +83,7 @@ const editSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("clear"), revision: z.number().int().nonnegative() }),
 ]);
 export function editPeople(household: string, author: string, canManage: boolean, input: unknown) {
+  if (readCircle(household).demo) throw new CircleError("The sample family uses fixed people groups. Add or remove sample photos to update them.", 409);
   const edit = editSchema.parse(input);
   return updateCircle(household, state => {
     const index: FaceIndex = state.faceIndex ??= emptyFaceIndex();

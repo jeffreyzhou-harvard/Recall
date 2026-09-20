@@ -2055,6 +2055,12 @@
 
 .circle-delete-actions { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px 20px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #e5e6dd; }
 .circle-delete-actions .circle-text-button { min-height: 44px; color: #8a4138; }
+.circle-story-delete { margin-top: 12px; }
+.circle-story-delete > .circle-text-button { min-height: 44px; color: #8a4138; }
+.circle-story-delete-confirm { margin-top: 8px; padding-block: 16px; border-block: 1px solid var(--recall-line); }
+.circle-story-delete-confirm > p { margin: 0 0 8px; color: var(--recall-ink); line-height: 1.5; }
+.circle-story-delete-confirm > p + p { color: var(--recall-muted); font-size: 14px; }
+.circle-story-delete-confirm > div { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
 .circle-delete-confirm { padding: 56px 32px 32px; color: #2b3c31; }
 .circle-delete-confirm > svg { color: #8a4138; margin-bottom: 20px; }
 .circle-delete-confirm h2 { margin: 0 0 20px; font-size: 30px; line-height: 1.2; }
