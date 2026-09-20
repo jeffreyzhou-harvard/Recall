@@ -39,11 +39,11 @@ Node 22.13+. No keys, no database, and no network are needed for any of the abov
 | `npm run assets:placeholder` | Generate stand-in media. Never overwrites an existing file. |
 | `npm run graph:seed` | Build an on-disk LadybugDB graph at `.data/recall.lbug` from the family seed, for Cypher poking. |
 
-## Frontend boilerplate
+## Shared photo collection
 
-The frontend is ready for backend integration: `/` is the patient call, `/caregiver` is the caregiver session waveform and conversation-suggestion form, `/onboarding` is phone-first setup, and `/revisit` is the next-conversation invitation. `/family` aliases `/caregiver`.
+`/caregiver` (also `/family`) opens the household's shared photos, moments, map, connections and attributed stories. `/revisit` opens photo storytelling, `/conversations` opens the existing private call records, and `/conversations/call` hosts scheduled patient calls. `/` introduces the collection; `/onboarding` creates an organizer account and records joint conversation preferences.
 
-These screens use isolated sample state and local files. They do not yet load authorized household data, schedule calls or persist suggestions. The waveform displays labeled per-topic call counts, not recorded audio or a memory score. The UI permits separately labeled question suggestions; the live backend still has its redirect-only question contract. See [the frontend handoff](docs/frontend-preview.md#backend-handoff) for entry points and integration boundaries.
+Photos retain their originals and available capture dates/GPS. OpenAI optionally groups and describes them and transcribes recordings for review. Email/password, single-use invitation links and existing access keys work for sign-in. Family invitations and explicitly opted-in photo reminders use Linq; copyable links work without messaging. Set the optional variables in `.env.example`. See [the collection guide](docs/PHOTO_FIRST_DEMO.md) and [its authorized scope](docs/PHOTO_FIRST_SCOPE.md).
 
 ## How it fits together
 
@@ -111,7 +111,7 @@ Cast is fixed: Susan, Maya (daughter), Priya (sister), Anika (granddaughter), Ca
 
 ## Connected application
 
-`/` is the guest welcome and role-based account entry. `/get-started` offers joint setup or invitation; `/sign-in` accepts an existing private access key. `/onboarding`, `/caregiver` (also `/family`), and `/revisit` use the live backend without sample history. There is no public email/password signup; initial setup requires an operator key or explicitly available local development access. Browser calls use microphone audio, final-turn transcription, Recall speech, and original-audio confirmation playback. Joint setup, scheduled calls, topic authoring and approval, private photo/voice contributions, invitations, member access, family records and exports are connected.
+The shared collection is persisted separately from the private patient-call graph. New organizers can sign up with email/password; invited relatives join through expiring links. Existing key-based accounts remain accessible. Joint setup, scheduled calls, topic approval, call confirmation, family records and exports retain their backend gates. Browser calls use microphone audio, final-turn transcription, Recall speech and original-audio confirmation playback.
 
 The safety engine includes phrase handoffs, missed-call tiering, caregiver acknowledgment and escalation. Delivery uses the configured dashboard or durable webhook channel. The fixture engine and its safety thresholds remain covered by `npm run check`.
 

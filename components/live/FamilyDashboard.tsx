@@ -26,7 +26,7 @@ type Dashboard = {
 type Section = ArchiveSection | "sessions";
 type FamilyMember = { person_id: string; display_name: string; role: string; removed_at?: string | null };
 
-export function FamilyDashboard() {
+export function FamilyDashboard({ initialSection = "moments" }: { initialSection?: Section }) {
   const { session, member, setMember } = useLive();
   const [people, setPeople] = useState<FamilyMember[]>([]);
   const [loaded, setLoaded] = useState<{ member: string; data: Dashboard } | null>(null);
@@ -34,7 +34,7 @@ export function FamilyDashboard() {
   const data = loaded?.member === member ? loaded.data : null;
   const [loading, setLoading] = useState(false);
   const [version, setVersion] = useState(0);
-  const [section, setSection] = useState<Section>("moments");
+  const [section, setSection] = useState<Section>(initialSection);
   const [openRequest, setOpenRequest] = useState(0);
   const [uploadRequest, setUploadRequest] = useState(0);
   const [exporting, setExporting] = useState(false);
@@ -49,7 +49,8 @@ export function FamilyDashboard() {
       const hash = window.location.hash;
       if (hash === "#sessions" || hash === "#topic-record") setSection("sessions");
       else if (["#places", "#connections", "#stories", "#moments"].includes(hash)) setSection(hash.slice(1) as ArchiveSection);
-      else if (!hash || hash === "#memories" || hash === "#suggestions") setSection("moments");
+      else if (!hash) setSection(initialSection);
+      else if (hash === "#memories" || hash === "#suggestions") setSection("moments");
       if (hash === "#suggestions") setOpenRequest((request) => request + 1);
     };
     readLocation();
@@ -59,7 +60,7 @@ export function FamilyDashboard() {
       window.removeEventListener("hashchange", readLocation);
       window.removeEventListener("popstate", readLocation);
     };
-  }, []);
+  }, [initialSection]);
 
   function navigate(next: Section) {
     setSection(next);

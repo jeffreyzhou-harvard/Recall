@@ -132,7 +132,7 @@ export class Onboarding {
     return this.create(input, true, beforeCommit);
   }
 
-  async createHousehold(input: NewHousehold): Promise<CreatedHousehold> { return this.create(input, false); }
+  async createHousehold(input: NewHousehold, beforeCommit?: (made: CreatedHousehold) => Promise<void>): Promise<CreatedHousehold> { return this.create(input, false, beforeCommit); }
 
   private async create(input: NewHousehold, firstOnly: boolean, beforeCommit?: (made: CreatedHousehold) => Promise<void>): Promise<CreatedHousehold> {
     Onboarding.plain(input.participant.display_name, input.caregiver.display_name);

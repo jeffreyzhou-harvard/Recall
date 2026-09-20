@@ -37,17 +37,17 @@ export function MemoryGraph({ moments, photos, stories, onSelect }: Props) {
   const graph = useMemo(() => {
     const nodes: GraphNode[] = [], edges: GraphEdge[] = [];
     const centerX = width / 2, centerY = 325;
-    const names = filter === "story" ? [] : [...new Set(pageMoments.flatMap((moment) => moment.people).filter((name) => name.trim()))];
+    const names = filter === "story" ? [] : [...new Set(pageMoments.flatMap((moment) => [...moment.people,...stories.filter(s=>s.eventId===moment.id).map(s=>s.author)]).filter((name) => name.trim()))];
     names.forEach((name, index) => {
       const angle = index / Math.max(names.length, 1) * Math.PI * 2 - Math.PI / 2;
-      nodes.push({ id: `person:${name}`, label: name, kind: "person", x: centerX + Math.cos(angle) * 105, y: centerY + Math.sin(angle) * 85, detail: "Named in your contribution", momentIds: pageMoments.filter((moment) => moment.people.includes(name)).map((moment) => moment.id) });
+      nodes.push({ id: `person:${name}`, label: name, kind: "person", x: centerX + Math.cos(angle) * Math.min(105,width*.17), y: centerY + Math.sin(angle) * 85, detail: "Connected through family labels or an original story", momentIds: pageMoments.filter((moment) => moment.people.includes(name)||stories.some(s=>s.eventId===moment.id&&s.author===name)).map((moment) => moment.id) });
     });
     pageMoments.forEach((moment, index) => {
       const angle = index / Math.max(pageMoments.length, 1) * Math.PI * 2 - Math.PI / 2 + .35;
-      const x = filter === "story" ? centerX + (index % 2 ? 150 : -220) : centerX + Math.cos(angle) * Math.min(285, Math.max(205, width * .285));
+      const x = filter === "story" ? centerX + (index % 2 ? 150 : -220) : centerX + Math.cos(angle) * Math.min(285, width * .285);
       const y = filter === "story" ? 175 + Math.floor(index / 2) * 230 : centerY + Math.sin(angle) * 205;
       const eventId = `moment:${moment.id}`;
-      nodes.push({ id: eventId, label: moment.title, kind: "event", x, y, photo: photos.find((photo) => photo.id === moment.coverId)?.url, detail: "Saved from your contribution", momentIds: [moment.id] });
+      nodes.push({ id: eventId, label: moment.title, kind: "event", x, y, photo: photos.find((photo) => photo.id === moment.coverId)?.url, detail: "A moment from your family photographs", momentIds: [moment.id] });
       if (filter !== "story") moment.people.filter((name) => name.trim()).forEach((name) => edges.push({ from: `person:${name}`, to: eventId, kind: "named" }));
       if (filter !== "story" && moment.place?.trim()) {
         const placeId = `place:${moment.place}`;
@@ -57,7 +57,7 @@ export function MemoryGraph({ moments, photos, stories, onSelect }: Props) {
           // Keep the outer place nodes clear of the photo captions beneath them.
           const placeAngle = angle + (Math.cos(angle) < 0 && Math.sin(angle) > 0 ? .6 : .3);
           const lowerRight = Math.cos(angle) > 0 && Math.sin(angle) > 0;
-          nodes.push({ id: placeId, label: moment.place, kind: "place", x: centerX + Math.cos(placeAngle) * Math.min(430, Math.max(300, width * .42)), y: centerY + Math.sin(placeAngle) * 250 + (lowerRight ? 60 : 0), detail: "Named in your contribution", momentIds: [moment.id] });
+          nodes.push({ id: placeId, label: moment.place, kind: "place", x: centerX + Math.cos(placeAngle) * Math.min(430, width * .42), y: centerY + Math.sin(placeAngle) * 250 + (lowerRight ? 60 : 0), detail: "A setting connected to these photographs", momentIds: [moment.id] });
         }
         edges.push({ from: eventId, to: placeId, kind: "named" });
       }
@@ -66,14 +66,16 @@ export function MemoryGraph({ moments, photos, stories, onSelect }: Props) {
       const event = nodes.find((node) => node.id === `moment:${moment.id}`);
       const ownStories = stories.filter((story) => story.eventId === moment.id);
       const storyId = `stories:${moment.id}`;
-      if (!event || !ownStories.length || (filter !== "story" && selected !== event.id && selected !== storyId)) return;
+      if (!event || !ownStories.length) return;
       const first = ownStories[0]!;
       // A source node opens every story for this memory without crowding the canvas.
       const x = filter === "story" ? event.x + 130 : event.x + (event.y < centerY ? 105 : -105);
       const y = filter === "story" ? event.y + 110 : event.y + (event.x >= centerX ? 130 : -130);
       nodes.push({ id: storyId, label: ownStories.length === 1 ? `${first.author}’s story` : `${ownStories.length} stories`, kind: "story", x, y, momentIds: [moment.id], detail: ownStories.length === 1 ? first.text : "Original stories for this memory", stories: ownStories });
       edges.push({ from: storyId, to: event.id, kind: "story" });
+      if(filter!=='story')for(const author of new Set(ownStories.map(s=>s.author))) edges.push({from:`person:${author}`,to:storyId,kind:'story'});
     });
+    if(width<600)nodes.forEach(node=>{node.x=Math.max(72,Math.min(width-72,node.x));});
     return { nodes, edges, byId: new Map(nodes.map((node) => [node.id, node])) };
   }, [pageMoments, photos, stories, width, filter, selected]);
 

@@ -38,6 +38,11 @@ describe("phone formatting", () => {
     expect(parsePhoneInput("+14165550123", "CA")).toMatchObject({ country: { iso: "CA" }, national: "4165550123" });
   });
 
+  it("does not remove national digits that happen to match the selected calling code", () => {
+    expect(parsePhoneInput("4420123456", "GB").national).toBe("4420123456");
+    expect(parsePhoneInput("3312345678", "FR").national).toBe("3312345678");
+  });
+
   it("treats a 10-digit US number as complete and a partial one as not", () => {
     expect(isCompletePhone("+12063428631")).toBe(true);
     expect(isCompletePhone("+1206342")).toBe(false);
