@@ -2,23 +2,24 @@
   <img src="public/brand/recall-mark.svg" alt="Recall logo" width="80" height="80">
 </p>
 <h1 align="center">Recall</h1>
-<p align="center"><strong>Cues, not answers — every memory stays in her own words.</strong></p>
+<p align="center"><strong>Cues, not answers — every memory stays in their own words.</strong></p>
+<p align="center">Memory participation and family connection for people living with dementia.</p>
 
-Recall brings family photos and stories together in a private memory graph, helping people living with dementia revisit their own memories through gentle voice conversations.
+Recall is built for people living with dementia and the families and caregivers who support them. It brings family photos and stories together in a private memory graph, helping people revisit their own memories through gentle voice conversations.
 
-Families contribute photographs and stories. The patient can revisit an approved topic in a browser voice call, with familiar context offered as needed. Their words enter the private call graph only after original-audio playback and confirmation; sharing with family requires a separate confirmation. Recall creates reasons for people to talk to each other, without speaking on anyone's behalf.
+Families contribute photographs and stories to create familiar starting points for conversations with a loved one living with dementia. The person can revisit an approved topic in a browser voice call, with familiar context offered as needed. Their words enter the private call graph only after original-audio playback and confirmation; sharing with family requires a separate confirmation. Recall creates reasons for people to talk to each other, without speaking on anyone's behalf.
 
 Built for HackMIT 2026, Healthcare track. [SPECS.md](SPECS.md) and [EVIDENCE.md](EVIDENCE.md) explain the design and its limits.
 
-## What is implemented
+## Built for people living with dementia
 
 - **Shared collection:** upload photographs, retain originals and available capture dates/GPS, organize them into moments, and add attributed written or recorded stories. OpenAI organization is optional; metadata grouping works without a key.
-- **One caregiver workspace:** Moments, People, Places, Connections, Stories, and Recall sessions share the Circle sidebar. The sidebar resizes, collapses, supports keyboard controls, and remembers its width.
+- **One workspace for dementia caregivers:** Moments, People, Places, Connections, Stories, and Recall sessions share the Circle sidebar. The sidebar resizes, collapses, supports keyboard controls, and remembers its width.
 - **People:** opt-in face detection runs in the browser with self-hosted models. Families can name, merge, separate, or dismiss suggested groups. Photo groups never establish an identity or relationship in the patient-call graph.
 - **Places and connections:** a map of photo locations and an interactive graph with selectable people, moments, stories, and relationship/source details on connecting lines.
 - **Collection management:** caregivers can delete individual photos, whole photo groups, or stories. Confirmation explains related removals; orphaned collection media is cleaned up. Deleting a shared call story does not erase its original private call record.
 - **Accounts and invitations:** caregiver email/password sign-in, existing access keys, expiring family/story links, and optional Linq invitation texts and opted-in photo reminders.
-- **Browser voice calls:** microphone input, Recall's spoken questions, live patient captions, speech endpoint detection, topic photos, original-audio confirmation playback, and saved call records. The implemented transport is the web app; ordinary telephone delivery is not connected.
+- **Voice conversations for people living with dementia:** browser microphone input, Recall's spoken questions, live captions, speech endpoint detection, topic photos, original-audio confirmation playback, and saved call records. The implemented transport is the web app; ordinary telephone delivery is not connected.
 - **Family call records:** an opt-in Weekly Note, dated per-topic call history, counts with denominators, and an access-checked printable record. These describe what happened in Recall calls, without a score or medical interpretation.
 
 ## Tech stack
