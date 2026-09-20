@@ -66,6 +66,14 @@ export class FamilyView {
     return this.displayName(memberId);
   }
 
+  /** Only this contributor's own submitted words. Never a patient's claim or another member's account. */
+  async ownContributions(memberId: string): Promise<Array<{ text: string; at: string }>> {
+    return (await this.graph.nodesOfType("EpisodicClaim"))
+      .filter((c) => c.prov.source_class === "family_contribution" && c.prov.author === memberId && !c.prov.patient_confirmed)
+      .map((c) => ({ text: c.props.text, at: c.prov.observed_at }))
+      .sort((a, b) => a.at.localeCompare(b.at));
+  }
+
   /** Is there anything of hers in the graph at all? A single boolean for the whole graph: it cannot be used to probe a topic. */
   async hasAnythingOfHers(): Promise<boolean> {
     for (const type of ["EpisodicClaim", "Contribution"] as const) {

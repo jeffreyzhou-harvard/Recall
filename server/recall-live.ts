@@ -1,3 +1,4 @@
+import { dataDirectory } from "./data-directory";
 /**
  * The live Recall process: the same RecallService as the judged path, held for the life of the server so the
  * family side and the schedule share one graph. Node only. Nothing on the judged path imports this
@@ -12,7 +13,7 @@
  * separately; when it lands it plugs in here as one more `CallDriver` plus a `TranscriptionProvider`
  * (lib/providers/deepgram.ts is ready for it), and nothing else in the engine has to change.
  *
- * Who it is for is chosen by RECALL_HOUSEHOLD. Unset (the default), it is the committed fixture family. Set to
+ * Who it is for is chosen by RECALL_HOUSEHOLD. Unset, it uses the household selected in joint setup; without one, access requires setup. Set to
  * a household id from the onboarding database, the graph starts from that household's identity layer and
  * the joint setup is the one they agreed - re-read before every call and every dashboard load, so a
  * revocation recorded there is in force at once (rule 12).
@@ -36,12 +37,17 @@ import { MemoryAlertChannel } from "@/lib/safety/alert";
 import { RecallService } from "@/lib/service/recall-service";
 import type { SessionRecording } from "@/lib/session/recording";
 import { SetupStore, type ScaffoldAdvisor } from "@/lib/tools";
-import { DEFAULT_ONBOARDING_DB, openOnboarding } from "./onboarding";
+import { SqliteGraphStore } from "./graph-store";
+import { activeHousehold } from "./active-household";
+import { openOnboarding } from "./onboarding";
 
 // One live recall per server process: it holds the graph, and a call in progress must outlive a request.
-const cache = globalThis as unknown as { __recallLive?: Promise<LiveRecall> };
+const cache = globalThis as unknown as { __recallLive?: Promise<LiveRecall>; __recallLiveKey?: string };
 export function getLiveRecall(): Promise<LiveRecall> {
-  cache.__recallLive ??= createLiveRecall(configFromEnv(process.env, process.cwd())).catch((e: unknown) => {
+  const config = configFromEnv(process.env, process.cwd());
+  const key = JSON.stringify(config);
+  if (cache.__recallLiveKey !== key) { cache.__recallLive = undefined; cache.__recallLiveKey = key; }
+  cache.__recallLive ??= createLiveRecall(config).catch((e: unknown) => {
     cache.__recallLive = undefined; // only a failed start-up is retried
     throw e;
   });
@@ -52,6 +58,8 @@ export type CallMode = "none" | "prerecorded";
 
 export interface LiveConfig {
   callMode: CallMode;
+  /** Explicit test/demo only. Never enabled by the live application. */
+  fixture?: boolean;
   /** Project root: where a policy file is read from. */
   root: string;
   /** Start of the session clock. Defaults to the judged timing; injectable so tests are repeatable. */
@@ -68,7 +76,7 @@ export function configFromEnv(env: NodeJS.ProcessEnv, root: string): LiveConfig 
   const callMode = env.RECALL_CALL ?? "none";
   if (callMode !== "none" && callMode !== "prerecorded") throw new Error(`RECALL_CALL must be "none" or "prerecorded", not "${callMode}"`);
   if (env.RECALL_HOUSEHOLD && env.RECALL_POLICY_FILE) throw new Error("set RECALL_HOUSEHOLD or RECALL_POLICY_FILE, not both: a household's setup comes from the onboarding database");
-  return { callMode, root, policyFile: env.RECALL_POLICY_FILE || undefined, household: env.RECALL_HOUSEHOLD || undefined, onboardingDb: env.RECALL_ONBOARDING_DB || undefined };
+  return { callMode, root, policyFile: env.RECALL_POLICY_FILE || undefined, household: env.RECALL_HOUSEHOLD || activeHousehold(root), onboardingDb: env.RECALL_ONBOARDING_DB || undefined };
 }
 
 export interface LiveRecall {
@@ -96,20 +104,28 @@ const loudly =
     });
 
 export async function createLiveRecall(config: LiveConfig): Promise<LiveRecall> {
-  const assets = new AssetIndex(MANIFEST);
-  const onboarding = config.household ? openOnboarding(config.root, config.onboardingDb ?? DEFAULT_ONBOARDING_DB) : null;
+  if (!config.household && !config.fixture) throw new SetupRequiredError();
+  if (config.household && config.callMode !== "none") throw new Error("Real households cannot use prerecorded calls.");
+  const assets = new AssetIndex(config.fixture ? MANIFEST : { version: 1, generated_by: "live", assets: [] });
+  const onboarding = config.household ? openOnboarding(config.root, config.onboardingDb ?? join(dataDirectory(config.root), "onboarding.db")) : null;
   const agreed = async (): Promise<unknown> => {
-    const status = await onboarding!.status(config.household!);
-    if (!status.steps.every((s) => s.done)) throw new Error(`${config.household} has not finished onboarding: ${status.steps.filter((s) => !s.done).map((s) => s.step).join(", ")}`);
-    return (await onboarding!.currentSetup(config.household!))!.document;
+    const version = await onboarding!.currentSetup(config.household!);
+    if (!version) throw new SetupRequiredError();
+    return version.document;
   };
-  const graph = MemoryGraphStore.from(buildGraph(onboarding ? await onboarding.graphSeed(config.household!) : FAMILY_SEED, assets));
+  if (onboarding) await agreed();
+  const seed = buildGraph(onboarding ? await onboarding.graphSeed(config.household!) : FAMILY_SEED, assets);
+  const graph = onboarding ? new SqliteGraphStore(join(dataDirectory(config.root), "recall-graph.db"), config.household!) : MemoryGraphStore.from(seed);
+  if (graph instanceof SqliteGraphStore) await graph.seed(seed);
   const prerecorded = config.callMode === "prerecorded";
   const fixtureClock = prerecorded ? new FixtureClock(config.now ?? JUDGED_TIMING.start_at) : null;
   const clock = fixtureClock ?? new SystemClock();
   const setup = new SetupStore(onboarding ? await agreed() : config.policyFile ? JSON.parse(readFileSync(join(config.root, config.policyFile), "utf8")) : POLICY);
   const refreshSetup = async (): Promise<void> => {
-    if (onboarding) setup.replace(await agreed());
+    if (onboarding) {
+      setup.replace(await agreed());
+      if (graph instanceof SqliteGraphStore) await graph.seed(buildGraph(await onboarding.graphSeed(config.household!), assets));
+    }
   };
   const alerts = new MemoryAlertChannel();
   const spark = process.env.MUSE_API_KEY ? new MuseSpark(requireMuseKey(process.env.MUSE_API_KEY)) : null;
@@ -149,4 +165,8 @@ export async function createLiveRecall(config: LiveConfig): Promise<LiveRecall> 
   };
 
   return { callMode: config.callMode, service, setup, alerts, refreshSetup, tick };
+}
+
+export class SetupRequiredError extends Error {
+  constructor() { super("Complete the joint setup before opening the family view."); this.name = "SetupRequiredError"; }
 }

@@ -2,15 +2,15 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { ArrowLeft, ArrowRight, MoveHorizontal } from "lucide-react";
-import { sessionSupport, type SessionSummary } from "@/lib/recall-preview/sessions";
-import { MemorySuggestionForm } from "./MemorySuggestionForm";
+import { sessionSupport, type SessionSummary } from "@/lib/family/session-summary";
+
 
 const envelope = [.12, .21, .32, .27, .46, .58, .49, .73, .86, 1, .82, .69, .77, .51, .43, .32, .38, .21, .12];
 const shortDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 const fullDate = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
 const dateLabel = (date: string, full = false) => (full ? fullDate : shortDate).format(new Date(date + "T12:00:00Z"));
 
-export function SessionWaveform({ sessions, children }: { sessions: SessionSummary[]; children?: ReactNode }) {
+export function SessionWaveform({ sessions, children, contribution, recordWindow = 8, minimumCalls = 3 }: { sessions: SessionSummary[]; children?: ReactNode; contribution?: ReactNode; recordWindow?: number; minimumCalls?: number }) {
   const [active, setActive] = useState(Math.max(0, sessions.length - 1));
   const [announcement, setAnnouncement] = useState("");
   const track = useRef<HTMLDivElement>(null);
@@ -93,7 +93,7 @@ export function SessionWaveform({ sessions, children }: { sessions: SessionSumma
     event.preventDefault(); select(next, true);
   }
 
-  if (!selected) return <div className="care-overview"><p>No calls to explore yet. A session will appear here after a Recall conversation.</p><MemorySuggestionForm /></div>;
+  if (!selected) return <div className="care-overview"><p>No calls to explore yet. A session will appear here after a Recall conversation.</p>{contribution}</div>;
 
   return <>
     <div className="session-wave" aria-label="Recall session history">
@@ -127,23 +127,23 @@ export function SessionWaveform({ sessions, children }: { sessions: SessionSumma
         {active === sessions.length - 1 && <p className="session-wave-end" aria-hidden="true">Latest call</p>}
         {active === 0 && <p className="session-wave-start" aria-hidden="true">First call</p>}
       </div>
-      <div className="session-wave-caption" id="session-wave-instructions"><p>Taller peaks: more calls about that topic recalled without a cue. Counts use up to 8 calls, as of each date. Dashed marks: not enough calls yet.</p><span>Scroll, tap, or use arrow keys.</span></div>
+      <div className="session-wave-caption" id="session-wave-instructions"><p>Taller peaks: more calls about that topic recalled without a cue. Counts use up to {recordWindow} calls, as of each date. Dashed marks: not enough calls yet.</p><span>Scroll, tap, or use arrow keys.</span></div>
       <p className="session-sr-only" role="status" aria-live="polite">{announcement}</p>
     </div>
     <div className="care-overview session-overview">
       <div>
         <section className="session-receipt" id="selected-session" aria-labelledby="selected-session-title">
-          <div className="session-receipt-heading"><time dateTime={selected.date}>{dateLabel(selected.date, true)}</time><span>Sample call</span></div>
+          <div className="session-receipt-heading"><time dateTime={selected.date}>{dateLabel(selected.date, true)}</time><span>Recall call</span></div>
           <div className="session-receipt-content" key={selected.id}>
             <h3 id="selected-session-title">{selected.topicName}</h3>
             <p className="session-support">{sessionSupport(selected.outcome)}</p>
-            <p className="session-count">{selected.unaidedCalls === null ? <><strong>Not enough calls yet</strong><span>This topic needs at least 3 calls before a peak is shown.</span></> : <><strong>{selected.unaidedCalls} of {selected.recentCalls} recent calls unaided</strong><span>For this topic, up to {dateLabel(selected.date)}.</span></>}</p>
+            <p className="session-count">{selected.unaidedCalls === null ? <><strong>Not enough calls yet</strong><span>This topic needs at least {minimumCalls} calls before a peak is shown.</span></> : <><strong>{selected.unaidedCalls} of {selected.recentCalls} recent calls unaided</strong><span>For this topic, up to {dateLabel(selected.date)}.</span></>}</p>
           </div>
           <p className="care-caption session-privacy">A brief account of the support used. Personal words stay private.</p>
         </section>
         {children}
       </div>
-      <MemorySuggestionForm />
+      {contribution}
     </div>
   </>;
 }

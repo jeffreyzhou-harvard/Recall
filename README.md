@@ -66,7 +66,7 @@ Family flows sit outside that reducer: a query is redirected, a contribution is 
 | Trims, hashes, receipts | `lib/provenance` — an edit-decision list that can only express silence and disfluency trims; hash-chained PROV-style log |
 | Onboarding database | `lib/onboarding` — households, the people in them, stated ties, invitations, and every version of the joint setup, append-only. SQLite (`node:sqlite`) with an in-memory twin; the same rules run over both |
 | Caregiver frontend | `/caregiver` (`/family` alias) — session waveform, optional topic details/Weekly Note, local memory and question suggestions |
-| Judged sandbox | `/present` — autoplay 90-second path; arrow keys step manually |
+| Judged sandbox | `/present` — isolated fixture-based engine check |
 
 The model may select tool calls. It cannot bypass gates. Storing a claim without confirmation, speaking an uncited fact, leaking graph content through `handle_family_query`, or climbing the ladder out of order are hard fails.
 
@@ -109,18 +109,13 @@ Cast is fixed: Susan, Maya (daughter), Priya (sister), Anika (granddaughter), Ca
 
 `/present` runs this offline, on prerecorded branches and fixture outputs. Telephony, ASR, and the network must never touch it.
 
-## What is built, and what is not
+## Connected application
 
-**Built, and covered by `npm run check`:** the recall loop end to end on fixtures - topic pick, the call gate, the five-rung ladder, capture, store- and share-confirmation, commit last, the retrieval layer - plus the safety handoff, the AI-identity line, all 19 tools, and the family side as an engine: the redirect-only ask box, the contribution path, the Weekly Note, the per-topic record with change lines, and the export, all behind a whitelist projection. `/present` runs the whole golden path, family beats included, as a plain engine check. The fixtures (`call-script.json`, `family-copy.json`, `record-thresholds.json`, `safety-phrases.json`) exist. `EVIDENCE.md` records the design choices that were checked against the literature.
+`/onboarding`, `/caregiver` (also `/family`), `/`, and `/revisit` now use the live backend. Joint setup, attributed text contributions, family records and exports are connected. No sample history is loaded into these routes. The current call screen reports that no live call is available.
 
-**Not built:**
+See [backend integration](docs/backend-integration.md) for local setup, member-bound browser access, persistent storage configuration, verification and the remaining work. The offline engine demo remains isolated at `/present`.
 
-- **The interface.** `/family` and `/components` do not exist, and `/` and `/present` are unstyled scaffolds. Direction is "The Living Graph" (`AGENTS.md` §10). The family side is reachable only through `/api/family/*`, which has no sign-in yet.
-- **A live call.** The earlier video call was removed. The call feature - her speech transcribed on the web app - is being built separately; it plugs in as a `CallDriver` plus a `TranscriptionProvider` (`lib/orchestrator/call-driver.ts` says what a driver owes the engine). Until then a call runs only on the prerecorded fixture, and a turn of the schedule is a manual, operator-only request.
-- **Onboarding capture.** The database, its rules, and its routes exist (see "Onboarding"); the screens do not, and neither does the "Who is this?" beat. A household onboarded today has people and a setup but no topics yet: topics enter through family contributions, which the API does not yet attach to a topic.
-- **Sign-in.** The family routes bind `member` to its own secret in `RECALL_FAMILY_CREDENTIALS` (a JSON object mapping member IDs to distinct secrets), sent through `x-recall-family`. The schedule and onboarding use `RECALL_OPERATOR_SECRET`. Overlapping keys, malformed mappings, or a configured legacy `RECALL_FAMILY_SECRET` disable access. Family credentials are required in development too; a full sign-in flow is still pending.
-- **Real media.** Everything in `/assets` is a generated stand-in. Word timings are placeholders. See below.
-- **`legacy/`** holds the earlier family-ask recall (forwarded asks, thread bridge). It is out of scope (`AGENTS.md` §14), excluded from the build, and can be deleted once the team agrees.
+**Still unbuilt:** live audio/calling and external safety delivery, automatic scheduling, topic authoring/approval, photo/voice uploads and invitation/account provisioning screens. Calls remain paused while those dependencies are absent. The local contact/calendar import and question-request prototypes are not live ingestion paths.
 
 ## Replacing the placeholder media
 

@@ -14,6 +14,7 @@
  * anything to family either, except the safety alert inside a call (rule 15):
  * the family side is read when an approved member opens it.
  */
+import { dashboardAccess } from "@/lib/tools/policy";
 import type { Clock, FixtureClock } from "@/lib/clock";
 import { LexicalAnswerInterpreter, applyAnswer, type Answer, type AnswerInterpreter, type ApplyResult } from "@/lib/discovery/answers";
 import { findGaps } from "@/lib/discovery/gaps";
@@ -131,7 +132,9 @@ export class RecallService {
    */
   private familyQueue: Promise<unknown> = Promise.resolve();
   private family<T extends FamilyTool>(tool: T, input: ToolInput<T>): Promise<ToolOutput<T>> {
-    const next = this.familyQueue.then(() => this.familyRuntime.call(tool, input));
+    const next = this.familyQueue.then(() => this.deps.graph.atomic
+      ? this.deps.graph.atomic(() => this.familyRuntime.call(tool, input))
+      : this.familyRuntime.call(tool, input));
     this.familyQueue = next.catch(() => undefined);
     return next;
   }
@@ -157,6 +160,26 @@ export class RecallService {
 
   exportRecord(requesterId: string): Promise<ToolOutput<"export_record_for_clinician">> {
     return this.family("export_record_for_clinician", { requester_id: requesterId });
+  }
+
+  /** Names and per-topic event counts only; the same whitelist as the record, with its access gate. */
+  async dashboardInfo(memberId: string) {
+    const policy = this.deps.setup.current();
+    if (!policy.approved_people.includes(memberId)) return null;
+    const view = new FamilyView(this.deps.graph, policy.person_id);
+    const detail = dashboardAccess(policy, memberId);
+    const rows = detail === "weekly_note_and_record" ? await view.outcomeRows() : [];
+    const ordered = rows.sort((a, b) => a.at.localeCompare(b.at) || a.topic_key.localeCompare(b.topic_key));
+    const sessions = ordered.map((row, i) => {
+      const window = ordered.slice(0, i + 1).filter((r) => r.topic_key === row.topic_key).slice(-this.deps.thresholds.record_window_calls);
+      return {
+        id: `${row.topic_key}:${row.at}:${i}`, date: row.at.slice(0, 10), topicId: row.topic_key, topicName: row.topic_name,
+        outcome: row.reached_at_rung === 1 ? "unaided" as const : row.reached_at_rung === 2 || row.reached_at_rung === 3 ? "cue" as const : row.reached_at_rung === 4 ? "recognition" as const : "unreached" as const,
+        recentCalls: window.length,
+        unaidedCalls: window.length >= this.deps.thresholds.min_calls_to_show ? window.filter((r) => r.reached_at_rung === 1).length : null,
+      };
+    });
+    return { person_name: await view.herName(), member_name: await view.memberName(memberId), detail_level: detail, record_window_calls: this.deps.thresholds.record_window_calls, min_calls_to_show: this.deps.thresholds.min_calls_to_show, sessions, contributions: await view.ownContributions(memberId) };
   }
 
   // --- caregiver controls (rule 12; section 6.3) ----------------------------------------------------------------

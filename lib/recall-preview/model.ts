@@ -1,5 +1,5 @@
 /** UI prototype only. Never passed to live capture, graph, or publishing services. */
-export type Outcome = "unaided" | "cue" | "recognition";
+export type Outcome = "unaided" | "cue" | "recognition" | "unreached";
 export type PreviewLine = { id: string; speaker: string; text: string; rung: number };
 export type PreviewTopic = {
   id: string; name: string; shortName: string; invitation: string; source: string;

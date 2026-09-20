@@ -79,7 +79,7 @@ describe("live family time", () => {
   it("posts a new Weekly Note after seven real days without running a call", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-11-06T15:00:00.000Z"));
-    const live = await createLiveRecall({ callMode: "none", root: process.cwd() });
+    const live = await createLiveRecall({ callMode: "none", root: process.cwd(), fixture: true });
     const first = await live.service.weeklyNote("person:maya");
     expect(first.status).toBe("posted");
     expect(JSON.stringify(first)).toContain("2026-11-06");
