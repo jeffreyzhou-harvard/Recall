@@ -6,10 +6,12 @@ export function StoryRecorder({
   momentId,
   name,
   onSaved,
+  apiBase = "/api/circle",
 }: {
   momentId: string;
   name: string;
   onSaved: () => Promise<void>;
+  apiBase?: string;
 }) {
   const [text, setText] = useState(""),
     [audio, setAudio] = useState<{ id: string; url: string } | null>(null),
@@ -28,7 +30,7 @@ export function StoryRecorder({
     request = useRef(crypto.randomUUID()),
     draft = useRef<string | null>(null);
   function discard(id: string) {
-    void fetch("/api/circle/discard-audio", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }), keepalive: true }).catch(() => {});
+    void fetch(apiBase + "/discard-audio", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }), keepalive: true }).catch(() => {});
   }
   useEffect(() => {
     mounted.current = true;
@@ -57,7 +59,7 @@ export function StoryRecorder({
     try {
       const form = new FormData();
       form.set("audio", file);
-      const r = await fetch("/api/circle/audio", {
+      const r = await fetch(apiBase + "/audio", {
         method: "POST",
         body: form,
       });
@@ -160,7 +162,7 @@ export function StoryRecorder({
         audioId: audio?.id,
         confirmed: true,
         audioReviewed: !audio || played,
-      });
+      }, apiBase);
       draft.current = null;
       await onSaved();
       setSaved(true);
