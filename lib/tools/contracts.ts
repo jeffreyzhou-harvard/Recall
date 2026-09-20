@@ -46,7 +46,7 @@ const trim = z.strictObject({ kind: z.enum(["silence", "disfluency"]), start_ms:
 /** Something in her turn that is about the call itself rather than the topic. Lexical, from the call script's phrase lists. */
 export const CONDUCT_SIGNALS = ["stop_request", "identity_question"] as const;
 export const RESPONSE_FORMATS = ["open", "forced_choice", "yes_no"] as const;
-export const CUE_KINDS = ["person", "photo", "family_claim"] as const;
+export const CUE_KINDS = ["person", "place", "photo", "family_claim"] as const;
 export const NOTE_LINE_KINDS = ["warm", "share", "gap", "difference", "pointer"] as const;
 export const QUERY_CATEGORIES = ["event", "place", "person", "other"] as const;
 

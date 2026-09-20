@@ -121,7 +121,7 @@ interface RungPlan {
   scaffold: ScriptLine;
   slot_ids: Record<string, string>;
   citations: string[];
-  cue: { kind: "person" | "photo" | "family_claim"; cue_id: string } | null;
+  cue: { kind: "person" | "place" | "photo" | "family_claim"; cue_id: string } | null;
   recognition?: { correct_edge_id: string; other_edge_id: string };
 }
 
@@ -130,7 +130,7 @@ interface Material {
   personId: string;
   verified: Map<string, { speaker: string; patient_confirmed: boolean }>;
   /** Verified claims about the topic, with the verified things each is also about. */
-  claims: Array<{ claim: GraphNode; about: GraphNode[] }>;
+  claims: Array<{ claim: GraphNode; about: GraphNode[]; mentionsOnly: boolean }>;
   place: GraphNode | null;
   relations: Array<{ edge: GraphEdge; said_as: string }>;
   photos: GraphNode[];
@@ -150,12 +150,13 @@ async function gather(ctx: ToolContext, topicId: string, verifiedIds: readonly s
     if (!other) continue;
     if (edge.type === "ABOUT" && other.type === "EpisodicClaim") {
       const about: GraphNode[] = [];
+      let mentionsOnly = false;
       for (const e of await ctx.graph.edgesOf(other.id)) {
         if (e.type !== "ABOUT" || e.from !== other.id || e.to === topicId || !verified.has(e.to)) continue;
         const n = await ctx.graph.getNode(e.to);
-        if (n) about.push(n);
+        if (n) { about.push(n); if (e.props.mention_only === true) mentionsOnly = true; }
       }
-      material.claims.push({ claim: other, about: about.sort((a, b) => (a.id < b.id ? -1 : 1)) });
+      material.claims.push({ claim: other, mentionsOnly, about: about.sort((a, b) => (a.id < b.id ? -1 : 1)) });
     } else if (edge.type === "DEPICTS" && other.type === "Artifact" && other.props.kind === "photo") material.photos.push(other);
     else if (edge.type === "RELATED_TO" && edge.props.relation === "took_place_at" && other.type === "Place") material.place = other;
   }
@@ -192,10 +193,18 @@ function planRung(ctx: ToolContext, rung: Rung, m: Material, familySourced: bool
         return [{ scaffold: ctx.script.ladder.family_sourced_association, slot_ids: { author, topic: topicId }, citations: [topicId, theirs.claim.id, author], cue: { kind: "family_claim", cue_id: theirs.claim.id } }];
       }
       const cues: RungPlan[] = [];
-      if (lines?.association?.person) {
+      const personLine = ctx.knowledgeQuestions ? ctx.script.ladder.knowledge_association ?? lines?.association?.person : lines?.association?.person;
+      if (personLine) {
         for (const c of m.claims.filter((c) => isHers(m, c.claim))) {
           for (const person of c.about.filter((n) => n.type === "Person" && n.id !== m.personId)) {
-            if (!cues.some((x) => x.cue?.cue_id === person.id)) cues.push({ scaffold: lines.association.person, slot_ids: { cue: person.id }, citations: [topicId, c.claim.id, person.id], cue: { kind: "person", cue_id: person.id } });
+            if (!cues.some((x) => x.cue?.cue_id === person.id)) cues.push({ scaffold: personLine, slot_ids: { cue: person.id }, citations: [topicId, c.claim.id, person.id], cue: { kind: "person", cue_id: person.id } });
+          }
+        }
+      }
+      if (ctx.knowledgeQuestions && ctx.script.ladder.knowledge_place_association) {
+        for (const c of m.claims.filter((c) => isHers(m, c.claim))) {
+          for (const place of c.about.filter((n) => n.type === "Place")) {
+            if (!cues.some((x) => x.cue?.cue_id === place.id)) cues.push({ scaffold: ctx.script.ladder.knowledge_place_association, slot_ids: { place: place.id }, citations: [topicId, c.claim.id, place.id], cue: { kind: "place", cue_id: place.id } });
           }
         }
       }
@@ -213,7 +222,7 @@ function planRung(ctx: ToolContext, rung: Rung, m: Material, familySourced: bool
       if (!line) return `the call script has no ${rung === 4 ? "recognition" : "reorientation"} line for this kind of topic`;
       if (!m.place) return "no verified place to name";
       // The fact itself must be hers, in her own confirmed words: a family account is never the "answer" (rule 13).
-      for (const c of m.claims.filter((c) => isHers(m, c.claim))) {
+      for (const c of m.claims.filter((c) => isHers(m, c.claim) && !c.mentionsOnly)) {
         for (const person of c.about.filter((n) => n.type === "Person" && n.id !== m.personId)) {
           const tie = m.relations.find((r) => r.edge.to === person.id);
           if (!tie) continue;

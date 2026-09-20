@@ -40,6 +40,8 @@ import { createRecallStore } from "@/lib/state/store";
 import { GateKeeper, TOOL_IMPLS, ToolRuntime, dashboardAccess, newSession, type FamilyToolContext, type Fault, type ScaffoldAdvisor, type SetupStore, type ToolContext, type ToolInput, type ToolName, type ToolOutput } from "@/lib/tools";
 
 export interface RecallDeps {
+  knowledgeQuestions?: boolean;
+  enrichKnowledge?: () => Promise<unknown>;
   isCallStopped?: () => boolean;
   callAttempts?: () => Array<{ session_id: string; at: string }>;
   onContributionCommitted?: (ctx: ToolContext) => Promise<void>;
@@ -133,6 +135,7 @@ export class RecallService {
     const store = createRecallStore();
     const personId = deps.setup.current().person_id;
     const ctx: ToolContext = {
+      knowledgeQuestions: deps.knowledgeQuestions,
       isCallStopped: deps.isCallStopped,
       callAttempts: deps.callAttempts,
       graph: deps.graph,
@@ -158,6 +161,7 @@ export class RecallService {
     if (machine.state === "idle") return null;
     await this.applyUnansweredStreak(machine, runtime);
     const recording = await buildRecording({ person_id: personId, started_at: startedAt, ended_at: deps.clock.iso(), machine, session: ctx.session, tool_log: runtime.log, receipt });
+    if (ctx.session.stored) await deps.enrichKnowledge?.();
     return { recording, ctx, runtime };
   }
 
@@ -226,8 +230,10 @@ export class RecallService {
   }
 
   /** "Tell Recall about a memory you share with Susan." One-way: it returns a thank-you or a hint, never anything from the graph. */
-  tellRecallAMemory(input: ToolInput<"receive_family_contribution">): Promise<ToolOutput<"receive_family_contribution">> {
-    return this.family("receive_family_contribution", input);
+  async tellRecallAMemory(input: ToolInput<"receive_family_contribution">): Promise<ToolOutput<"receive_family_contribution">> {
+    const result = await this.family("receive_family_contribution", input);
+    if (result.status === "stored_as_family_claim") await this.deps.enrichKnowledge?.();
+    return result;
   }
 
   /** The "Ask about Susan" box. Whatever is typed, the reply is the redirect line (rule 10). */

@@ -1,3 +1,4 @@
+import { planQuestion } from "@/lib/knowledge/questions";
 /**
  * The orchestrator walks the enforced tool sequence and feeds the reducer
  * (AGENTS.md section 6):
@@ -141,7 +142,10 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
 
     const line = (key: FixedLineKey): Promise<Prompt> => runtime.call("render_prompt", { topic_id: topicId, scaffold_id: ctx.script.lines[key].id, slot_ids: {}, citations: [] });
     for (const key of ["greeting", "identity", "store_question", "share_question", "close_warm", "close_kind", "close_not_stored", "narrowing", "stop_ack", "safety"] as const) fixed[key] = await line(key);
-    const elaborate = ctx.script.ladder.categories[topic.category]?.elaborate ?? ctx.script.ladder.elaborate_default;
+    const knowledgePlan = ctx.knowledgeQuestions ? await planQuestion(ctx.graph, ctx.setup.current(), topicId, ctx.clock.iso()) : null;
+    const gap = knowledgePlan?.gap;
+    const followup = gap && gap !== "own_account" ? ctx.script.ladder.knowledge_followups?.[gap] : null;
+    const elaborate = followup ?? ctx.script.ladder.categories[topic.category]?.elaborate ?? ctx.script.ladder.elaborate_default;
     fixed.elaborate = await runtime.call("render_prompt", { topic_id: topicId, scaffold_id: elaborate.id, slot_ids: {}, citations: [] });
     const opening = await runtime.call("select_scaffold", { topic_id: topicId, state: "opening", verified_ids: verified, rungs_fired: [] });
     if (opening.rung !== 1 || !opening.scaffold_id) throw new GateError("evidence", "free recall cannot be asked: the topic has nothing verified to name it by");

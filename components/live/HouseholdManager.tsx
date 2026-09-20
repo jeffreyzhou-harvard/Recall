@@ -1,5 +1,7 @@
 "use client";
 import Link from "next/link";
+import { KnowledgeReview } from "./KnowledgeReview";
+import { KnowledgeImport } from "./KnowledgeImport";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import "@/app/onboarding-live.css";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
@@ -46,6 +48,8 @@ export function HouseholdManager() {
       <label>Your memory<textarea required value={story} maxLength={2000} onChange={(e) => setStory(e.target.value)} rows={4} /></label>
       <button className="care-action" disabled={busy}>Save topic for review<ArrowRight size={18} aria-hidden="true" /></button>
     </form>
+    {caregiver && <KnowledgeReview member={caregiver.person_id} refreshKey={message} />}
+    {caregiver && <KnowledgeImport key={caregiver.person_id} contributor={caregiver} members={people.filter((p) => setup.document.approved_people.includes(p.person_id))} onSaved={load} />}
     <form className="live-setup-section" aria-busy={busy} onSubmit={(e) => { e.preventDefault(); void work(async () => { await api(`${base}/choices`, { method: "POST", body: JSON.stringify({ expected_version: setup.version, patient_agreed: patientAgreed, caregiver_agreed: caregiverAgreed, members: choices, topics: allowed, web_calls_enabled: webEnabled, alert_channel: channel }) }); await load(); setMessage("Your joint choices are saved."); }); }}>
       <h2>Review together</h2>
       <p>These choices need agreement from {patient?.display_name} and {caregiver?.display_name}.</p>

@@ -73,6 +73,7 @@ export interface RetrievalParams {
   policy_id: string;
   audience: string;
   allowed_sources: readonly SourceClass[];
+  approved_authors?: readonly string[];
   max_hops: number;
   now_iso: string;
 }
@@ -159,6 +160,7 @@ export async function retrieveCandidates(store: GraphStore, params: RetrievalPar
     // First, always: an observation or an inference is not context, whatever the policy allows.
     if (!SPEAKABLE_AS_FACT.has(p.status)) return "not_confirmed";
     if (!allowed.has(p.source_class)) return "source_class_not_allowed";
+    if (params.approved_authors && ["family_contribution", "discovery_answer", "joint_setup"].includes(p.source_class) && !params.approved_authors.includes(p.author)) return "source_class_not_allowed";
     if (p.expires_at !== null && p.expires_at <= params.now_iso) return "expired";
     if (!p.audience_scope.includes(params.audience)) return "audience_out_of_scope";
     const permitted = (await store.edgesOf(artifactId)).some((e) => e.type === "PERMITTED_IN" && e.to === params.policy_id);

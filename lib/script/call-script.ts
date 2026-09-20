@@ -70,6 +70,9 @@ export const callScriptSchema = z.strictObject({
     free_recall: line,
     family_sourced_association: line,
     elaborate_default: line,
+    knowledge_association: line.optional(),
+    knowledge_place_association: line.optional(),
+    knowledge_followups: z.strictObject({ people: line, place: line, occasion: line }).optional(),
     categories: z.record(z.string(), categoryLines),
   }),
   stop_phrases: z.array(z.string().min(1)).min(1),
@@ -109,6 +112,9 @@ export function fill(template: ScriptLine, values: Readonly<Record<string, strin
 /** Every fixed line in the script, flat, for the lint and for checking that script ids are unique. */
 export function allScriptLines(script: CallScript): ScriptLine[] {
   const out: ScriptLine[] = [...Object.values(script.lines), script.ladder.free_recall, script.ladder.family_sourced_association, script.ladder.elaborate_default];
+  if (script.ladder.knowledge_association) out.push(script.ladder.knowledge_association);
+  if (script.ladder.knowledge_place_association) out.push(script.ladder.knowledge_place_association);
+  if (script.ladder.knowledge_followups) out.push(...Object.values(script.ladder.knowledge_followups));
   for (const c of Object.values(script.ladder.categories)) {
     out.push(c.context);
     for (const l of [c.association?.person, c.association?.photo, c.recognition, c.reorientation, c.elaborate]) if (l) out.push(l);

@@ -108,6 +108,7 @@ export interface ScaffoldChoice {
 export type ScaffoldAdvisor = (advice: ScaffoldAdvice) => Promise<ScaffoldChoice>;
 
 export interface ToolContext {
+  knowledgeQuestions?: boolean;
   /** Live transport stop, checked inside the atomic commit boundary. */
   isCallStopped?: () => boolean;
   onContributionCommitted?: () => Promise<void>;

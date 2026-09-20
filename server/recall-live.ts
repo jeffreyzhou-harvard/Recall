@@ -1,3 +1,5 @@
+import { KnowledgeUpdater, LiteralGraphExtractor } from "@/lib/knowledge/updates";
+import { MuseGraphExtractor } from "@/lib/providers/muse/graph";
 import { CallAttempts } from "./call-attempts";
 import { MediaStore } from "./media";
 import { WebCall, LiveTranscription } from "./web-call";
@@ -72,6 +74,7 @@ export interface LiveRecall {
   service: RecallService;
   graph: import("@/lib/graph/store").GraphStore;
   assets: AssetIndex;
+  knowledge: KnowledgeUpdater;
   setup: SetupStore;
   /** Safety alerts, held for the designated caregiver's dashboard card. The only thing Recall ever sends to family (rule 15). */
   alerts: MemoryAlertChannel | DurableAlerts;
@@ -107,7 +110,7 @@ export async function createLiveRecall(config: LiveConfig): Promise<LiveRecall> 
   };
   if (onboarding) await agreed();
   const seed = buildGraph(onboarding ? await onboarding.graphSeed(config.household!) : FAMILY_SEED, assets);
-  const graph = onboarding ? new SqliteGraphStore(join(dataDirectory(config.root), "recall-graph.db"), config.household!) : MemoryGraphStore.from(seed);
+  const graph = onboarding ? new SqliteGraphStore(join(dataDirectory(config.root), "recall-graph.db"), config.household!, process.env.RECALL_GRAPH_READS !== "sqlite") : MemoryGraphStore.from(seed);
   if (graph instanceof SqliteGraphStore) await graph.seed(seed);
   const prerecorded = config.callMode === "prerecorded";
   const fixtureClock = prerecorded ? new FixtureClock(config.now ?? JUDGED_TIMING.start_at) : null;
@@ -127,10 +130,13 @@ export async function createLiveRecall(config: LiveConfig): Promise<LiveRecall> 
   const transcription = new LiveTranscription();
   let webCall: WebCall | null = null;
   const spark = process.env.MUSE_API_KEY ? new MuseSpark(requireMuseKey(process.env.MUSE_API_KEY)) : null;
+  const knowledge = new KnowledgeUpdater(graph, () => setup.current(), spark ? new MuseGraphExtractor(spark) : new LiteralGraphExtractor(), refreshSetup);
   const { default: default_ms, ...ms } = JUDGED_TIMING.tool_latency_ms;
 
   const service = new RecallService({
     graph,
+    knowledgeQuestions: !config.fixture,
+    ...(!config.fixture ? { enrichKnowledge: () => knowledge.process(1).catch(() => ({ failed: 1 })) } : {}),
     callAttempts: () => attempts?.all() ?? [],
     onContributionCommitted: async (ctx) => { if (ctx.session.stored) await webCall?.retainConfirmed({ contribution_hash: ctx.session.stored.contribution_hash, store: ctx.session.store_confirmation, share: ctx.session.share_confirmation, share_audio: ctx.session.share_audio_window }); },
     onCallSession: (id) => { currentSession = id; },
@@ -164,6 +170,7 @@ export async function createLiveRecall(config: LiveConfig): Promise<LiveRecall> 
   let sessions = 0;
   const tick = (): Promise<SessionRecording | null> => {
     const next = queue.then(async () => {
+      if (!config.fixture) await knowledge.process(2);
       if (config.callMode === "none" || (config.callMode === "web" && !process.env.DEEPGRAM_API_KEY)) return null;
       await refreshSetup();
       await service.tickSafetyEscalations();
@@ -179,7 +186,7 @@ export async function createLiveRecall(config: LiveConfig): Promise<LiveRecall> 
     return next;
   };
 
-  return { callMode: config.callMode, service, graph, assets, media, currentCall: () => webCall, setup, alerts, refreshSetup, tick };
+  return { callMode: config.callMode, service, graph, assets, knowledge, media, currentCall: () => webCall?.ended ? null : webCall, setup, alerts, refreshSetup, tick };
 }
 
 export class SetupRequiredError extends Error {

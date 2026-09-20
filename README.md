@@ -115,6 +115,8 @@ Cast is fixed: Susan, Maya (daughter), Priya (sister), Anika (granddaughter), Ca
 
 The safety engine includes phrase handoffs, missed-call tiering, caregiver acknowledgment and escalation. Delivery uses the configured dashboard or durable webhook channel. The fixture engine and its safety thresholds remain covered by `npm run check`.
 
+The [knowledge graph](docs/knowledge-graph.md) now supports selected onboarding imports, continuous Muse-assisted updates, contributor interpretation review, graph-driven follow-ups and native Ladybug reads.
+
 See [backend integration](docs/backend-integration.md) for configuration, verification and deployment limits. A real browser microphone/speaker walkthrough remains to be verified. The offline `/present` demo remains isolated and still contains placeholder recordings. The local contact/calendar import and question-request prototypes are not live ingestion paths.
 
 ## Replacing the placeholder media

@@ -1,3 +1,4 @@
+import { KnowledgeUpdater } from "@/lib/knowledge/updates";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildFixtureRig } from "@/fixtures/harness";
 import { createLiveRecall, getLiveRecall } from "@/server/recall-live";
@@ -36,7 +37,7 @@ describe("member-bound route access (§2 rules 5, 14, 15)", () => {
   it("serves the credential owner and enforces revocation on their next request", async () => {
     credentials();
     const rig = await buildFixtureRig();
-    vi.mocked(getLiveRecall).mockResolvedValue({ ...rig, callMode: "none", media: null, currentCall: () => null, refreshSetup: async () => {}, tick: async () => null });
+    vi.mocked(getLiveRecall).mockResolvedValue({ ...rig, knowledge: new KnowledgeUpdater(rig.graph, () => rig.setup.current()), callMode: "none", media: null, currentCall: () => null, refreshSetup: async () => {}, tick: async () => null });
     const first = await dashboard(request("person:maya"));
     expect(first.status).toBe(200);
     expect((await first.json()).topic_record.status).not.toBe("no_access");

@@ -113,8 +113,10 @@ describe("evidence-bounded speech (rule 6)", () => {
     const b = await bench({ overlays: [neighbour] });
     expect(b.verified).not.toContain("person:ravi");
     expect(b.verified).not.toContain("RELATED_TO:person:susan->person:ravi");
-    const rejected = b.runtime.log.find((c) => c.tool === "verify_claim_support")!.output as { rejected: Array<{ claim_id: string; reason: string }> };
-    expect(rejected.rejected.filter((r) => r.reason === "binding_without_approved_source").map((r) => r.claim_id).sort()).toEqual(["RELATED_TO:person:susan->person:ravi", "person:ravi"]);
+    // Unapproved evidence is now rejected before traversal, so it cannot lead to another person's claims.
+    const retrieved = b.runtime.log.find((c) => c.tool === "query_context_graph")!.output as { candidates: Array<{ root_id: string }>; relations: Array<{ edge_id: string }> };
+    expect(retrieved.candidates.map((c) => c.root_id)).not.toContain("person:ravi");
+    expect(retrieved.relations.map((r) => r.edge_id)).not.toContain("RELATED_TO:person:susan->person:ravi");
   });
 });
 

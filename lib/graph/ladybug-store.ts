@@ -49,10 +49,10 @@ const NODE_COLUMNS =
 
 /** DDL derived from the same tables the seed validator uses, so the schemas cannot drift apart. */
 export function schemaDdl(): string[] {
-  const nodes = NODE_TYPES.map((t) => `CREATE NODE TABLE ${t}(${NODE_COLUMNS})`);
+  const nodes = NODE_TYPES.map((t) => `CREATE NODE TABLE IF NOT EXISTS ${t}(${NODE_COLUMNS})`);
   const rels = EDGE_TYPES.map((t) => {
     const pairs = EDGE_SIGNATURES[t].map(([from, to]) => `FROM ${from} TO ${to}`).join(", ");
-    return `CREATE REL TABLE ${t}(${pairs}, id STRING, props STRING, prov STRING, source_class STRING)`;
+    return `CREATE REL TABLE IF NOT EXISTS ${t}(${pairs}, id STRING, props STRING, prov STRING, source_class STRING)`;
   });
   return [...nodes, ...rels];
 }
