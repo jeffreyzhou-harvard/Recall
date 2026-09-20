@@ -5,6 +5,8 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { api } from "@/client/api";
 import { useLive } from "./LiveProvider";
+import { PhoneField } from "./PhoneField";
+import { isCompletePhone } from "@/lib/phone/format";
 import type { SetupVersion } from "@/lib/onboarding/types";
 import type { Preferences } from "@/lib/onboarding/form";
 type Status = { people: Array<{ person_id: string; display_name: string; role: string; removed_at: string | null }>; setup: SetupVersion | null; reconfirmation_due: boolean };
@@ -39,6 +41,7 @@ export function JointSetup() {
     e.preventDefault(); if (pending) return;
     setError("");
     if (step === 0 && (!participant.trim() || !caregiver.trim())) { setError("Enter both names to continue."); return; }
+    if (step === 0 && !ids && !isCompletePhone(phone)) { setError("Enter a complete phone number."); return; }
     if (step === 1 && (draft.days.length === 0 || draft.end <= draft.start)) { setError(draft.days.length === 0 ? "Choose at least one day for calls." : "Choose an end time after the start time."); return; }
     if (step < 3) { setStep(step + 1); return; }
     setPending(true); setError("");
@@ -83,7 +86,10 @@ export function JointSetup() {
         <p className="setup-intro">Start with the person who will receive calls and the caregiver beside them.</p>
         <fieldset className="live-setup-fields" disabled={pending}><legend className="sr-only">The people setting up Recall</legend>
           <label>Their name<input autoComplete="off" value={participant} disabled={!!ids} onChange={(e) => { setParticipant(e.target.value); setDraft((d) => ({ ...d, patient_agreed: false, caregiver_agreed: false })); }} maxLength={80} required /></label>
-          {!ids && <label>Their phone number<input type="tel" autoComplete="tel" value={phone} onChange={(e) => { setPhone(e.target.value); setDraft((d) => ({ ...d, patient_agreed: false, caregiver_agreed: false })); }} pattern="\+[1-9][0-9]{6,14}" required aria-describedby="setup-phone-help" /><span id="setup-phone-help" className="live-setup-hint">Include + and the country code. This number belongs to the person receiving calls.</span></label>}
+          {!ids && <>
+            <PhoneField value={phone} required disabled={pending} describedBy="setup-phone-help" onChange={(next) => { setPhone(next); setDraft((d) => ({ ...d, patient_agreed: false, caregiver_agreed: false })); }} />
+            <span id="setup-phone-help" className="live-setup-hint">This number belongs to the person who will receive Recall’s calls, not the caregiver.</span>
+          </>}
           <label>Your name<input autoComplete="name" value={caregiver} disabled={!!ids} onChange={(e) => { setCaregiver(e.target.value); setDraft((d) => ({ ...d, patient_agreed: false, caregiver_agreed: false })); }} maxLength={80} required /></label>
         </fieldset>
         <p className="live-setup-hint">You can invite more family members after setup.</p>
