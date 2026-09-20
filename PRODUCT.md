@@ -15,7 +15,7 @@ Updated AGENTS.md and SPECS.md, pulled from main at e77d3b6, replace the earlier
 ## Current scope
 
 - `/`: incoming call, one captioned utterance at a time, separate remember/share choices, completion or stop.
-- `/family`: Maya's sample family view, weekly note, consented sample quote, neutral topic counts and comparisons.
+- `/family`: Maya's sample family view, topic-only Weekly Note, dated session bookshelf, neutral topic counts and comparisons.
 - `/revisit`: a gentle invitation to the next topic, with a choice to leave it for another time.
 - Optional design details below the call expose the scripted transcript and sample graph for review, outside the patient surface.
 
@@ -23,7 +23,7 @@ The recall frontend uses explicitly labeled fictional fixtures in memory. It mak
 
 ## Product constraints
 
-“Cues, not answers — every memory stays in her own words.” An open invitation comes first. Never judge an answer or infer clinical state. Recall identifies itself as an AI assistant. Captured words require separate store and share decisions; a stop before both resolve retains nothing new. Family receives only a consented quote, never a raw graph or transcript. Source attribution survives every view.
+“Cues, not answers — every memory stays in her own words.” An open invitation comes first. Never judge an answer or infer clinical state. Recall identifies itself as an AI assistant. Captured words require separate store and share decisions; a stop before both resolve retains nothing new. The current caregiver frontend shows topic-only call notes and counts, never patient quotations, raw graph content or transcripts. The underlying sample flow retains separate store/share decisions. Source attribution survives every view.
 
 Scripted sample words are development content, not attributed recordings. They never enter live graph or delivery services. Every sample line has an ID. No fabricated audio waveform, audio hash, clinical score or evidence of improvement. The caregiver's waveform-shaped event navigator represents labeled per-topic counts; it is never presented as recorded audio.
 
@@ -31,17 +31,17 @@ Family records display plain per-topic counts with the mandatory contextual head
 
 ## Brand commitments
 
-Product name: **Recall**, renamed at the user's request. The user selected Braille Institute's Atkinson Hyperlegible Next font and reference design, then explicitly rejected the bright colors and visual noise. Their latest direction is authoritative: a soft neutral background, dark text, restrained outlines, no colored accents or shadows. Keep the exact self-hosted Atkinson Hyperlegible Next variable font, including the OFL license. No serif in the new recall surfaces.
+Product name: **Recall**, renamed at the user's request. The user selected Braille Institute's Atkinson Hyperlegible Next font and reference design, then explicitly rejected the bright colors and visual noise. Their latest direction is authoritative: a soft neutral background, dark text, restrained outlines, no bright accent fields or elevated shadows. The approved BRAND_BOOK.md adds a small clay connected path in the compact five-node logo on every surface, including the patient, and a clay date marker on the caregiver timeline. Keep the exact self-hosted Atkinson Hyperlegible Next variable font, including the OFL license. No serif in the new recall surfaces.
 
 Phone: one current utterance, familiar person named, an End call action. No settings menu within the patient view. Confirmation has equal Yes / No buttons and a quiet End call action. Settings live on the caregiver side. The title, quote and question use controlled type weights, without decorative status dots, illustrations or badges.
 
-The caregiver view leads with a scrollable waveform of sessions and a brief selected-call summary, beside Suggest a conversation. Peaks represent per-topic unaided call counts as of that session, with denominators; fewer than three calls remains unmeasured. Categories and the Weekly Note sit in closed disclosures. The private graph and unshared words stay outside the session projection. Four-step onboarding previews photos, explicitly selected contacts, explicitly selected calendar events, granular photo permissions and agreed calling times. These remain local in the tab; import is not a live graph write or a scheduled call. `/caregiver` is canonical, `/family` remains an alias, and `/onboarding` is setup.
+The caregiver view leads with a scrollable 3D bookshelf of dated sessions and a brief selected-call summary, beside Suggest a conversation. Different-height spines form a waveform along one aligned baseline; measured counts below four use light spines, four and above use dark spines. Resting spine heights and the small waveform on each cover represent per-topic unaided call counts as of that session, with denominators; fewer than three calls stays dashed and unmeasured. The selected cover turns open and expands for reading, with accessible instructions explaining its reading expansion. A two-symbol legend defines the counts, a date timeline tracks elapsed calendar time, and separate text filters narrow the topic. Fine binding rules and a page edge give the books simple material detail. Reduced motion presents flat covers. Categories and the Weekly Note sit in closed disclosures. The private graph and unshared words stay outside the session projection. Four-step onboarding previews photos, explicitly selected contacts, explicitly selected calendar events, granular photo permissions and agreed calling times. These remain local in the tab; import is not a live graph write or a scheduled call. `/caregiver` is canonical, `/family` remains an alias, and `/onboarding` is setup.
 
 REMI (remistory.com) and REMME (tryremme.com) are additional user-selected product references for caregiver-led setup, familiar photo cues and open conversation. Their therapeutic marketing and emotional analytics are not copied as claims about Recall.
 
 ## Accessibility
 
-Minimum 24px patient cues and 44px controls; main call actions are 64–76px. Dark text on a warm neutral surface, stable placement, generous separation, no text over images. One current utterance with reserved word positions, announced once to assistive technology. Reduced motion shows complete sentences. Preview pacing pauses separately. Stop remains available. Narrow screens and enlarged text scroll vertically without clipping.
+Minimum 24px patient cues and 44px controls; main call actions are 64–76px. Dark text on a warm neutral surface, stable placement, generous separation, no text over images. One current utterance in complete short caption portions, announced once to assistive technology, without word reveal. Preview pacing pauses separately. Stop remains available. Narrow screens and enlarged text scroll vertically without clipping.
 
 ## Evidence and references
 
@@ -53,6 +53,6 @@ The latest patient direction makes the familiar photograph the dominant visual d
 
 ## Caregiver overview revision
 
-September 19: the user requested a useful social, emotional and intellectual overview rather than a node diagram. Connection is represented by observable call topics; emotional perspective only by words Susan chooses to share, without inferred mood. Intellectual activity stays in the existing plain per-topic counts. The quiet visual system and patient screens are preserved.
+September 19: the user requested a useful social, emotional and intellectual overview rather than a node diagram. Connection is represented by observable call topics; no emotional inference is permitted. The latest caregiver revision removes patient quotations entirely, including shared lines, and keeps the Weekly Note topic-only. Intellectual activity stays in the existing plain per-topic counts. The quiet visual system and patient screens are preserved.
 
 The user then explicitly requested caregiver-suggested questions for future sessions. This frontend permits memory contributions and separately labeled question requests, with optional photos. The request is an invitation for Susan to discuss and separately choose to share, never a graph-derived answer or automatic immediate call. Suggestions are local to the tab and are not written to the live service. The backend retains its prior redirect-only contract pending a separately reviewed integration.

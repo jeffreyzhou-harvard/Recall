@@ -6,17 +6,15 @@ import { ArrowRight, Phone, PhoneOff, Pause, Play, RotateCcw, SkipForward } from
 import { usePreview } from "./PreviewProvider";
 import { PreviewNav } from "./PreviewNav";
 import { RecallFrame, RecallHeader } from "./RecallFrame";
+import { SetupPhoto } from "./SetupPhoto";
+import { photoForSession } from "@/lib/recall-preview/source-view";
+import type { SampleSetupPhoto } from "@/lib/recall-preview/imports";
 
-function useReducedMotion() {
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setReduced(query.matches);
-    update(); query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, []);
-  return reduced;
-}
+const standalonePhoto: SampleSetupPhoto = {
+  id: "standalone-cape-may", name: "Family beach photo", topicId: "cape-may",
+  src: "/preview/family-beach.png", alt: "Illustrative family photograph: a mother and daughter sitting together on a beach.",
+  metadata: { capturedAt: "", device: "", dimensions: { width: 1448, height: 1086 }, album: "Fictional sample", placeLabel: "", caption: "", contributor: "Sample illustration" },
+};
 
 function captionPages(text: string): string[][] {
   const pages: string[][] = [];
@@ -33,46 +31,40 @@ function captionPages(text: string): string[][] {
   return pages;
 }
 
-function Caption({ text, speaker, paused, reduced, onComplete }: { text: string; speaker: string; paused: boolean; reduced: boolean; onComplete: () => void }) {
+function Caption({ text, speaker, paused, onComplete }: { text: string; speaker: string; paused: boolean; onComplete: () => void }) {
   const pages = captionPages(text);
   const [page, setPage] = useState(0);
   // A short portion of the literal line leaves room for the familiar photograph.
   const words = pages[page]!;
-  const [visible, setVisible] = useState(1);
   useEffect(() => {
-    if (paused || reduced || visible >= words.length) return;
-    const timer = window.setTimeout(() => setVisible((value) => value + 1), 270);
-    return () => window.clearTimeout(timer);
-  }, [paused, reduced, visible, words.length]);
-  useEffect(() => {
-    if (paused || (!reduced && visible < words.length)) return;
+    if (paused) return;
     const timer = window.setTimeout(() => {
-      if (page + 1 < pages.length) { setPage((value) => value + 1); setVisible(1); }
+      if (page + 1 < pages.length) setPage((value) => value + 1);
       else onComplete();
-    }, reduced ? Math.max(5500, words.length * 430) : 3800);
+    }, Math.max(5500, words.length * 430));
     return () => window.clearTimeout(timer);
-  }, [onComplete, paused, reduced, visible, words.length, page, pages.length]);
+  }, [onComplete, paused, words.length, page, pages.length]);
   return <>
-    <p className="recall-caption" aria-hidden="true">{words.map((word, index) => <span key={index} style={{ visibility: reduced || index < visible ? "visible" : "hidden" }}>{word}{index < words.length - 1 ? " " : ""}</span>)}</p>
+    <p className="recall-caption" aria-hidden="true">{words.join(" ")}</p>
     <p className="sr-only" role="status" aria-atomic="true">{speaker}: {words.join(" ")}</p>
   </>;
 }
 
 export function RecallPhone() {
-  const { data, state, dispatch } = usePreview();
+  const { data, state, dispatch, setup } = usePreview();
   const topic = data.topics.find((item) => item.id === state.topicId)!;
   const line = topic.lines[state.lineIndex]!;
   const contribution = topic.lines.find((item) => item.id === topic.contributionLineId)!;
-  const reduced = useReducedMotion();
   const questionRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     if (state.phase === "remember" || state.phase === "share") questionRef.current?.focus({ preventScroll: true });
   }, [state.phase]);
   const active = ["conversation", "remember", "share"].includes(state.phase);
   const done = state.phase === "finished" || state.phase === "stopped";
-  const showPhoto = topic.id === "cape-may" && (state.phase === "incoming" || state.phase === "conversation");
+  const selectedPhoto = photoForSession(setup, topic.id, standalonePhoto);
+  const showPhoto = Boolean(selectedPhoto?.src) && (state.phase === "incoming" || state.phase === "conversation");
   const photo = <figure className="recall-memory-photo">
-    <img src="/preview/family-beach.png" width={1448} height={1086} alt="Illustrative family photograph: a mother and daughter sitting together on a beach." />
+    {selectedPhoto && <SetupPhoto photo={selectedPhoto} eager />}
     {state.phase === "conversation" && <figcaption>{topic.name}</figcaption>}
   </figure>;
 
@@ -98,7 +90,7 @@ export function RecallPhone() {
         <section className="recall-conversation" aria-label="Current words">
           {state.phase === "conversation" && <>
             <div className="recall-speaker">{line.speaker === data.person ? "Susan’s words" : "Recall says"}</div>
-            <Caption key={line.id} text={line.text} speaker={line.speaker} paused={state.paused} reduced={reduced} onComplete={() => dispatch({ type: "advance" })} />
+            <Caption key={line.id} text={line.text} speaker={line.speaker} paused={state.paused} onComplete={() => dispatch({ type: "advance" })} />
           </>}
           {(state.phase === "remember" || state.phase === "share") && <>
             <div className="recall-speaker">Your words</div>
@@ -143,7 +135,7 @@ export function RecallPhone() {
       <details className="recall-inspector">
         <summary>Behind this preview</summary>
         <p>These are fictional sample lines, not a live transcript. Voices, recorded playback, and live transcription will be connected later. Remember and share buttons simulate the two spoken choices.</p>
-        <p>The beach photo is an AI-generated illustration of fictional people for layout review. It is not family evidence and is never sent to the memory graph. No microphone or audio is used here.</p>
+        <p>Sample photos are AI-generated illustrations, not family evidence. Once setup is agreed, only the sample photo you selected for this topic appears. Real uploads are never attached to this fixed script automatically. No microphone or audio is used here.</p>
         <h2>Conversation script</h2>
         <ol>{topic.lines.map((item) => <li key={item.id}><strong>{item.speaker}</strong><p>{item.text}</p></li>)}</ol>
         <h2>Sample context graph</h2>
