@@ -25,6 +25,8 @@ export function withConfirmation(prov: Provenance, c: Confirmation): Provenance 
 }
 
 export interface GraphStore {
+  /** Optional native graph read index, captured at one committed revision. */
+  withReadSnapshot?<T>(read: (snapshot: GraphStore) => Promise<T>): Promise<T>;
   /** Persistent stores can commit a complete service operation or roll it back. */
   atomic?<T>(work: () => Promise<T>): Promise<T>;
   getNode(id: string): Promise<GraphNode | null>;

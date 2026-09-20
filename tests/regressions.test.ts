@@ -420,8 +420,8 @@ describe("revoking a contributor takes effect before the next call (rule 12)", (
     expect(before.verified).toContain("claim:maya-remembers-cape-may");
     const after = await bench({ policy: policyWith((p) => ((p.approved_people = ["person:priya"]), (p.recall_set_up_by = "person:priya"), (p.safety.designated_caregivers = [{ person_id: "person:priya", alert_channel: "dashboard" }]), (p.attestations.introduced_by = "person:priya"), (p.dashboard.grants = []))) });
     expect(after.verified).not.toContain("claim:maya-remembers-cape-may");
-    const out = after.runtime.log.find((c) => c.tool === "verify_claim_support")!.output as { rejected: Array<{ claim_id: string; reason: string }> };
-    expect(out.rejected.find((r) => r.claim_id === "claim:maya-remembers-cape-may")?.reason).toBe("contributor_not_approved");
+    const out = after.runtime.log.find((c) => c.tool === "query_context_graph")!.output as { candidates: Array<{ root_id: string }> };
+    expect(out.candidates.map((c) => c.root_id)).not.toContain("claim:maya-remembers-cape-may");
   });
 });
 

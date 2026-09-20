@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Microphone } from "@/client/microphone";
+import { KnowledgeReview } from "./KnowledgeReview";
 import { Plus } from "lucide-react";
 import { api } from "@/client/api";
 import type { ToolOutput } from "@/lib/tools/contracts";
@@ -50,6 +51,7 @@ export function MemoryForm({ member, name, person, onSaved }: { member: string; 
       <div className="care-form-actions"><button className="care-action care-action-primary" disabled={pending || recording}>{pending ? "Saving…" : "Save memory"}</button><button type="button" className="care-text-action" disabled={pending || recording} onClick={() => setOpen(false)}>Cancel</button></div>
       <p className="care-caption">This saves your contribution. It does not schedule a call.</p>
     </form>}{error && <p role="alert" className="setup-error">{error}</p>}<p role="status" className="care-save-status">{status}</p>
+    <KnowledgeReview member={member} refreshKey={status} />
     <div className="care-human-invitation"><h3>Or, make time for a call.</h3><p>If you have a question for {person}, ask them directly.</p></div>
   </aside>;
 }

@@ -8,14 +8,16 @@ import type { ToolImpl } from "../runtime";
 export const query_context_graph: ToolImpl<"query_context_graph"> = async (input, ctx) => {
   const nowIso = ctx.clock.iso();
   const token = await ctx.gate.requireToken(input.policy_token_id, input.topic_id, nowIso);
-  const result = await retrieveCandidates(ctx.graph, {
+  const read = (graph: import("@/lib/graph/store").GraphStore) => retrieveCandidates(graph, {
     topic_id: input.topic_id,
     policy_id: token.policy_id,
     audience: token.person_id,
     allowed_sources: token.allowed_source_classes,
+    approved_authors: [ctx.setup.current().person_id, ...ctx.setup.current().approved_people],
     max_hops: input.max_hops,
     now_iso: nowIso,
   });
+  const result = ctx.graph.withReadSnapshot ? await ctx.graph.withReadSnapshot(read) : await read(ctx.graph);
   ctx.session.candidates = result.candidates;
   ctx.session.relations = result.relations;
   return result;

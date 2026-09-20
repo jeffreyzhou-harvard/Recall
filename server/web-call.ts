@@ -26,6 +26,7 @@ export class WebCall implements CallDriver {
   topicLabel = "";
   stopped = false;
   private closed = false;
+  get ended() { return this.closed; }
   private expired = false;
   get cannotCommit() { return this.stopped || this.expired; }
   private reject: ((error: Error) => void) | null = null;

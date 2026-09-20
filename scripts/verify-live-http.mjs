@@ -1,7 +1,7 @@
 /** Runs against a production build with a temporary, isolated database. Never writes the user's household. */
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -53,6 +53,9 @@ try {
   assert.doesNotMatch(JSON.stringify(dashboard), /Susan|Maya|Cape May/);
   assert.equal((await request("/api/family/dashboard?member=another-member", undefined, { cookie })).status, 403);
   assert.equal((await request("/api/live/schedule", {}, { cookie })).status, 403);
+  assert.equal((await request("/api/family/knowledge?member=another-member", undefined, { cookie })).status, 403);
+  assert.equal((await request("/api/onboarding/knowledge", undefined, { cookie })).status, 403);
+  assert.deepEqual(await json(await request(`/api/family/knowledge?member=${member}`, undefined, { cookie })), []);
   const csrf = await fetch(base + "/api/family/memory", { method: "POST", headers: { cookie, origin: "https://other.test", "Content-Type": "application/json" }, body: JSON.stringify({ member, who: "x", what_happened: "Must not save." }) });
   assert.equal(csrf.status, 403);
   const exported = await request("/api/family/export", { member }, { cookie });
@@ -64,6 +67,14 @@ try {
   assert.equal(relativeLogin.status, 200); const relativeCookie = relativeLogin.headers.get("set-cookie").split(";")[0];
   assert.equal((await request(`/api/family/dashboard?member=${joined.person_id}`, undefined, { cookie: relativeCookie })).status, 403);
   const topic = await json(await request("/api/onboarding/topics", { contributor_id: member, label: "planting tulips", story: "We planted tulips together." }), 201);
+  const importBody = { request_id: randomUUID(), contributor_id: member, reviewed: true, items: [{ kind: "calendar", label: "a family gathering", text: "Family gathering in the garden.", date: "2020-07-14", place: "garden" }] };
+  const imported = await json(await request("/api/onboarding/knowledge", importBody), 201);
+  assert.equal(imported.imported, 1);
+  assert.deepEqual(await json(await request("/api/onboarding/knowledge", importBody), 201), imported);
+  assert.equal((await request("/api/onboarding/knowledge", importBody, { cookie })).status, 403);
+  assert.equal((await request("/api/onboarding/knowledge", { ...importBody, request_id: randomUUID(), reviewed: false })).status, 400);
+  const importedTopics = await json(await request("/api/onboarding/topics"));
+  assert.ok(importedTopics.some((t) => t.id === imported.topics[0].id));
   const choices = { expected_version: saved.version, patient_agreed: true, caregiver_agreed: true, members: [{ id: member, approved: true, detail: "weekly_note_and_record" }, { id: joined.person_id, approved: true, detail: "weekly_note" }], topics: [topic.id], web_calls_enabled: false, alert_channel: "dashboard" };
   await json(await request(`/api/onboarding/households/${hid}/choices`, choices));
   assert.equal((await request(`/api/onboarding/households/${hid}/choices`, choices)).status, 409);
@@ -90,6 +101,6 @@ try {
   dashboard = await json(await request(`/api/family/dashboard?member=${member}`, undefined, { cookie }));
   assert.equal(dashboard.weekly_note.status, "no_access"); assert.equal(dashboard.topic_record.status, "no_access");
   assert.equal((await request("/api/family/export", { member }, { cookie })).status, 403);
-  console.log("Live HTTP verification passed: setup, consent, persistence across restart, sessions, member isolation, CSRF, export, invitations, topic approval, patient isolation and revocation.");
+  console.log("Live HTTP verification passed: setup, consent, persistence across restart, sessions, member isolation, CSRF, export, invitations, topic approval, selected graph imports, patient isolation and revocation.");
 } catch (error) { console.error(error); process.exitCode = 1; }
 finally { await stop(); rmSync(dir, { recursive: true, force: true }); }

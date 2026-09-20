@@ -64,6 +64,13 @@
       "id": "ELABORATE",
       "text": "What do you remember about that?"
     },
+    "knowledge_association": { "id": "LADDER-3-KNOWLEDGE", "text": "You mentioned {cue}. What comes to mind?" },
+    "knowledge_place_association": { "id": "LADDER-3-KNOWLEDGE-PLACE", "text": "You mentioned {place}. What comes to mind?" },
+    "knowledge_followups": {
+      "people": { "id": "KG-PEOPLE", "text": "Who, if anyone, comes to mind with that memory?" },
+      "place": { "id": "KG-PLACE", "text": "What comes to mind about the place in that memory?" },
+      "occasion": { "id": "KG-OCCASION", "text": "What comes to mind about the time of year?" }
+    },
     "categories": {
       "family_summers": {
         "memory_kind": "autobiographical",

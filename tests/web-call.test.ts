@@ -1,3 +1,5 @@
+import { KnowledgeUpdater } from "@/lib/knowledge/updates";
+import { planQuestion } from "@/lib/knowledge/questions";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -54,14 +56,18 @@ describe("live browser transport", () => {
     await r.driver.hangUp(); expect(r.media.get(window.asset_id)).toBeNull(); await expect(r.transcript.allTurns(window.asset_id)).rejects.toThrow();
   });
   it("runs a real family-sourced topic through spoken confirmation and stores only the confirmed audio", async () => {
-    const r = await rig(["Yes.", "I mixed the flour with my sister.", "Yes.", "Yes."]);
+    const r = await rig(["Yes.", "I mixed the flour with Maya.", "Yes.", "Yes."]);
     const topic = await createTopic(r.graph, r.setup.current(), { contributor_id: "person:maya", label: "baking bread", story: "We baked bread together." });
     const policy = structuredClone(r.setup.current()); policy.topics.allow = [topic.id]; policy.topics.block = []; r.setup.replace(policy);
-    const service = new RecallService({ ...r, transcription: r.transcript, callDriver: () => r.driver, script: CALL_SCRIPT, copy: FAMILY_COPY, thresholds: RECORD_THRESHOLDS, safetyPhrases: SAFETY_PHRASES, isCallStopped: () => r.driver.cannotCommit, onContributionCommitted: async (ctx) => r.driver.retainConfirmed({ contribution_hash: ctx.session.stored!.contribution_hash, store: ctx.session.store_confirmation, share: ctx.session.share_confirmation, share_audio: ctx.session.share_audio_window }) });
+    const updater = new KnowledgeUpdater(r.graph, () => r.setup.current(), undefined, undefined, r.clock);
+    await updater.process(100);
+    const service = new RecallService({ ...r, knowledgeQuestions: true, enrichKnowledge: () => updater.process(100), transcription: r.transcript, callDriver: () => r.driver, script: CALL_SCRIPT, copy: FAMILY_COPY, thresholds: RECORD_THRESHOLDS, safetyPhrases: SAFETY_PHRASES, isCallStopped: () => r.driver.cannotCommit, onContributionCommitted: async (ctx) => r.driver.retainConfirmed({ contribution_hash: ctx.session.stored!.contribution_hash, store: ctx.session.store_confirmation, share: ctx.session.share_confirmation, share_audio: ctx.session.share_audio_window }) });
     const run = service.runScheduledCall("session:web-test"); await drive(r.driver, run, async (id) => { await r.driver.receive(id, audio); });
     const result = await run; expect(result?.recording.final_state).toBe("stored");
     const contribution = (await r.graph.nodesOfType("Contribution")).find((n) => n.id.includes("web-test"));
-    expect(contribution?.props.literal_transcript).toBe("I mixed the flour with my sister."); expect(contribution?.props.shared).toBe(true);
+    expect(contribution?.props.literal_transcript).toBe("I mixed the flour with Maya."); expect(contribution?.props.shared).toBe(true);
+    expect((await r.graph.edgesOf(result!.ctx.session.stored!.claim_id)).some((e) => e.type === "ABOUT" && e.to === "person:maya" && e.props.mention_only === true)).toBe(true);
+    expect(await planQuestion(r.graph, r.setup.current(), topic.id, r.clock.iso())).toMatchObject({ purpose: "fill_gap", gap: "place" });
     expect(r.media.get(contribution!.prov.asset_id!)?.entry.sha256).toBe(contribution?.prov.media_hash);
     expect(r.media.get(result!.ctx.session.store_confirmation!.audio.asset_id)).not.toBeNull();
     expect(r.media.get(result!.ctx.session.share_audio_window!.asset_id)).not.toBeNull();

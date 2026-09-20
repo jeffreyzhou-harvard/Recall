@@ -44,4 +44,8 @@ Use HTTPS in deployment. Sessions use HttpOnly, SameSite=Strict cookies, Secure 
 
 The implementation session verified the real Deepgram speech-to-audio-to-transcription connection. Automated browser access was unavailable, so real microphone permissions, speaker playback, device-specific audio behavior, mobile layout, and a complete spoken browser call still require manual verification. No claim of zero defects or deployment readiness is made. The isolated `/present` demo retains its explicitly labeled placeholder assets and timing warnings; it never writes the live household.
 
-The web-transport policy adaptation follows the user's September 19 instruction to present the conversation as a call inside the web app. No reducer, tool JSON contract, policy fixture, call script, safety list, or record threshold was edited. Before deployment with real participants, the external reviews in AGENTS.md Appendix B.7 still apply.
+The web-transport policy adaptation follows the user's September 19 instruction to present the conversation as a call inside the web app. The knowledge-graph extension adds reviewed-script follow-ups and a place cue kind; these require the second review described in AGENTS.md §13. The reducer, policy fixtures, safety list and record thresholds are unchanged. Before deployment with real participants, the external reviews in AGENTS.md Appendix B.7 still apply.
+
+## Knowledge graph
+
+See [the knowledge graph guide](knowledge-graph.md) for selective imports, Muse extraction, contributor interpretation review, graph-driven follow-ups, Ladybug reads and the durable update queue. These paths use the same household graph as calls and family contributions.

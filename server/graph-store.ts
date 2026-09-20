@@ -2,10 +2,36 @@
 import { DatabaseSync } from "node:sqlite";
 import { chmodSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import { createHash } from "node:crypto";
+import { LadybugGraphStore } from "@/lib/graph/ladybug-store";
+import { loadInto } from "@/lib/graph/store";
 import { assertErasable, byId, withConfirmation, type GraphStore } from "@/lib/graph/store";
 import type { Confirmation, ErasableNodeType, GraphData, GraphEdge, GraphNode, NodeOf, NodeType, Provenance } from "@/lib/graph/types";
 
 export class SqliteGraphStore implements GraphStore {
+  private index: LadybugGraphStore | null = null;
+  private indexHash = "";
+  private indexQueue: Promise<unknown> = Promise.resolve();
+  /** SQLite commits evidence and audio together; Ladybug executes graph reads over that committed snapshot.
+   * The index is disposable and never a second authority for consent or confirmations. */
+  withReadSnapshot<T>(read: (snapshot: GraphStore) => Promise<T>): Promise<T> {
+    if (!this.nativeReads) return read(this);
+    const next = this.indexQueue.then(async () => {
+      const data = await this.atomic(() => this.snapshot());
+      const hash = createHash("sha256").update(JSON.stringify(data)).digest("hex");
+      if (hash !== this.indexHash) {
+        const replacement = await LadybugGraphStore.open();
+        try { await loadInto(replacement, data); }
+        catch (error) { await replacement.close(); throw error; }
+        const previous = this.index;
+        this.index = replacement; this.indexHash = hash;
+        await previous?.close();
+      }
+      return read(this.index!);
+    });
+    this.indexQueue = next.catch(() => undefined);
+    return next;
+  }
   private readonly db: DatabaseSync;
   private queue: Promise<unknown> = Promise.resolve();
   atomic<T>(work: () => Promise<T>): Promise<T> {
@@ -17,7 +43,7 @@ export class SqliteGraphStore implements GraphStore {
     this.queue = next.catch(() => undefined);
     return next;
   }
-  constructor(path: string, private readonly household: string) {
+  constructor(path: string, private readonly household: string, private readonly nativeReads = false) {
     mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
     this.db = new DatabaseSync(path);
     chmodSync(path, 0o600);
@@ -88,5 +114,6 @@ export class SqliteGraphStore implements GraphStore {
   }
   /** Private media uses this connection so audio receipts and graph claims commit together. */
   mediaDatabase(): DatabaseSync { return this.db; }
-  close(): void { this.db.close(); }
+  async closeIndex(): Promise<void> { await this.indexQueue; await this.index?.close(); this.index = null; this.indexHash = ""; }
+  close(): void { this.db.close(); void this.closeIndex(); }
 }
