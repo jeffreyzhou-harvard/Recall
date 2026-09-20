@@ -11,12 +11,12 @@ function WebCallView() {
   const [caller, setCaller] = useState("Recall");
   const [topic, setTopic] = useState<string | null>(null);
   const [command, setCommand] = useState<WebCommand | null>(null), [active, setActive] = useState(false), [message, setMessage] = useState("Checking for a call…"), [error, setError] = useState(""), [answering, setAnswering] = useState(false);
-  const mic = useRef<Microphone | null>(null), handled = useRef(""), current = useRef<WebCommand | null>(null), mounted = useRef(true), sending = useRef<Promise<void> | null>(null);
+  const mic = useRef<Microphone | null>(null), handled = useRef(""), current = useRef<WebCommand | null>(null), mounted = useRef(true);
   const generation = useRef(0), stoppedLocally = useRef(false);
   async function action(kind: string, step = "") { await api(`/api/call/action?action=${kind}&step=${encodeURIComponent(step)}`, { method: "POST" }); }
   async function sendAudio(step: string, bytes: Uint8Array, stop = false) {
     const send = async () => { const response = await fetch(`/api/call/action?action=audio&step=${encodeURIComponent(step)}${stop ? "&stop=true" : ""}`, { method: "POST", body: new Uint8Array(bytes), headers: { "Content-Type": "audio/wav" }, credentials: "same-origin" }); if (!response.ok) throw new Error("The recording could not be sent. Your call has ended."); };
-    const task = send(); sending.current = task; try { await task; } finally { if (sending.current === task) sending.current = null; }
+    await send();
   }
   const fail = (e: unknown) => { generation.current++; stoppedLocally.current = true; current.current = null; mic.current?.close(); mic.current = null; if (mounted.current) { setCommand(null); setAnswering(false); setMessage("Your call has ended."); setError(e instanceof Error ? e.message : "The call could not continue."); setActive(false); } void action("stop").catch(() => undefined); };
   useEffect(() => {
@@ -65,7 +65,8 @@ function WebCallView() {
     const step = current.current, audio = mic.current?.finish(); current.current = null; mic.current?.close(); mic.current = null; setCommand(null); setAnswering(false); setActive(false); setMessage("Your call has ended.");
     try {
       if (audio && step?.kind === "listen") await sendAudio(step.id, audio, true);
-      else { if (sending.current) await sending.current.catch(() => undefined); await action("stop"); }
+      // Tell the server immediately, including while an already-submitted turn is transcribing.
+      else await action("stop");
     } catch { await action("stop").catch(() => undefined); }
   }
   const incoming = command?.kind === "incoming";

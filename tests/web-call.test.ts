@@ -90,6 +90,39 @@ describe("live browser transport", () => {
     expect(db.prepare("SELECT count(*) AS n FROM confirmation_receipts").get()!.n).toBe(0);
     expect(db.prepare("SELECT count(*) AS n FROM media").get()!.n).toBe(0);
   });
+  it("keeps hang-up latched when a non-safety transcript completes afterward", async () => {
+    const r = await rig(["Yes.", "I mixed the flour with my sister.", "Yes.", "Yes."]);
+    const service = new RecallService({ ...r, transcription: r.transcript, callDriver: () => r.driver, script: CALL_SCRIPT, copy: FAMILY_COPY, thresholds: RECORD_THRESHOLDS, safetyPhrases: SAFETY_PHRASES, isCallStopped: () => r.driver.cannotCommit });
+    const run = service.runScheduledCall("session:stop-during-upload");
+    await drive(r.driver, run, async (id, i) => {
+      if (i !== 3) { await r.driver.receive(id, audio); return; }
+      let finish!: (result: { transcript: string; words: ReturnType<typeof words> }) => void;
+      r.recognition.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+      const receiving = r.driver.receive(id, audio);
+      r.driver.stop(); finish({ transcript: "Yes.", words: words("Yes.") });
+      await receiving;
+    });
+    expect((await run)?.recording.final_state).toBe("stopped");
+    expect(r.driver.cannotCommit).toBe(true);
+    expect((await r.graph.nodesOfType("Contribution")).some((n) => n.id.includes("stop-during-upload"))).toBe(false);
+    expect((r.graph as SqliteGraphStore).mediaDatabase().prepare("SELECT count(*) AS n FROM media").get()!.n).toBe(0);
+  });
+
+  it.each(["I fell.", "I mixed the flour with my sister."])("keeps an in-flight HTTP upload available for safety checks after hang-up: %s", async (reply) => {
+    const r = await rig([reply]);
+    const service = new RecallService({ ...r, transcription: r.transcript, callDriver: () => r.driver, script: CALL_SCRIPT, copy: FAMILY_COPY, thresholds: RECORD_THRESHOLDS, safetyPhrases: SAFETY_PHRASES, isCallStopped: () => r.driver.cannotCommit });
+    const run = service.runScheduledCall("session:stop-during-body");
+    await drive(r.driver, run, async (id) => {
+      let finish!: (body: Buffer) => void;
+      const receiving = r.driver.receive(id, () => new Promise((resolve) => { finish = resolve; }));
+      r.driver.stop(); finish(audio); await receiving;
+    });
+    expect((await run)?.recording.final_state).toBe(reply === "I fell." ? "safety_handoff" : "stopped");
+    expect(r.alerts.count()).toBe(reply === "I fell." ? 1 : 0);
+    expect(r.driver.cannotCommit).toBe(true);
+    expect((r.graph as SqliteGraphStore).mediaDatabase().prepare("SELECT count(*) AS n FROM media").get()!.n).toBe(0);
+  });
+
   it("does not cancel a submitted final recording when hang-up arrives during transcription", async () => {
     const r = await rig();
     let finish!: (result: { transcript: string; words: ReturnType<typeof words> }) => void;
@@ -99,6 +132,15 @@ describe("live browser transport", () => {
     await drive(r.driver, run, async (id) => { const receiving = r.driver.receive(id, audio); r.driver.stop(); finish({ transcript: "", words: words("I fell.") }); await receiving; });
     expect((await run)?.recording.final_state).toBe("safety_handoff"); expect(r.alerts.count()).toBeGreaterThan(0);
   });
+  it("honors a hang-up submitted with audio even when transcription fails", async () => {
+    const r = await rig(); r.recognition.mockRejectedValueOnce(new Error("provider unavailable"));
+    const service = new RecallService({ ...r, transcription: r.transcript, callDriver: () => r.driver, script: CALL_SCRIPT, copy: FAMILY_COPY, thresholds: RECORD_THRESHOLDS, safetyPhrases: SAFETY_PHRASES, isCallStopped: () => r.driver.cannotCommit });
+    const run = service.runScheduledCall("session:stop-provider-failed");
+    await drive(r.driver, run, async (id) => { await r.driver.receive(id, audio, true); });
+    expect((await run)?.recording.final_state).toBe("stopped");
+    expect(r.driver.cannotCommit).toBe(true);
+  });
+
   it("counts a ring that happened before a process failure toward the minimum call interval", async () => {
     const r = await rig(), dir = folder(), first = new CallAttempts(dir, "test"); first.record("session:interrupted-process", r.clock.iso()); first.close();
     const reopened = new CallAttempts(dir, "test"); stores.push(reopened);
@@ -142,6 +184,20 @@ describe("private media and accounts", () => {
     const r = await buildFixtureRig(), p = structuredClone(r.setup.current()); p.call_transport = "web"; p.attestations.number_saved_in_her_phone = false; p.attestations.saved_contact_photo = false;
     expect(attestationsMissing(p)).toEqual([]); p.attestations.recall_introduced_to_her = false; expect(attestationsMissing(p).length).toBeGreaterThan(0);
   });
+  it("retries every pending caregiver handoff even when the first remains unavailable", async () => {
+    const post = vi.fn().mockResolvedValue(new Response(null, { status: 503 }));
+    vi.stubEnv("RECALL_SAFETY_WEBHOOKS", JSON.stringify({ first: { url: "https://first.example/handoff", token: "a".repeat(32) }, second: { url: "https://second.example/handoff", token: "b".repeat(32) } }));
+    const channel = new DurableAlerts(folder(), "h", post); stores.push(channel);
+    for (const caregiver of ["first", "second"]) await expect(channel.send({ alert_id: caregiver, script_id: "fixed", caregiver_id: caregiver, channel: "webhook", category: "fall", at: "2026-09-19T15:00:00Z", text: "Fixed handoff." })).rejects.toThrow();
+    post.mockClear();
+    post.mockImplementation(async (url) => new Response(null, { status: String(url).includes("first") ? 503 : 200 }));
+    await expect(channel.retryPending()).rejects.toThrow();
+    expect(post.mock.calls.map(([url]) => url)).toContain("https://second.example/handoff");
+    post.mockClear();
+    await expect(channel.retryPending()).rejects.toThrow();
+    expect(post.mock.calls.map(([url]) => url)).toEqual(["https://first.example/handoff"]);
+  });
+
   it("retries durable handoffs with the same idempotency key and does not send duplicates after success", async () => {
     const post = vi.fn().mockResolvedValueOnce(new Response(null, { status: 503 })).mockResolvedValue(new Response(null));
     vi.stubEnv("RECALL_SAFETY_WEBHOOKS", JSON.stringify({ caregiver: { url: "https://caregiver.example/handoff", token: "a".repeat(32) } }));
