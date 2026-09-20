@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { POST as circlePost, GET as circleGet } from "@/app/api/circle/[...path]/route";
@@ -19,13 +19,15 @@ import type { CircleView } from "@/components/circle/types";
 import { GET as familyDashboard } from "@/app/api/family/dashboard/route";
 import { POST as familyExport } from "@/app/api/family/export/route";
 import { POST as familyPause } from "@/app/api/family/pause/route";
+import sampleKit from "@/fixtures/sample-family.json";
+import type { PeopleView } from "@/lib/people/types";
 vi.mock("@/server/transcribe", () => ({ transcribe: vi.fn() }));
 vi.mock("@/server/recall-voice", () => ({ recallVoice: vi.fn() }));
 
 let root: string;
 const audio = wavFromPcm(new Uint8Array(16000 * 2 * 3));
 const request = (route: string, cookie = "", body?: unknown) => new Request(`http://localhost:3001${route}`, { method: body === undefined ? "GET" : "POST", headers: { Origin: "http://localhost:3001", Cookie: cookie, "Content-Type": body instanceof Uint8Array ? "audio/wav" : "application/json" }, ...(body === undefined ? {} : { body: body instanceof Uint8Array ? new Uint8Array(body) : JSON.stringify(body) }) });
-const post = (name: string, cookie = "") => circlePost(request(`/api/circle/${name}`, cookie, {}), { params: Promise.resolve({ path: [name] }) });
+const post = (name: string, cookie = "", body: unknown = {}) => circlePost(request(`/api/circle/${name}`, cookie, body), { params: Promise.resolve({ path: [name] }) });
 const cookies = (response: Response) => response.headers.getSetCookie().map(cookie => cookie.split(";")[0]).join("; ");
 const state = async (cookie: string) => (await (await circleGet(request("/api/circle/state", cookie), { params: Promise.resolve({ path: ["state"] }) })).json()) as CircleView;
 const call = (name: string, cookie: string, body?: unknown, query = "") => (body === undefined ? demoGet : demoPost)(request(`/api/demo/call/${name}${query}`, cookie, body), { params: Promise.resolve({ action: name }) });
@@ -91,6 +93,78 @@ async function completeCall(cookie: string, household: string, replies: string[]
   return { live, photos, spoken };
 }
 describe("paired local caregiver and patient demos", () => {
+  it("populates a fresh sample's moments, people, places and connections on upload, then stories after the shared call", async () => {
+    const opened = await post("demo", "", { fresh: true }), familyCookie = cookies(opened);
+    expect(opened.status).toBe(200);
+    const initial = await state(familyCookie);
+    expect(initial.moments.map(moment => moment.title).sort()).toEqual(["Home Garden Morning", "Quiet Library Rooms"]);
+    expect(initial.photos).toHaveLength(6);
+    expect(initial.stories).toEqual([]);
+    const people = async () => (await (await circleGet(request("/api/circle/people", familyCookie), { params: Promise.resolve({ path: ["people"] }) })).json()) as PeopleView;
+    expect((await people()).groups).toEqual([]);
+    expect(initial.connections!.relationships).toHaveLength(4);
+
+    const form = new FormData(); form.set("requestId", "full-sample-upload");
+    for (const entry of sampleKit) form.append("photos", new File([readFileSync(path.join(process.cwd(), "public/sample-family", entry.file))], entry.file, { type: "image/jpeg" }));
+    const upload = await circlePost(new Request("http://localhost:3001/api/circle/photos", { method: "POST", headers: { Origin: "http://localhost:3001", Cookie: familyCookie }, body: form }), { params: Promise.resolve({ path: ["photos"] }) });
+    expect(upload.status).toBe(200);
+    expect(await upload.json()).toMatchObject({ added: 12, moments: 4, rejected: [], warning: null });
+    const populated = await state(familyCookie);
+    expect(populated.photos).toHaveLength(18);
+    expect(populated.stories).toEqual([]);
+    expect(populated.moments).toHaveLength(6);
+    for (const title of new Set(sampleKit.map(entry => entry.event))) {
+      const moment = populated.moments.find(moment => moment.title === title)!;
+      expect(moment.photoIds).toHaveLength(3);
+      expect(moment.place).toBeTruthy();
+      expect(moment.latitude).toEqual(expect.any(Number));
+      expect(moment.longitude).toEqual(expect.any(Number));
+      expect(populated.connections!.people.some(person => person.momentIds.includes(moment.id))).toBe(true);
+    }
+    expect((await people()).groups.map(group => group.name)).toEqual(["Grandmother", "Mother", "Daughter 1", "Daughter 2"]);
+
+    const patient = await post("demo-patient", familyCookie), patientCookie = cookies(patient);
+    expect(patient.status).toBe(200);
+    expect(samplePatient(request("/api/demo/session", patientCookie))!.household_id).toBe(initial.household);
+    expect((await state(familyCookie)).stories).toEqual([]);
+    const words = "We spent the day together and Maya made lunch for us.";
+    const { live } = await completeCall(patientCookie, initial.household, [words, "Yes.", "Yes."]);
+    const after = await state(familyCookie);
+    expect(after.stories).toHaveLength(1);
+    expect(after.stories[0]).toMatchObject({ text: words, author: "Susan", callEvidence: { status: "participant_confirmed", source: "Shared Recall call" } });
+    expect(after.moments.some(moment => moment.id === after.stories[0]!.eventId)).toBe(true);
+    expect((await live.graph.nodesOfType("Contribution"))[0]!.props).toMatchObject({ literal_transcript: words, shared: true });
+    expect(after.photos).toEqual(populated.photos);
+
+    vi.setSystemTime(new Date(Date.now() + 1000));
+    const restarted = await post("demo", patientCookie, { fresh: true });
+    expect(restarted.status).toBe(200);
+    const newCookie = cookies(restarted), clean = await state(newCookie);
+    expect(clean.household).not.toBe(initial.household);
+    expect(clean.moments.map(moment => moment.title).sort()).toEqual(["Home Garden Morning", "Quiet Library Rooms"]);
+    expect(clean.photos).toHaveLength(6);
+    expect(clean.stories).toEqual([]);
+    const newPeople = await circleGet(request("/api/circle/people", newCookie), { params: Promise.resolve({ path: ["people"] }) });
+    expect((await newPeople.json()).groups).toEqual([]);
+    expect(samplePatient(request("/api/demo/session", newCookie))!.household_id).toBe(clean.household);
+    const reopenedPatient = await post("demo-patient", newCookie);
+    expect(samplePatient(request("/api/demo/session", cookies(reopenedPatient)))!.household_id).toBe(clean.household);
+    expect((await state(familyCookie)).stories[0]!.text).toBe(words);
+    expect(readCircle(initial.household).photos).toHaveLength(18);
+  });
+  it("keeps an active patient call in its sample family until it ends", async () => {
+    const pair = await openPair();
+    expect((await call("start", pair.patientCookie, {})).status).toBe(200);
+    expect(sampleCallRunning(pair.household)).toBe(true);
+    const live = await getSampleRecall(pair.household);
+    await vi.waitFor(() => expect(live.currentCall()).not.toBeNull());
+    const fresh = await post("demo", pair.patientCookie, { fresh: true });
+    expect(fresh.status).toBe(409);
+    expect(fresh.headers.getSetCookie()).toEqual([]);
+    expect((await state(pair.familyCookie)).household).toBe(pair.household);
+    expect((await call("action", pair.patientCookie, {}, "?action=stop")).status).toBe(200);
+    await vi.waitFor(() => expect(sampleCallRunning(pair.household)).toBe(false));
+  });
   it("repairs an unexpected question and a confirmation repeat without saving either as a memory", async () => {
     const pair = await openPair();
     const memory = "I don't remember the year, but we grew tomatoes with Maya every summer.";

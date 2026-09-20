@@ -98,7 +98,10 @@ export function MemoryGraph({ moments, photos, stories, connections, onSelect }:
 
   return <section className="archive-graph" aria-label="Connections in your contributions">
     <div className="archive-graph-toolbar">
-      <div className="archive-graph-tabs" role="group" aria-label="Filter connections">{filters.map(({ value, label }) => <button type="button" key={value} aria-pressed={filter === value} onClick={() => { setFilter(value); clearSelection(); }}>{label}</button>)}</div>
+      <div className="archive-graph-filter">
+        <div className="archive-graph-tabs" role="group" aria-label="Filter connections">{filters.map(({ value, label }) => <button type="button" key={value} aria-pressed={filter === value} onClick={() => { setFilter(value); clearSelection(); }}>{label}</button>)}</div>
+        {(moments.length > 0 || !!connections?.people.length) && <p className="archive-graph-help" id={`${id}-instructions`}>Select a person, memory, or connecting line to see its source and details.</p>}
+      </div>
       {moments.length > 4 ? <nav className="archive-graph-paging" aria-label="Browse memory connections">
         <button type="button" disabled={currentPage === 0} onClick={() => changePage(currentPage - 1)}><ChevronLeft size={18} aria-hidden="true" />Previous</button>
         <span aria-live="polite">{currentPage * 4 + 1}–{Math.min(currentPage * 4 + 4, moments.length)} of {moments.length}</span>
@@ -106,7 +109,6 @@ export function MemoryGraph({ moments, photos, stories, connections, onSelect }:
       </nav> : <p>{connections?.source ?? "Every connection has a source."}</p>}
     </div>
     {moments.length === 0 && !connections?.people.length ? <div className="archive-viz-empty"><h2>Your connections start with a memory.</h2><p>People and places you name in your contributions will appear here.</p></div> : <>
-      <p className="archive-graph-help" id={`${id}-instructions`}>Select a person, memory, or connecting line to see its source and details.</p>
       <p className="archive-viz-sr" aria-live="polite">{visibleCount} {filter === "all" ? "connections" : filters.find((item) => item.value === filter)?.label.toLowerCase()} shown.</p>
       <div className="archive-graph-viewport" ref={viewport}>
         <svg className="archive-graph-svg" viewBox={`0 0 ${width} 650`} role="group" tabIndex={0} aria-label="Memory connections" aria-describedby={`${id}-instructions`}

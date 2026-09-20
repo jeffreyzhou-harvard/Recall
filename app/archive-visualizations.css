@@ -41,10 +41,18 @@
   z-index: 2;
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 14px;
-  padding: 20px 22px 0;
+  gap: 20px;
+  padding: 20px 24px 16px;
+}
+
+.archive-graph-filter {
+  display: grid;
+  flex: 1 1 360px;
+  min-width: 0;
+  justify-items: start;
+  gap: 12px;
 }
 
 .archive-graph-toolbar > p {
@@ -219,7 +227,7 @@
 .archive-graph-inspector h2 { margin: 16px 20px 16px 0; font-size: 28px; font-weight: 600; line-height: 1.25; overflow-wrap: anywhere; }
 .archive-graph-inspector p { margin: 0 0 14px; font-size: 18px; line-height: 1.5; color: var(--recall-muted); overflow-wrap: anywhere; }
 .archive-graph-inspector .archive-graph-story { color: var(--recall-ink); white-space: pre-wrap; }
-.archive-graph-help { margin: 0; padding: 0 24px 16px; color: var(--recall-muted); font-size: 16px; }
+.archive-graph-help { max-width: 60ch; margin: 0; color: var(--recall-muted); font-size: 16px; line-height: 1.5; }
 .archive-graph-edge { cursor: pointer; }
 .archive-graph-edge-target { pointer-events: stroke; }
 .archive-graph-edge-line { pointer-events: none; }
@@ -313,8 +321,6 @@
 
 @media (min-width: 761px) {
   .archive-graph { overflow: hidden; }
-  .archive-graph-toolbar { position: absolute; inset: 0 0 auto; pointer-events: none; }
-  .archive-graph-tabs { pointer-events: auto; }
   .archive-graph-footer { position: absolute; inset: auto 0 0; pointer-events: none; }
   .archive-graph-controls { pointer-events: auto; }
   .archive-graph-viewport,
@@ -322,7 +328,7 @@
 }
 
 @media (max-width: 760px) {
-  .archive-graph-toolbar { padding: 16px 16px 0; }
+  .archive-graph-toolbar { padding: 16px; }
   .archive-graph-toolbar > p { width: 100%; }
   .archive-graph-tabs { width: 100%; }
   .archive-graph-paging { width: 100%; justify-content: space-between; }

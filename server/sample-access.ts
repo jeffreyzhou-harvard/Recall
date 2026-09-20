@@ -20,13 +20,13 @@ export function samplePatient(request: Request) {
   const account = accountForMember(principal.member_id);
   return account?.role === "patient" && readCircle(account.household_id).demo ? account : null;
 }
-export async function openSampleFamily(request: Request) {
+export async function openSampleFamily(request: Request, { fresh = false }: { fresh?: boolean } = {}) {
   requireLocalSample(request);
   const principal = browserPrincipal(request);
   const current = principal?.role === "family" ? accountForMember(principal.member_id) : null;
   const existing = current && readCircle(current.household_id).demo ? current : samplePatient(request);
   const onboarding = getOnboarding();
-  if (existing) {
+  if (existing && !fresh) {
     const people = await onboarding.people(existing.household_id);
     const caregiver = people.find(p => p.role === "caregiver"), participant = people.find(p => p.role === "participant");
     if (caregiver && participant) return { household: existing.household_id, caregiver, participant };

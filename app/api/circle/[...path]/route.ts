@@ -30,8 +30,8 @@ import { sameOrigin, sessionCookie, browserPrincipal } from "@/server/session";
 import { getOnboarding, newInvitationToken } from "@/server/onboarding";
 import { accountForMember, issueAccount, revokeAccount } from "@/server/accounts";
 import { OnboardingError } from "@/lib/onboarding/types";
-import { openSampleFamily, SAMPLE_PATIENT_COOKIE } from "@/server/sample-access";
-import { prepareSampleCall, syncSampleSharedMemories, visibleSampleStories } from "@/server/sample-call";
+import { openSampleFamily, requireLocalSample, samplePatient, SAMPLE_PATIENT_COOKIE } from "@/server/sample-access";
+import { prepareSampleCall, sampleCallRunning, syncSampleSharedMemories, visibleSampleStories } from "@/server/sample-call";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 180;
@@ -212,13 +212,17 @@ async function handle(request: Request, context: Context): Promise<Response> {
       );
     }
     if (["demo", "demo-patient"].includes(action) && isPost) {
-      const sample = await openSampleFamily(request);
+      requireLocalSample(request);
+      const fresh = action === "demo" && body?.fresh === true;
+      const priorPatient = fresh ? samplePatient(request) : null;
+      if (priorPatient && sampleCallRunning(priorPatient.household_id)) throw new CircleError("End the current sample call before starting a new family demo.", 409);
+      const sample = await openSampleFamily(request, { fresh });
       if (!accountForMember(sample.caregiver.person_id)) issueAccount(sample.household, sample.caregiver.person_id, "family");
       const headers = new Headers(noStore);
       headers.append("Set-Cookie", sessionCookie({ role: "family", member_id: sample.caregiver.person_id }, request));
-      if (action === "demo-patient") {
+      if (action === "demo-patient" || fresh) {
         if (!accountForMember(sample.participant.person_id)) issueAccount(sample.household, sample.participant.person_id, "patient");
-        await prepareSampleCall(sample.household);
+        if (action === "demo-patient") await prepareSampleCall(sample.household);
         headers.append("Set-Cookie", sessionCookie({ role: "patient", member_id: sample.participant.person_id }, request, SAMPLE_PATIENT_COOKIE));
       }
       return Response.json({ ok: true }, { headers });

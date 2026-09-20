@@ -86,7 +86,7 @@ export function Welcome() {
     setBusy(true);
     setError("");
     try {
-      await post("demo", {});
+      await post("demo", { fresh: true });
       await refreshSession();
       router.push("/caregiver");
     } catch (e) {
