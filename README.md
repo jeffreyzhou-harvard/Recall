@@ -38,6 +38,15 @@ Node 22.13+. No keys, no database, and no network are needed for any of the abov
 | `npm run assets:hash` | Re-hash `/assets` into the manifest. Refuses to touch a changed `final` asset without `--allow-replace`. |
 | `npm run assets:placeholder` | Generate stand-in media. Never overwrites an existing file. |
 | `npm run graph:seed` | Build an on-disk LadybugDB graph at `.data/recall.lbug` from the family seed, for Cypher poking. |
+| `npm run prizes:check` | Check that the seven-target judge brief is complete. |
+| `npm run prizes:brief` | Print the concise round-one and round-two talk track for the team sync. |
+| `npm run prizes:prompt` | Print the bounded prompt for drafting sponsor justifications from the shared brief. |
+
+## Prize alignment
+
+The internal [prize alignment brief](docs/PRIZE_ALIGNMENT.md) keeps every demo explanation pointed at the same human moment and technical proof. It covers seven targets: Long Lake, OpenAI, Meta, Dropbox, Deepgram, Ramp, and Cognition/Devin. The winning story is consistent across rounds: Recall helps a person reach her own memories in her own words, then gives family a reason to call her directly.
+
+Before a team sync, run `npm run prizes:check` and `npm run prizes:brief`. Use `npm run prizes:prompt` when preparing a short, judge-facing justification from the shared demo records.
 
 ## Frontend boilerplate
 
@@ -118,6 +127,10 @@ The safety engine includes phrase handoffs, missed-call tiering, caregiver ackno
 The [knowledge graph](docs/knowledge-graph.md) now supports selected onboarding imports, continuous Muse-assisted updates, contributor interpretation review, graph-driven follow-ups and native Ladybug reads.
 
 See [backend integration](docs/backend-integration.md) for configuration, verification and deployment limits. A real browser microphone/speaker walkthrough remains to be verified. The offline `/present` demo remains isolated and still contains placeholder recordings. The local contact/calendar import and question-request prototypes are not live ingestion paths.
+
+## Contributors
+
+- [EdtechMilan](https://github.com/EdtechMilan) — product direction, accessible frontend design, caregiver experience, and research-grounded graph work.
 
 ## Replacing the placeholder media
 

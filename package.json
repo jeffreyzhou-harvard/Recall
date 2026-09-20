@@ -20,6 +20,9 @@
     "lint:language": "tsx scripts/language-lint.ts",
     "verify": "tsx scripts/verify.ts",
     "verify:strict": "tsx scripts/verify.ts --strict",
+    "prizes:check": "node scripts/prize-alignment.mjs --check",
+    "prizes:brief": "node scripts/prize-alignment.mjs --brief",
+    "prizes:prompt": "node scripts/prize-alignment.mjs --prompt",
     "check": "npm run typecheck && npm run test && npm run lint:language && npm run verify"
   },
   "dependencies": {
