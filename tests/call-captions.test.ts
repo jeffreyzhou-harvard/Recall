@@ -14,6 +14,23 @@ function captions() {
 }
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 describe("ephemeral patient captions", () => {
+  it("exposes a pause only after a complete utterance, and clears it when speech resumes", () => {
+    const { value, streams } = captions();
+    value.start("one"); value.receive("one", pcm, 16000, 0);
+    const handlers = streams[0]!.handlers;
+    handlers.onTranscript!("At the beach.", true);
+    expect(value.snapshot?.endpointMs).toBeUndefined();
+    handlers.onTurn({ start_ms: 0, end_ms: 1500, words: [] });
+    expect(value.snapshot?.endpointMs).toBe(1500);
+    handlers.onSpeechStarted!(1700);
+    expect(value.snapshot?.endpointMs).toBeNull();
+    handlers.onTurn({ start_ms: 1700, end_ms: 2500, words: [] });
+    handlers.onTranscript!("And then", false);
+    expect(value.snapshot?.endpointMs).toBeUndefined();
+    value.finish(); handlers.onTurn({ start_ms: 2500, end_ms: 3000, words: [] });
+    expect(value.snapshot?.endpointMs).toBeUndefined();
+    value.clear();
+  });
   it("replaces interim words, appends finalized segments, and accepts the authoritative completed transcript", () => {
     const { value, streams } = captions();
     value.start("one"); value.receive("one", pcm, 16000, 0);

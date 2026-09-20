@@ -48,6 +48,9 @@ function WebCallView({ demo }: { demo: boolean }) {
         setCaller(state.display_name || "Recall"); setTopic(state.topic); current.current = state.command; setCommand(state.command); setMessage(state.message); setActive(state.status === "active");
         setPhotos(state.status === "active" && state.command?.kind !== "incoming" ? state.photos ?? [] : []);
         setCaption(state.status === "active" ? state.caption ?? null : null);
+        if (state.command?.kind === "listen" && handled.current === state.command.id && state.caption?.step === state.command.id) {
+          mic.current?.updateSpeechPreview({ text: state.caption.text, endpointMs: state.caption.endpointMs ?? null, unavailable: state.caption.unavailable });
+        }
         if (state.status !== "active") { captionUpload.current?.close(); mic.current?.close(); mic.current = null; handled.current = ""; }
       } catch { if (!cancelled) fail(new Error("Connection lost. Your microphone is off.")); }
       finally { if (!cancelled) timer = setTimeout(() => void poll(), 500); }

@@ -1,3 +1,4 @@
+import { shouldFinishTurn, type SpeechPreview } from "./turn-end";
 /** The microphone is read only during a call's listening turn. No background audio is uploaded. */
 export class Microphone {
   private generation = 0;
@@ -9,7 +10,8 @@ export class Microphone {
   private playing: AudioBufferSourceNode | null = null;
   private length = 0;
   private started = 0;
-  private lastVoice = 0;
+  private lastVoice: number | null = null;
+  private preview: SpeechPreview | null = null;
   private tick: ReturnType<typeof setInterval> | null = null;
   private captionSamples: Float32Array[] = [];
   private captionLength = 0;
@@ -32,21 +34,22 @@ export class Microphone {
           if (this.captionLength >= this.context!.sampleRate / 2) this.flushCaption();
         }
         let energy = 0; for (const sample of data) energy += sample * sample;
-        if (Math.sqrt(energy / data.length) > 0.012) this.lastVoice = performance.now();
+        if (Math.sqrt(energy / data.length) > 0.012) this.lastVoice = this.length / this.context!.sampleRate * 1000;
       };
       const source = this.context.createMediaStreamSource(stream); source.connect(this.node); this.node.connect(this.context.destination); await this.context.resume();
     } catch (e) { this.close(); throw e; }
   }
   listen(onFinal: (wav: Uint8Array) => void, onChunk?: (pcm: Uint8Array, rate: number) => void) {
     if (!this.context) throw new Error("Microphone is not ready.");
-    this.samples = []; this.length = 0; this.started = performance.now(); this.lastVoice = 0; this.recording = true;
+    this.samples = []; this.length = 0; this.started = performance.now(); this.lastVoice = null; this.preview = null; this.recording = true;
     this.captionSamples = []; this.captionLength = 0; this.onChunk = onChunk ?? null;
     if (this.tick) clearInterval(this.tick);
     this.tick = setInterval(() => {
-      const now = performance.now();
-      if ((this.lastVoice && now - this.lastVoice > 6500) || (!this.lastVoice && now - this.started > 25000) || now - this.started > 75000) { const bytes = this.finish(); if (bytes) onFinal(bytes); }
+      const elapsed = this.length / this.context!.sampleRate * 1000;
+      if (shouldFinishTurn(elapsed, this.lastVoice, this.preview) || performance.now() - this.started > 75000) { const bytes = this.finish(); if (bytes) onFinal(bytes); }
     }, 200);
   }
+  updateSpeechPreview(preview: SpeechPreview) { if (this.recording) this.preview = preview; }
   finish(): Uint8Array | null {
     if (!this.recording) return null; this.recording = false; if (this.tick) clearInterval(this.tick); this.tick = null;
     this.flushCaption(); this.onChunk = null;

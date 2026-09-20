@@ -64,7 +64,7 @@ async function completeCall(cookie: string, household: string, replies: string[]
   });
   expect((await call("start", cookie, {})).status).toBe(200);
   const live = await getSampleRecall(household);
-  const seen = new Set<string>(), photos: string[] = [];
+  const seen = new Set<string>(), photos: string[] = [], spoken: string[] = [];
   for (let i = 0; i < 700 && sampleCallRunning(household); i++) {
     await new Promise(resolve => setTimeout(resolve, 5));
     const response = await call("status", cookie), data = await response.json();
@@ -72,6 +72,10 @@ async function completeCall(cookie: string, household: string, replies: string[]
     const command = data.command;
     if (!command || seen.has(command.id)) continue;
     seen.add(command.id);
+    if (command.kind === "speak") {
+      spoken.push(command.text);
+      if (spoken.length === 2) expect(data.photos.length).toBeGreaterThan(0);
+    }
     if (data.photos?.length) {
       expect(data.photos[0].url).toContain("/api/demo/call/photo?");
       const url = new URL(data.photos[0].url, "http://localhost:3001");
@@ -84,9 +88,34 @@ async function completeCall(cookie: string, household: string, replies: string[]
   }
   expect(sampleCallRunning(household)).toBe(false);
   expect(live.currentCall()).toBeNull();
-  return { live, photos };
+  return { live, photos, spoken };
 }
 describe("paired local caregiver and patient demos", () => {
+  it("repairs an unexpected question and a confirmation repeat without saving either as a memory", async () => {
+    const pair = await openPair();
+    const memory = "I don't remember the year, but we grew tomatoes with Maya every summer.";
+    const { live, spoken } = await completeCall(pair.patientCookie, pair.household, ["Could you repeat that?", "Which picture do you mean?", memory, "Can you say that again?", "Yes.", "No."]);
+    expect(spoken[1]).toBe(spoken[2]);
+    expect(spoken.filter(text => text === "Want me to remember that?")).toHaveLength(2);
+    const contributions = await live.graph.nodesOfType("Contribution");
+    expect(contributions).toHaveLength(1);
+    expect(contributions[0]!.props).toMatchObject({ literal_transcript: memory, shared: false });
+    expect((await live.graph.nodesOfType("TopicOutcome"))[0]!.props).toMatchObject({ first_rung_reached_unaided: 3, highest_rung_used: 3 });
+    expect((await state(pair.familyCookie)).stories).toEqual([]);
+  });
+  it("gives a thinking turn room, then still honors an explicit stop", async () => {
+    const pair = await openPair();
+    const { live, spoken } = await completeCall(pair.patientCookie, pair.household, ["Let me think.", "I have to go."]);
+    expect(spoken).toHaveLength(3);
+    expect(await live.graph.nodesOfType("Contribution")).toEqual([]);
+    expect(await live.graph.nodesOfType("TopicOutcome")).toEqual([]);
+  });
+  it("closes repeated conversational detours without a stuck call or stored question", async () => {
+    const pair = await openPair();
+    const { live } = await completeCall(pair.patientCookie, pair.household, Array(4).fill("What do you mean?"));
+    expect(await live.graph.nodesOfType("Contribution")).toEqual([]);
+    expect((await live.graph.nodesOfType("Session"))[0]!.props.outcome).toBe("no_answer_today");
+  });
   it("can open the patient demo first and then join that same family from the home page", async () => {
     const patient = await post("demo-patient");
     expect(patient.status).toBe(200);
@@ -136,7 +165,7 @@ describe("paired local caregiver and patient demos", () => {
     expect(dashboard.status).toBe(200);
     const record = await dashboard.json();
     expect(record.info.sessions).toHaveLength(1);
-    expect(record.info.sessions[0]).toMatchObject({ recentCalls: 1, unaidedCalls: null });
+    expect(record.info.sessions[0]).toMatchObject({ recentCalls: 1, unaidedCalls: null, outcome: "cue" });
     expect(record.topic_record.topics[0].lines[0].script_id).toBe("FAM-REC-NOT-ENOUGH");
     expect(record.can_pause).toBe(true);
     expect(JSON.stringify(record.info.sessions)).not.toContain(text);

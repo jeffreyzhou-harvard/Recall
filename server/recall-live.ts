@@ -17,7 +17,7 @@ import { MemoryGraphStore } from "@/lib/graph/memory-store";
 import { buildGraph } from "@/lib/graph/seed";
 import { FixtureCallDriver } from "@/lib/orchestrator/call-driver";
 import { AssetIndex } from "@/lib/provenance/assets";
-import { MuseAnswerInterpreter, museScaffoldAdvisor } from "@/lib/providers/muse/reasoning";
+import { MuseAnswerInterpreter, museScaffoldAdvisor, museConversationAdvisor } from "@/lib/providers/muse/reasoning";
 import { MuseSpark, requireMuseKey } from "@/lib/providers/muse/spark";
 import { FixtureTranscription } from "@/lib/providers/transcription";
 import { MemoryAlertChannel } from "@/lib/safety/alert";
@@ -141,6 +141,9 @@ export async function createLiveRecall(config: LiveConfig): Promise<LiveRecall> 
   const service = new RecallService({
     graph,
     knowledgeQuestions: !config.fixture,
+    openingPhotos: !!config.sampleDemo,
+    conversationalRepairs: !config.fixture,
+    ...(!config.fixture && spark ? { conversationAdvisor: museConversationAdvisor(spark) } : {}),
     ...(!config.fixture ? { enrichKnowledge: () => knowledge.process(1).catch(() => ({ failed: 1 })) } : {}),
     callAttempts: () => attempts?.all() ?? [],
     onContributionCommitted: async (ctx) => { if (ctx.session.stored) await webCall?.retainConfirmed({ contribution_hash: ctx.session.stored.contribution_hash, store: ctx.session.store_confirmation, share: ctx.session.share_confirmation, share_audio: ctx.session.share_audio_window }); },

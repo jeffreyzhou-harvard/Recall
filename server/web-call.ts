@@ -24,6 +24,7 @@ export class LiveTranscription implements TranscriptionProvider {
   forget(id: string) { this.turns.delete(id); }
 }
 export class WebCall implements CallDriver {
+  readonly offeredPhotoIds = new Set<string>();
   readonly call_asset_id = `web-call:${randomUUID()}`;
   command: WebCommand | null = null;
   topicLabel = "";
@@ -76,7 +77,10 @@ export class WebCall implements CallDriver {
     } catch { return []; } // An unavailable photograph must never interrupt her audio or confirmation.
   }
   async photos(): Promise<WebCallPhoto[]> {
-    return (await this.currentPhotos()).map(({ id }) => ({ id, url: `/api/call/photo?call=${encodeURIComponent(this.call_asset_id)}&photo=${encodeURIComponent(id)}` }));
+    return (await this.currentPhotos()).map(({ id }) => {
+      this.offeredPhotoIds.add(id);
+      return { id, url: `/api/call/photo?call=${encodeURIComponent(this.call_asset_id)}&photo=${encodeURIComponent(id)}` };
+    });
   }
   async photo(callId: string, id: string): Promise<Media | null> {
     if (callId !== this.call_asset_id) return null;

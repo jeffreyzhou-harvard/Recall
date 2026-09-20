@@ -1,7 +1,7 @@
 /** Ephemeral, patient-only captions. The final WAV transcription remains the engine's evidence. */
 import { DeepgramLive, requireDeepgramKey, type LiveHandlers } from "@/lib/providers/deepgram";
 
-export type CallCaption = { step: string; text: string; final: boolean; unavailable: boolean };
+export type CallCaption = { step: string; text: string; final: boolean; unavailable: boolean; endpointMs?: number | null };
 export type CaptionStream = Pick<DeepgramLive, "sendAudio" | "end">;
 export type CaptionFactory = (rate: number, handlers: LiveHandlers) => CaptionStream;
 const connect: CaptionFactory = (sampleRate, handlers) => new DeepgramLive(requireDeepgramKey(process.env.DEEPGRAM_API_KEY), { sampleRate }, handlers);
@@ -39,7 +39,9 @@ export class CallCaptions {
             if (final && text.trim()) this.stable = `${this.stable} ${text}`.trim().slice(-4000);
             this.value = { step, text: `${this.stable} ${final ? "" : text}`.trim().slice(-4000), final, unavailable: false };
           },
-          onTurn: () => {}, // Never feed preview text into safety, confirmation, or the graph.
+          // Timing only: the browser still records and submits the full WAV for all authoritative processing.
+          onTurn: turn => { if (current()) this.value!.endpointMs = turn.end_ms; },
+          onSpeechStarted: () => { if (current()) this.value!.endpointMs = null; },
           onError: unavailable,
           onClosed: unavailable,
         });

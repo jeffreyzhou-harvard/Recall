@@ -41,6 +41,8 @@ export interface SpokenPrompt {
 }
 
 export interface CallDriver {
+  /** Photo artifacts offered to the patient by the browser transport during this call. */
+  readonly offeredPhotoIds?: ReadonlySet<string>;
   readonly call_asset_id: string;
   /** Browser hang-up after a final recording: safety is checked before honoring it. */
   readonly stopped?: boolean;

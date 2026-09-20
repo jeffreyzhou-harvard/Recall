@@ -17,6 +17,7 @@ export const build_caregiver_receipt: ToolImpl<"build_caregiver_receipt"> = asyn
   if (session.session_id !== input.session_id) throw new Error(`session "${input.session_id}" is not this session`);
   const machine = ctx.machine();
   const c = machine.context;
+  const reached = c.reached_at_rung === null ? null : Math.max(c.reached_at_rung, session.opening_photo_cue_id ? 3 : 1);
   const topic = session.topic;
   const lines: Array<{ script_id: string; text: string; citations: string[] }> = [];
   const add = (key: FamilyLineKey, values: Record<string, string>, citations: string[] = []): void => {
@@ -29,14 +30,14 @@ export const build_caregiver_receipt: ToolImpl<"build_caregiver_receipt"> = asyn
   else if (machine.state === "stopped") add("receipt_stopped", {});
   else if (machine.state === "safety_handoff") add("receipt_safety", {});
   else if (topic && c.rungs_fired.length > 0) {
-    if (c.reached_at_rung === null) add("receipt_not_reached", { topic: topic.label }, [topic.topic_id]);
-    else if (c.reached_at_rung === 3) {
+    if (reached === null) add("receipt_not_reached", { topic: topic.label }, [topic.topic_id]);
+    else if (reached === 3) {
       const cue = c.cues_offered.find((x) => x.rung === 3);
       const cueNode = cue ? await ctx.graph.getNode(cue.cue_id) : null;
       // The cue's name is said only if the cue was a verified person; otherwise the line without a name is used.
       if (cueNode?.type === "Person" && ctx.gate.isVerified(cueNode.id)) add("receipt_cue", { topic: topic.label, cue: cueNode.props.display_name }, [topic.topic_id, cueNode.id]);
       else add("receipt_context", { topic: topic.label }, [topic.topic_id]);
-    } else add(BY_RUNG[c.reached_at_rung]!, { topic: topic.label }, [topic.topic_id]);
+    } else add(BY_RUNG[reached]!, { topic: topic.label }, [topic.topic_id]);
   }
 
   // "No correction, no distress" is a statement about what Recall logged, not about her: no line Recall spoke
