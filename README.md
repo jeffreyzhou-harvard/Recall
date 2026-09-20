@@ -1,140 +1,185 @@
-# Recall
+<p align="center">
+  <img src="public/brand/recall-mark.svg" alt="Recall logo" width="80" height="80">
+</p>
+<h1 align="center">Recall</h1>
+<p align="center"><strong>Cues, not answers — every memory stays in her own words.</strong></p>
 
-Most dementia products help families manage the person. Recall helps the person keep reaching her own memories, and keeps the people around her calling her directly to do it.
+Recall brings family photos and stories together in a private memory graph, helping people living with dementia revisit their own memories through gentle voice conversations.
 
-Recall has two parts, built on one private memory graph:
+Families contribute photographs and stories. The patient can revisit an approved topic in a browser voice call, with familiar context offered as needed. Their words enter the private call graph only after original-audio playback and confirmation; sharing with family requires a separate confirmation. Recall creates reasons for people to talk to each other, without speaking on anyone's behalf.
 
-1. **Capture.** She and the people who know her contribute memories — photos, voice, short stories — while those memories are still accessible. The graph holds people, relationships, places, events, stories, and preferences, each with visible provenance: who said it, and when.
-2. **Retrieve.** Recall periodically calls her on an ordinary phone. It picks a personally meaningful memory and helps her reach it herself: free recall first, then progressively more context, only as needed. It also learns which cues actually help *her*, and prefers those next time.
+Built for HackMIT 2026, Healthcare track. [SPECS.md](SPECS.md) and [EVIDENCE.md](EVIDENCE.md) explain the design and its limits.
 
-Family stay in the loop without replacing her. They can contribute memories, open a light weekly note and a per-topic record of what happened in calls, and are pointed back to calling her.
+## What is implemented
 
-Core loop: **CAPTURE → ORGANIZE → RETRIEVE → REINFORCE → LEARN → REPEAT.** Not: **CAPTURE → simulate the person.**
+- **Shared collection:** upload photographs, retain originals and available capture dates/GPS, organize them into moments, and add attributed written or recorded stories. OpenAI organization is optional; metadata grouping works without a key.
+- **One caregiver workspace:** Moments, People, Places, Connections, Stories, and Recall sessions share the Circle sidebar. The sidebar resizes, collapses, supports keyboard controls, and remembers its width.
+- **People:** opt-in face detection runs in the browser with self-hosted models. Families can name, merge, separate, or dismiss suggested groups. Photo groups never establish an identity or relationship in the patient-call graph.
+- **Places and connections:** a map of photo locations and an interactive graph with selectable people, moments, stories, and relationship/source details on connecting lines.
+- **Collection management:** caregivers can delete individual photos, whole photo groups, or stories. Confirmation explains related removals; orphaned collection media is cleaned up. Deleting a shared call story does not erase its original private call record.
+- **Accounts and invitations:** caregiver email/password sign-in, existing access keys, expiring family/story links, and optional Linq invitation texts and opted-in photo reminders.
+- **Browser voice calls:** microphone input, Recall's spoken questions, live patient captions, speech endpoint detection, topic photos, original-audio confirmation playback, and saved call records. The implemented transport is the web app; ordinary telephone delivery is not connected.
+- **Family call records:** an opt-in Weekly Note, dated per-topic call history, counts with denominators, and an access-checked printable record. These describe what happened in Recall calls, without a score or medical interpretation.
 
-**Cues, not answers — every memory stays in her own words.**
+## Tech stack
 
-If Maya wants to know what Susan remembers about her wedding, Recall does not answer from the graph. It says: *"Susan's talked about this before. Want to give her a call?"* and stops there. A product that answers family questions from a database of someone's memories is a reason to stop calling her. Recall exists to be the opposite.
+Versions below describe the repository's current dependency families; [package.json](package.json) and [package-lock.json](package-lock.json) contain the exact requirements and resolved versions.
 
-Recall is not a digital replica, a "chat with her" interface, or a bot that relays decisions. It never impersonates her, never fabricates a first-person memory she didn't provide, and never becomes the thing family members talk to instead of her.
+| Layer | Technology and role |
+| --- | --- |
+| Frontend | Next.js 16 App Router, React 19, TypeScript 7 |
+| Styling and motion | Custom CSS, Tailwind CSS 4, Framer Motion 13, Lucide icons, locally hosted Atkinson Hyperlegible Next |
+| State and validation | Zustand 5, a deterministic call reducer, Zod 4 |
+| Server | Next.js route handlers on Node.js 22.13+; one long-lived process |
+| Durable storage | SQLite through built-in `node:sqlite` for onboarding, accounts, collection state, graph evidence, and call records; private filesystem media |
+| Graph retrieval | Embedded LadybugDB (`@ladybugdb/core`) over committed graph snapshots, or the same guarded traversal directly in SQLite |
+| Voice | Deepgram Nova-3 transcription and streaming captions; Aura-2 Thalia for Recall's own voice |
+| Conversation and graph proposals | Optional Meta Muse Spark; typed outputs checked by the policy, evidence, and confirmation gates |
+| Photo organization and recording transcription | Optional OpenAI integration; configured defaults are `gpt-5.4-mini` and `gpt-4o-mini-transcribe` |
+| Photo processing | Sharp, Exifr for capture metadata, and HEIC conversion |
+| Face grouping | Pinned `@vladmandic/face-api@1.7.15`, with vendored detection, landmark, and descriptor models |
+| Maps | MapLibre GL |
+| Optional messaging | Linq for shared-collection invitations and opted-in reminders |
+| Checks | Vitest 5, TypeScript, language/conduct lint, and asset/provenance verification |
+| Deployment | Railway Node service with a persistent volume |
 
-`AGENTS.md` is the complete brief, including the non-negotiables. `SPECS.md` is the locked design doc. When they disagree, `AGENTS.md` wins. HackMIT 2026, Healthcare track.
+The face library is pinned and archived upstream; see [People and model limitations](docs/PEOPLE.md). Provider keys remain on the server.
 
-## Run it
+## Run locally
+
+Use **Node.js 22.13 or newer**.
 
 ```bash
-npm install
-npm run check        # typecheck + tests + language lint + provenance verify
-npm run dev          # http://localhost:3000/present is the judged path
+npm ci
+cp -n .env.example .env.local
+npm run dev
 ```
 
-Node 22.13+. No keys, no database, and no network are needed for any of the above. (Onboarding real households uses one SQLite file through Node's built-in `node:sqlite`: still no service to run and no new dependency. See "Onboarding" below.)
+Open [localhost:3000](http://localhost:3000). For another port, use `npm run dev -- --port 3001`. Keep an existing `.env.local` rather than replacing it.
 
-| Command | What it does |
+The sample collection needs no provider keys. Live voice calls require Deepgram. The app creates local SQLite files and private media under the git-ignored `.data/` directory; no separate database service is needed. Dependencies must be installed first.
+
+| Route | Purpose |
 | --- | --- |
-| `npm run check` | `typecheck` + `test` + `lint:language` + `verify`. Must pass before a task is called done. |
-| `npm run lint:language` | The banned-phrase and conduct lint (`AGENTS.md` §12, test 8) over every fixed line and every line Recall rendered on the golden path. |
-| `npm run verify` | Asset hashes, seed validation, citation resolution, the judged path end to end, authorship invariants. |
-| `npm run verify:strict` | The pre-demo gate. Same, but **fails while any placeholder media or placeholder word timing remains.** |
-| `npm run assets:hash` | Re-hash `/assets` into the manifest. Refuses to touch a changed `final` asset without `--allow-replace`. |
-| `npm run assets:placeholder` | Generate stand-in media. Never overwrites an existing file. |
-| `npm run graph:seed` | Build an on-disk LadybugDB graph at `.data/recall.lbug` from the family seed, for Cypher poking. |
+| `/` | Landing page, sign-in/setup entry points, and local demo links |
+| `/sign-in`, `/onboarding` | Account access and joint family setup |
+| `/caregiver`, `/family` | Shared collection and caregiver workspace |
+| `/conversations` | Recall sessions inside the same Circle workspace |
+| `/revisit` | Patient photo storytelling and entry to their Recall call |
+| `/conversations/call` | Scheduled patient browser call |
+| `/demo/call` | Local sample patient's call, paired with the caregiver demo |
+| `/onboarding/manage` | Joint preferences, approved topics, member access, and selected imports |
 
-## Shared photo collection
+## Sample family walkthrough
 
-`/caregiver` (also `/family`) opens the household's shared photos, moments, map, connections and attributed stories. `/revisit` opens photo storytelling, `/conversations` opens the existing private call records, and `/conversations/call` hosts scheduled patient calls. `/` introduces the collection; `/onboarding` creates an organizer account and records joint conversation preferences.
+The two sample entry points are currently **development-only and localhost-only**. Production builds do not expose them.
 
-Photos retain their originals and available capture dates/GPS. OpenAI optionally groups and describes them and transcribes recordings for review. Email/password, single-use invitation links and existing access keys work for sign-in. Family invitations and explicitly opted-in photo reminders use Linq; copyable links work without messaging. Set the optional variables in `.env.example`. See [the collection guide](docs/PHOTO_FIRST_DEMO.md) and [its authorized scope](docs/PHOTO_FIRST_SCOPE.md).
+1. Click **Explore a sample family** on the landing page. Each click starts a fresh sample household with **Home Garden Morning** and **Quiet Library Rooms** only. The four person-focused moments, People groups, and stories are absent. Connections already includes explicitly fictional family ties.
+2. Upload the 12 original JPEGs from the **Relay Family Photo Kit**, also included in [public/sample-family](public/sample-family). Exact file hashes select the authored sample grouping; altered or unrelated files use the regular organization pipeline.
+3. The forming-groups animation plays for **three seconds**, then the collection shows **Our Cape May summer**, **A birthday around the table**, **The kitchen before Diwali**, and **A long weekend in Acadia**. Places and Connections use the uploaded moments.
+4. In this sample only, People shows at most **Grandmother, Mother, Daughter 1, and Daughter 2**, using authored crops from uploaded kit photos. These are demonstration fixtures, not inferred identities. Real households use opt-in face grouping.
+5. Click **Try the patient call demo** to open the paired patient tab. It joins the same sample household through a separate signed session. Start the demo call, answer, and allow microphone access.
+6. The sample call shows the event's photos with its opening question, displays live captions, and handles replies through the existing conversation gates. After audio playback, confirm storage and then sharing. Only share-confirmed words appear as a story on the associated moment and in the caregiver's Connections view.
 
-The sidebar can be resized or collapsed and remembers its setting. **People** (`/caregiver#people`) groups similar faces when you choose **Find people**, using self-hosted open-source models in your browser, with no API key. Family members name and correct the suggestions. See [People and model limitations](docs/PEOPLE.md).
+Returning between the two tabs preserves their shared sample. Clicking **Explore a sample family** again starts another fresh sample; it is not a resume button. The fictional setup does not change the deployment's active household or send external calls or safety alerts.
 
-## How it fits together
+## Calls, memory, and authorship
 
-Recall places a scheduled recall call to her, climbs a five-rung support ladder, captures her exact words, and stores them only after she hears the line played back and says yes. A second question asks whether to share that line with family. Family never trigger a same-moment call, and Recall never answers them from the graph.
+The private patient-call graph and the household's shared photo collection are separate. A collection upload does not automatically become approved evidence for a real patient's call.
 
-```
-idle → scheduled → policy_passed → connected → topic_selected → asking
-     → lost → reanchored → recalled → confirming → confirmed → stored
-```
+The call engine chooses an approved topic from the graph and uses the least support needed: free recall, context, association, recognition, and permitted reorientation. Family contributions remain attributed to their authors and are never silently treated as the patient's account. Optional Muse proposals can help interpret a reply or select supported context, but cannot bypass the gates.
 
-The call nests as `connected { greet → select_topic → ladder* → capture → confirm }`. Confirm asks two questions in order: store ("Want me to remember that?"), then share ("Would you like me to share it with your family?"). Commit happens last. A stop at the share question stores nothing.
+Real-household calls keep the opening unaided question photo-free. Verified topic photographs can appear with an association cue or after the patient reaches the memory. The sample demo's opening-photo behavior is an explicit exception, and the engine records the photo support. Topic and contributor permissions are rechecked when serving private call photos.
 
-Family flows sit outside that reducer: a query is redirected, a contribution is stored as that contributor's unconfirmed claim, a weekly note is posted at most once per member per 7 days, and the per-topic record is a view, not a post.
+Only completed recorded turns drive the call engine. Streaming captions are temporary previews. Recall plays back the patient's actual recorded words before asking:
 
-| Piece | Where it lives |
+1. “Want me to remember that?”
+2. “Would you like me to share it with your family?”
+
+Commit happens after both questions resolve. A stop before commit stores no contribution; a declined or unclear share answer can still permit private storage after a confirmed store answer. The patient's voice is never synthesized.
+
+Family questions about what the patient remembers receive a redirect to call them directly, not an answer drawn from their graph. Call records contain per-topic counts, dates, and fixed explanatory copy. The printed record states that it is **not a clinical assessment or diagnosis**.
+
+The safety path uses fixed phrase matches and missed-call counts, with designated-caregiver acknowledgment and one backup escalation. Delivery uses the configured dashboard or durable webhook channel. Recall is not an emergency service.
+
+## Configuration
+
+Copy only the settings you need from [.env.example](.env.example); never commit keys or private data.
+
+| Variable | Use |
 | --- | --- |
-| Reducer and transition table | `lib/state` — one source of truth; every pane keys off the same transitions |
-| 21 tools and hard gates | `lib/tools` — topic pick, place call, graph query, evidence, ladder, capture, store- and share-confirmation, family redirect, weekly note, topic record, clinician export, safety check, missed-call alert, caregiver ack |
-| Memory graph + retrieval layer | `lib/graph` — 18 node types, provenance on every claim and edge, a thinner per-cue effectiveness layer that never decides whether to climb, only which cue to try |
-| Trims, hashes, receipts | `lib/provenance` — an edit-decision list that can only express silence and disfluency trims; hash-chained PROV-style log |
-| Onboarding database | `lib/onboarding` — households, the people in them, stated ties, invitations, and every version of the joint setup, append-only. SQLite (`node:sqlite`) with an in-memory twin; the same rules run over both |
-| Caregiver frontend | `/caregiver` (`/family` alias) — persisted session bookshelf, optional topic details/Weekly Note, attributed memory and private media contributions |
-| Judged sandbox | `/present` — isolated fixture-based engine check |
+| `DEEPGRAM_API_KEY` | Required for live patient speech transcription and Recall's voice |
+| `MUSE_API_KEY` | Optional conversation support and graph extraction proposals |
+| `OPENAI_API_KEY` | Optional photo organization and collection recording transcription |
+| `OPENAI_VISION_MODEL`, `OPENAI_TRANSCRIPTION_MODEL` | Override the photo/recording model defaults |
+| `LINQ_API_KEY` | Optional collection invitation texts and opted-in reminders |
+| `RECALL_PUBLIC_URL` | Public HTTPS origin for shared links |
+| `RECALL_DATA_DIR` | Private persistent storage root; defaults to `.data/` |
+| `RECALL_GRAPH_READS` | `ladybug` by default; `sqlite` uses direct durable-store traversal |
+| `RECALL_CALL` | Set to `web` for browser calls |
+| `RECALL_SCHEDULER` | Set to `1` to check agreed call windows and process pending graph work |
+| `RECALL_REMINDER_TIMEZONE` | Shared-collection reminder timezone |
+| `RECALL_SAFETY_WEBHOOKS` | Optional JSON map of designated-caregiver handoff endpoints |
+| `RECALL_OPERATOR_SECRET`, `RECALL_FAMILY_CREDENTIALS` | Optional operator/member access-key configuration |
 
-The model may select tool calls. It cannot bypass gates. Storing a claim without confirmation, speaking an uncited fact, leaking graph content through `handle_family_query`, or climbing the ladder out of order are hard fails.
+For a fresh installation using **Start your family**, leave the operator secret, policy file, and household override unset, with `RECALL_FAMILY_CREDENTIALS={}`. The first household can create its caregiver account through onboarding; subsequent access uses the saved account. An operator-managed installation uses its separate operator credential instead. Remove the obsolete `RECALL_FAMILY_SECRET` if configured.
 
-**Support ladder (least support first):** free recall → context → association → recognition → reorientation. Climb one rung at a time. Rung 1 is an invitation ("I'd love to hear about the summers at Cape May. What comes to mind?"), never "Who is…?" or "Do you remember…?". Family-sourced, unconfirmed claims stop at rung 3 and are spoken only attributed, followed by an open question.
+The optional `RECALL_ONBOARDING_DB` and `RECALL_CIRCLE_DB` variables override individual database paths. Leave them unset to keep those files under `RECALL_DATA_DIR`. `RECALL_HOUSEHOLD` pins the active live household; legacy `RECALL_POLICY_FILE` fixture configuration cannot be combined with it.
 
-## Family services (current backend contract)
+Real calls require joint setup, approved topics and windows, an introduction to Recall, and a patient session. Initial setup leaves calls paused; enabling them requires joint review. Family credentials cannot answer a patient call or trigger an immediate one.
 
-Family are part of the loop, passively and lightly. Nothing here is shown to her.
+## Deploy on Railway
 
-- **Tell Recall about a memory.** A one-way form. Stored as the contributor's claim with `patient_confirmed: false`. A question typed here is rejected with a hint to call her.
-- **Ask about Susan.** Redirect only. The entire response is the fixed line pointing them to call her. No graph content, ever.
-- **Weekly Note.** At most one per approved member per 7 days, shown when they open the dashboard. Topic-only, observable; her words only after share-confirmation; at most one gap or difference prompt.
-- **Per-topic record.** Counts and dates from the last 8 calls that included a topic. No total, no score, no color-coded verdict. Fixed header: this is a record of what happened in Recall calls, not a measure of her memory overall.
-- **Export for a doctor.** Member-initiated. The same counts, dates, and header, plus "This record is not a clinical assessment or diagnosis." Recall never sends the file to anyone.
+Use one service for the frontend and backend, with a persistent volume for SQLite and media.
 
-Recall never calls, texts, emails, or pushes family, with one exception: a fixed-text safety alert to designated caregivers if her final turn matches a lexical phrase on the safety list. The alert states a category and time. It never quotes her. Recall is not an emergency service.
+1. Connect this repository's `main` branch using Railpack.
+2. Attach a [Railway volume](https://docs.railway.com/volumes) to the service at `/data`.
+3. Set the build command to `npm run build` and start command to `npm run start -- --hostname 0.0.0.0`.
+4. Add the following variables, plus any provider keys needed:
 
-## Onboarding
+   ```dotenv
+   NODE_ENV=production
+   RAILPACK_NODE_VERSION=22
+   PORT=3000
+   RECALL_DATA_DIR=/data/recall
+   RECALL_GRAPH_READS=sqlite
+   RECALL_CALL=web
+   RECALL_SCHEDULER=1
+   RECALL_FAMILY_CREDENTIALS={}
+   RECALL_SAFETY_WEBHOOKS={}
+   RECALL_REMINDER_TIMEZONE=America/New_York
+   ```
 
-Before Recall's first call, a household is set up: her, the caregiver setting Recall up with her, and whoever they invite. `lib/onboarding` holds it, and the live server can run for a household from it (`RECALL_HOUSEHOLD=household:1`) instead of the committed fixture family.
+5. Generate a service domain using port **3000**, then set `RECALL_PUBLIC_URL` to that HTTPS origin.
+6. Keep **one replica** and **Serverless/sleeping off**. Current calls and their command acknowledgments live in one process.
+7. Use `/api/session` as the healthcheck path, deploy, and complete family setup. Upload a photo and restart the service to check persistence. Enable volume backups.
 
-- **One file, no service.** `SqliteOnboardingStore` uses Node's built-in `node:sqlite`, at `.data/onboarding.db` (git-ignored; `RECALL_ONBOARDING_DB` moves it). `MemoryOnboardingStore` is its twin, and `tests/onboarding.test.ts` runs every rule over both.
-- **Two ways to change the setup, and the difference is the point.** `recordJointSetup` needs her AND a caregiver, and is the only way to add or widen anything. `tightenSetup` is what she, or a caregiver, may do alone at any time: revoke, narrow, pause (rule 12). It compares the new document with the current one and refuses, by name, anything that gives more - above all any change to the safety block (rule 15). Every version is kept, with who agreed and who recorded it; the table is append-only in the schema itself.
-- **Nobody signs themselves up.** Family join by an invitation from her or a caregiver. The token is shown once, to the inviter, to pass on themselves - Recall never contacts family (rule 5) - and only its hash is kept.
-- **Data minimization is in the schema (rule 8).** One phone number - hers - and nothing else about anyone: no diagnosis, stage, birth date, address, or email column exists, a family member's row cannot hold a number, and clinical or state language is refused in any name or note.
-- **Ask, don't assert.** A tie between two people is recorded only because a named member stated it, in the word they used, and `graphSeed()` turns the household into the identity layer of her graph - people, stated ties, the setup - with no memories in it. Those come only from her own confirmed words, or a family contribution in its author's name.
+SQLite schemas are created by the app at runtime; no separate PostgreSQL service or migration command is required. Back up the whole private data directory. Local accounts and uploaded files do not transfer automatically, and an active call does not survive a process restart.
 
-Routes are under `/api/onboarding/*`. Private-key browser sessions enforce setup authority; accepting an invitation needs its one-time token.
+**Hosted sample demos still require a code change:** the current sample routes check for development mode and localhost. Railway environment variables alone do not enable them. Keep `NODE_ENV=production`.
 
-## The 90-second golden path
+## Checks and repository map
 
-Cast is fixed: Susan, Maya (daughter), Priya (sister), Anika (granddaughter), Cape May, Lincoln Elementary, Princeton. Do not invent another.
+```bash
+npm run check
+npm run build
+```
 
-1. Onboarding: Maya's photo, Susan names her, the graph node forms with provenance.
-2. The phone rings as a saved contact, "Recall (from Maya)." Recall discloses it is an AI assistant Maya set up, then invites her to talk about summers at Cape May. It waits. She is unsure.
-3. The ladder climbs: context, then association ("You and Maya used to go there together"). She reaches it. Recall does not rewrite her line. Store-confirmation, then share-confirmation. The graph grows from this call.
-4. Later, Maya types "What did Mom say about her wedding?" Recall's entire response: **"Susan's talked about this before. Want to give her a call?"**
-5. The dashboard shows the weekly note, the line Susan chose to share, and the per-topic record. Never a score.
-6. Provenance receipt: her waveform, literal transcript, 2 silence trims, 0 generated first-person words. Final line: **Cues, not answers — every memory stays in her own words.**
+| Command | Purpose |
+| --- | --- |
+| `npm run check` | Typecheck, tests, language/conduct lint, and provenance verification |
+| `npm test` | Vitest engine, storage, permissions, collection, and integration checks |
+| `npm run graph:seed` | Build a local LadybugDB seed at `.data/recall.lbug` |
 
-`/present` runs this offline, on prerecorded branches and fixture outputs. Telephony, ASR, and the network must never touch it.
+| Path | Responsibility |
+| --- | --- |
+| `app/`, `components/circle/` | Routes and shared caregiver workspace |
+| `components/live/`, `client/` | Patient calls, microphone capture, onboarding, and browser helpers |
+| `server/circle/` | Shared collection, photos, stories, People, invitations, and sample fixtures |
+| `server/` | Sessions, accounts, scheduling, live calls, private media, and durable graph |
+| `lib/state/`, `lib/tools/`, `lib/orchestrator/` | Deterministic call transitions and enforced tool contracts |
+| `lib/graph/`, `lib/knowledge/`, `lib/provenance/` | Evidence, graph updates, hashes, receipts, and retrieval |
+| `lib/onboarding/`, `lib/family/` | Joint setup, permissions, count-only records, and exports |
+| `fixtures/`, `assets/`, `tests/` | Fixed copy, thresholds, source media, and verification |
 
-## Connected application
-
-The shared collection is persisted separately from the private patient-call graph. New organizers can sign up with email/password; invited relatives join through expiring links. Existing key-based accounts remain accessible. Joint setup, scheduled calls, topic approval, call confirmation, family records and exports retain their backend gates. Browser calls use microphone audio, final-turn transcription, Recall speech and original-audio confirmation playback.
-
-Local sample families open with six fictional photographs in two groups: Home Garden Morning and Quiet Library Rooms. Connections starts with Susan, Maya, Priya, and Anika, their explicitly fictional family ties, and links to these moments; this creates no accounts, photo identities, or patient-call evidence. Upload the 12 original photographs from the Relay Family Photo Kit during the demo to create Our Cape May summer, A birthday around the table, The kitchen before Diwali, and A long weekend in Acadia. In sample families only, exact file hashes identify these fictional fixtures and apply their declared grouping without an API key, including across separate upload batches. Successful sample uploads play the grouping reveal for three seconds before showing the receipt. Other uploads use the normal photo organization pipeline. Caregivers can delete a photograph or photo group from its detail view; confirmation lists any stories and recordings that will also be removed. Deletion cleans up private media and People references. Patients have a prominent “Your Recall call” link in their photograph view.
-
-Browser calls also display verified photographs attached to the approved conversation topic. Photos appear at the association rung or once she has reached the memory, remain visible while she answers and confirms, and disappear when the call ends. The opening unaided question remains photo-free. Multiple photographs have manual previous/next controls; an unavailable image does not interrupt audio. Image requests require the patient's session and the current call, and recheck topic/contributor permissions. Photos in the separate shared collection are not automatically approved call evidence; they need an attributed photo contribution linked to an approved call topic.
-
-For the paired local demo, **Try the patient call demo** beneath **Explore a sample family** opens `/demo/call` in another tab. The tabs use separate signed caregiver/patient sessions for the same sample household, so opening either demo first works and returning preserves uploaded photos. Click **Start demo call**, then **Answer call** and allow the microphone. This uses the existing browser call engine, Deepgram speech/transcription (`DEEPGRAM_API_KEY`), and the normal store/share confirmation gates. Sample photo groups become attributed call topics; confirmed words persist in that household’s private graph, and only share-confirmed words appear as stories attached to their photo group and in Connections. The caregiver tab refreshes every three seconds. This local-only fictional setup never changes the deployment’s active household or sends external calls or alerts.
-
-The call now displays live patient captions through the server-side Deepgram streaming client; these are temporary previews, and only final recorded turns can reach the confirmation gates. In Connections, select a connecting line to inspect its relationship and source. Shared demo call stories also include their actual backend edge type, properties and confirmation timestamps; the caregiver view never receives unshared call transcripts or the full private graph.
-
-The safety engine includes phrase handoffs, missed-call tiering, caregiver acknowledgment and escalation. Delivery uses the configured dashboard or durable webhook channel. The fixture engine and its safety thresholds remain covered by `npm run check`.
-
-The [knowledge graph](docs/knowledge-graph.md) now supports selected onboarding imports, continuous Muse-assisted updates, contributor interpretation review, graph-driven follow-ups and native Ladybug reads.
-
-See [backend integration](docs/backend-integration.md) for configuration, verification and deployment limits. A real browser microphone/speaker walkthrough remains to be verified. The offline `/present` demo remains isolated and still contains placeholder recordings. The local contact/calendar import and question-request prototypes are not live ingestion paths.
-
-## Replacing the placeholder media
-
-1. Record, then drop the real file into `/assets` (keep the id; the extension may change).
-2. In `assets/manifest.json`, update that entry's `path` and set `"status": "final"`. Set `duration_ms` by hand if it is not a PCM WAV.
-3. `npm run assets:hash`
-4. Re-derive word timings from the real recording and replace the call transcript fixture, setting `"timing_status": "measured"`. The pauses in her answer must still exceed 700 ms for the receipt to read "2 pauses trimmed".
-5. `npm run verify:strict`
-
-`/assets` is append-only after hashing. Recall's spoken lines in the recording must match `render_prompt` (or a fixed script ID) word for word: if they drift, the run stops rather than letting the audio say one thing while the trace shows another.
+Further implementation notes: [backend integration](docs/backend-integration.md), [knowledge graph](docs/knowledge-graph.md), [People](docs/PEOPLE.md), and [shared-collection scope](docs/PHOTO_FIRST_SCOPE.md).
