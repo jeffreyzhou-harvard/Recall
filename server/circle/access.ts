@@ -5,7 +5,7 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import { promisify } from "node:util";
-import { browserPrincipal } from "../session";
+import { browserPrincipal, SESSION_COOKIE } from "../session";
 import { accountForMember, issueAccount } from "../accounts";
 import { getOnboarding, hashToken } from "../onboarding";
 import { activeHousehold } from "../active-household";
@@ -13,8 +13,8 @@ import { CircleError, limit, withCircleDb } from "./store";
 const scrypt = promisify(scryptCallback);
 export const digest = (s: string) =>
   createHash("sha256").update(s).digest("hex");
-export async function circleIdentity(request: Request) {
-  const principal = browserPrincipal(request);
+export async function circleIdentity(request: Request, cookieName = SESSION_COOKIE) {
+  const principal = browserPrincipal(request, cookieName);
   if (!principal)
     throw new CircleError("Sign in to open your family collection.", 401);
   const account = principal.member_id

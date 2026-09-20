@@ -5,8 +5,9 @@ import path from "node:path";
 import { POST as circlePost, GET as circleGet } from "@/app/api/circle/[...path]/route";
 import { GET as demoGet, POST as demoPost } from "@/app/api/demo/call/[action]/route";
 import { GET as demoSession } from "@/app/api/demo/session/route";
-import { browserPrincipal } from "@/server/session";
-import { samplePatient } from "@/server/sample-access";
+import { browserPrincipal, sessionCookie } from "@/server/session";
+import { samplePatient, SAMPLE_PATIENT_COOKIE } from "@/server/sample-access";
+import { issueAccount, revokeAccount } from "@/server/accounts";
 import { getSampleRecall, sampleCallRunning, syncSampleSharedMemories } from "@/server/sample-call";
 import { getOnboarding } from "@/server/onboarding";
 import { activeHousehold } from "@/server/active-household";
@@ -27,7 +28,8 @@ vi.mock("@/server/recall-voice", () => ({ recallVoice: vi.fn() }));
 let root: string;
 const audio = wavFromPcm(new Uint8Array(16000 * 2 * 3));
 const request = (route: string, cookie = "", body?: unknown) => new Request(`http://localhost:3001${route}`, { method: body === undefined ? "GET" : "POST", headers: { Origin: "http://localhost:3001", Cookie: cookie, "Content-Type": body instanceof Uint8Array ? "audio/wav" : "application/json" }, ...(body === undefined ? {} : { body: body instanceof Uint8Array ? new Uint8Array(body) : JSON.stringify(body) }) });
-const post = (name: string, cookie = "", body: unknown = {}) => circlePost(request(`/api/circle/${name}`, cookie, body), { params: Promise.resolve({ path: [name] }) });
+const post = (name: string, cookie = "", body: unknown = {}) => circlePost(request(`/api/circle/${name}`, cookie, body), { params: Promise.resolve({ path: name.split("/") }) });
+const get = (name: string, cookie = "") => circleGet(request(`/api/circle/${name}`, cookie), { params: Promise.resolve({ path: name.split("/") }) });
 const cookies = (response: Response) => response.headers.getSetCookie().map(cookie => cookie.split(";")[0]).join("; ");
 const state = async (cookie: string) => (await (await circleGet(request("/api/circle/state", cookie), { params: Promise.resolve({ path: ["state"] }) })).json()) as CircleView;
 const call = (name: string, cookie: string, body?: unknown, query = "") => (body === undefined ? demoGet : demoPost)(request(`/api/demo/call/${name}${query}`, cookie, body), { params: Promise.resolve({ action: name }) });
@@ -95,6 +97,84 @@ async function completeCall(cookie: string, household: string, replies: string[]
 describe("paired local caregiver and patient demos", () => {
   /** The sample kit arrives with fictional family-written stories; a call adds only its own shared line. */
   const fromCall = <T extends { callEvidence?: unknown }>(view: { stories: T[] }) => view.stories.filter(story => story.callEvidence);
+  it("preserves Maya and People after an invitation and Susan's photo-storytelling link", async () => {
+    const family = await post("demo"), familyCookie = cookies(family);
+    const maya = await state(familyCookie);
+    expect((await post("invite", familyCookie, { name: "Priya" })).status).toBe(200);
+    const invitation = await post("patient-link", familyCookie);
+    const token = new URL((await invitation.json()).url).hash.slice(1);
+    const accepted = await post("link", familyCookie, { token, accept: true, reminders: false });
+    expect(accepted.status).toBe(200);
+    expect(await accepted.json()).toEqual({ destination: "/demo/revisit" });
+    expect(accepted.headers.getSetCookie()).toHaveLength(1);
+    expect(cookies(accepted)).toMatch(/^recall_sample_patient=/);
+
+    // Both tabs share this browser cookie jar. Opening Susan must not replace Maya.
+    const jar = familyCookie + "; " + cookies(accepted);
+    expect(browserPrincipal(request("/api/session", jar))).toEqual({ role: "family", member_id: maya.member });
+    expect(await state(jar)).toMatchObject({ name: "Maya", member: maya.member, canManage: true });
+    expect((await get("people", jar)).status).toBe(200);
+    const susan = await (await get("sample-patient/state", jar)).json() as CircleView;
+    expect(susan).toMatchObject({ name: "Susan", household: maya.household, canManage: false });
+    expect(susan.member).not.toBe(maya.member);
+    expect(susan.invitations).toEqual([]);
+
+    // Her view also works in a browser with only the patient cookie.
+    expect((await get("sample-patient/state", cookies(accepted))).status).toBe(200);
+    expect(susan.photos[0]!.url).toMatch(/^\/api\/circle\/sample-patient\/media\//);
+    expect((await get(susan.photos[0]!.url.replace("/api/circle/", ""), cookies(accepted))).status).toBe(200);
+    expect((await get("state", cookies(accepted))).status).toBe(401);
+
+    const words = "Maya planted the tomatoes beside the garden gate.";
+    const saved = await post("sample-patient/story", jar, { momentId: susan.moments[0]!.id, text: words, requestId: "susan-photo-story", confirmed: true });
+    expect(saved.status).toBe(200);
+    expect(await saved.json()).toMatchObject({ author: "Susan", owner: susan.member, text: words });
+    expect((await state(jar)).stories).toContainEqual(expect.objectContaining({ author: "Susan", text: words }));
+    expect((await get("people", jar)).status).toBe(200);
+
+    const reopened = await post("link", jar, { token });
+    expect(reopened.status).toBe(200);
+    expect(await reopened.json()).toMatchObject({ alreadyJoined: true, destination: "/demo/revisit" });
+    expect(cookies(reopened)).toMatch(/^recall_sample_patient=/);
+    expect((await post("link", familyCookie, { token })).status).toBe(410);
+  });
+  it("keeps sample photo access scoped, revocable and local, without falling back to Maya", async () => {
+    const family = await post("demo"), familyCookie = cookies(family);
+    expect((await get("sample-patient/state", familyCookie)).status).toBe(401);
+    const invitation = await post("patient-link", familyCookie);
+    const token = new URL((await invitation.json()).url).hash.slice(1);
+    const accepted = await post("link", familyCookie, { token, accept: true });
+    const patientCookie = cookies(accepted), jar = familyCookie + "; " + patientCookie;
+    expect((await get("sample-patient/people", jar)).status).toBe(403);
+    expect((await post("sample-patient/invite", jar, { name: "Someone" })).status).toBe(403);
+    const crossOrigin = request("/api/circle/sample-patient/preferences", jar, { reminders: true });
+    crossOrigin.headers.set("Origin", "https://elsewhere.test");
+    expect((await circlePost(crossOrigin, { params: Promise.resolve({ path: ["sample-patient", "preferences"] }) })).status).toBe(403);
+    const remote = new Request("https://recall.test/api/circle/sample-patient/state", { headers: { Cookie: jar } });
+    expect((await circleGet(remote, { params: Promise.resolve({ path: ["sample-patient", "state"] }) })).status).toBe(404);
+    vi.stubEnv("NODE_ENV", "production");
+    expect((await get("sample-patient/state", jar)).status).toBe(404);
+    vi.stubEnv("NODE_ENV", "development");
+    const patient = samplePatient(request("/api/demo/session", patientCookie))!;
+    revokeAccount(patient.member_id);
+    expect((await get("sample-patient/state", jar)).status).toBe(401);
+    expect((await post("link", jar, { token })).status).toBe(410);
+    expect((await get("people", jar)).status).toBe(200);
+  });
+  it("retains normal patient invitation sign-in outside the fictional sample", async () => {
+    const made = await getOnboarding().createHousehold({ participant: { display_name: "Real participant", phone: "+15555550111" }, caregiver: { display_name: "Organizer" } });
+    issueAccount(made.household.household_id, made.caregiver.person_id, "family");
+    const familyCookie = sessionCookie({ role: "family", member_id: made.caregiver.person_id }, request("/api/session")).split(";")[0]!;
+    const invitation = await post("patient-link", familyCookie);
+    const token = new URL((await invitation.json()).url).hash.slice(1);
+    const accepted = await post("link", "", { token, accept: true });
+    expect(await accepted.json()).toEqual({ destination: "/revisit" });
+    expect(cookies(accepted)).toMatch(/^recall_session=/);
+    expect(browserPrincipal(request("/api/session", cookies(accepted)))).toEqual({ role: "patient", member_id: made.participant.person_id });
+    expect((await state(cookies(accepted))).name).toBe("Real participant");
+    const disguisedSample = sessionCookie({ role: "patient", member_id: made.participant.person_id }, request("/api/session"), SAMPLE_PATIENT_COOKIE).split(";")[0]!;
+    expect((await get("sample-patient/state", disguisedSample)).status).toBe(401);
+  });
   it("populates a fresh sample's moments, people, places, connections and family stories on upload, then a story from the shared call", async () => {
     const opened = await post("demo", "", { fresh: true }), familyCookie = cookies(opened);
     expect(opened.status).toBe(200);

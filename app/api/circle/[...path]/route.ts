@@ -27,11 +27,11 @@ import { deleteCollectionItem, deleteStory } from "@/server/circle/delete";
 import { askFamilyGraph, familyQueryRevision } from "@/server/circle/graph-query";
 import { ensureSampleStories, loadSampleFamily, sampleFamilyConnections } from "@/server/circle/sample";
 import { editPeople, faceThumbnail, getPeople, saveFaceScan } from "@/server/circle/people";
-import { sameOrigin, sessionCookie, browserPrincipal } from "@/server/session";
+import { sameOrigin, sessionCookie, browserPrincipal, SESSION_COOKIE } from "@/server/session";
 import { getOnboarding, newInvitationToken } from "@/server/onboarding";
 import { accountForMember, issueAccount, revokeAccount } from "@/server/accounts";
 import { OnboardingError } from "@/lib/onboarding/types";
-import { openSampleFamily, requireLocalSample, samplePatient, SAMPLE_PATIENT_COOKIE } from "@/server/sample-access";
+import { localSampleRequest, openSampleFamily, requireLocalSample, samplePatient, SAMPLE_PATIENT_COOKIE } from "@/server/sample-access";
 import { prepareSampleCall, sampleCallRunning, syncSampleSharedMemories, visibleSampleStories } from "@/server/sample-call";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,9 +44,20 @@ const str = (v: unknown, max = 500) =>
 type Context = { params: Promise<{ path: string[] }> };
 async function handle(request: Request, context: Context): Promise<Response> {
   try {
-    const parts = (await context.params).path,
+    const routeParts = (await context.params).path,
+      sampleView = routeParts[0] === "sample-patient",
+      parts = sampleView ? routeParts.slice(1) : routeParts,
       action = parts[0] || "",
       isPost = request.method === "POST";
+    if (sampleView) {
+      requireLocalSample(request);
+      if (!samplePatient(request)) throw new CircleError("Open Susan’s invitation to view her sample photographs.", 401);
+      if (!["state", "media", "audio", "discard-audio", "story", "preferences"].includes(action))
+        throw new CircleError("This action isn’t available in the patient photo view.", 403);
+    }
+    const mediaUrl = (url: string) => sampleView
+      ? url.replace(/^\/api\/circle\/media\//, "/api/circle/sample-patient/media/")
+      : url;
     if (isPost && !sameOrigin(request))
       throw new CircleError("Open this action from Recall.", 403);
     const body =
@@ -73,29 +84,35 @@ async function handle(request: Request, context: Context): Promise<Response> {
         const existing = withCircleDb((db) =>
           db
             .prepare(
-              "SELECT member,role,destination,name,used FROM links WHERE hash=?",
+              "SELECT member,household,role,destination,name,used FROM links WHERE hash=?",
             )
             .get(digest(token)),
         ) as
           | {
               member: string;
+              household: string;
               role: string;
               destination: string;
               name: string;
               used: number;
             }
           | undefined;
+        const sampleLink = existing?.role === "patient" && localSampleRequest(request) && readCircle(existing.household).demo;
+        const patient = sampleLink ? samplePatient(request) : null;
+        const joined = patient && patient.member_id === existing?.member
+          ? { role: patient.role, member_id: patient.member_id }
+          : principal;
         if (
-          principal &&
+          joined &&
           existing?.used &&
-          existing.member === principal.member_id &&
-          existing.role === principal.role
+          existing.member === joined.member_id &&
+          existing.role === joined.role
         )
-          return reply({
+          return Response.json({
             alreadyJoined: true,
-            destination: existing.destination,
+            destination: sampleLink ? existing.destination.replace(/^\/revisit(?=\?|$)/, "/demo/revisit") : existing.destination,
             name: existing.name,
-          });
+          }, { headers: { ...noStore, ...(sampleLink ? { "Set-Cookie": sessionCookie(joined, request, SAMPLE_PATIENT_COOKIE) } : {}) } });
         throw error;
       }
       if (!body?.accept) {
@@ -108,12 +125,13 @@ async function handle(request: Request, context: Context): Promise<Response> {
         });
       }
       const claimed = await claimLink(token, typeof body?.reminders === "boolean" ? body.reminders : undefined);
+      const sampleLink = claimed.principal.role === "patient" && localSampleRequest(request) && readCircle(link.household).demo;
       return Response.json(
-        { destination: claimed.destination },
+        { destination: sampleLink ? claimed.destination.replace(/^\/revisit(?=\?|$)/, "/demo/revisit") : claimed.destination },
         {
           headers: {
             ...noStore,
-            "Set-Cookie": sessionCookie(claimed.principal, request),
+            "Set-Cookie": sessionCookie(claimed.principal, request, sampleLink ? SAMPLE_PATIENT_COOKIE : SESSION_COOKIE),
           },
         },
       );
@@ -228,7 +246,7 @@ async function handle(request: Request, context: Context): Promise<Response> {
       }
       return Response.json({ ok: true }, { headers });
     }
-    const identity = await circleIdentity(request),
+    const identity = await circleIdentity(request, sampleView ? SAMPLE_PATIENT_COOKIE : SESSION_COOKIE),
       { household, person, people, canManage } = identity;
     if (action === "graph-query" && isPost) return reply(await askFamilyGraph(request, body));
     if (["people", "face-scan", "face"].includes(action)) {
@@ -267,9 +285,9 @@ async function handle(request: Request, context: Context): Promise<Response> {
           .all(household, Date.now()),
       ) as Record<string, unknown>[];
       return reply({
-        photos: state.photos.map(({ hash, owner, namedPeople, ...p }) => p),
+        photos: state.photos.map(({ hash, owner, namedPeople, ...p }) => ({ ...p, url: mediaUrl(p.url) })),
         moments: state.moments,
-        stories: await visibleSampleStories(household, person.person_id, state),
+        stories: (await visibleSampleStories(household, person.person_id, state)).map(story => ({ ...story, ...(story.audioUrl ? { audioUrl: mediaUrl(story.audioUrl) } : {}) })),
         graphQueryRevision: await familyQueryRevision(identity),
         imports: state.imports.slice(-8).map(({ id, at, added, duplicates, moments }) => ({ id, at, added, duplicates, moments })),
         demo: state.demo,
@@ -411,7 +429,7 @@ async function handle(request: Request, context: Context): Promise<Response> {
           createdAt: new Date().toISOString(),
         });
       });
-      return reply({ id, text, url: "/api/circle/media/" + id, warning });
+      return reply({ id, text, url: mediaUrl("/api/circle/media/" + id), warning });
     }
     if (action === "story") {
       if (typeof body?.text !== "string" || body.text.length > 6000)

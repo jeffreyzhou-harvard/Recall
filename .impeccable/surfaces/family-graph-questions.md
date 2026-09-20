@@ -4,13 +4,13 @@ Mode: Operate. Extension of Circle's Connections view, authorized by the user on
 
 ## Direction contract
 
-THESIS: Let a family ask a question and follow the answer back to an attributed story or photo group.
+THESIS: Let a family ask about people, places, events or connections and follow the answer back to an attributed graph record, story or photo group; a recorded story is not required.
 
 OWN-WORLD: Inherit the current Circle paper, ink and sage tokens, Atkinson controls, serif headings, and Lucide icons. Preserve the existing graph and its animation.
 
 STORY: A family member asks about their collection, reads a sourced answer, opens the original moment, or chooses a suggested conversation question. Private call content stays outside the query projection.
 
-FIRST VIEWPORT: A compact heading and labeled question field above the graph; Ask Recall sits beside the field on desktop and below it on narrow screens. Answers expand in document flow, with source links and a short list of conversation ideas.
+FIRST VIEWPORT: A small sans-serif heading doubles as the question field's label above the graph. A one-row textarea and Ask action share the desktop row and stack on narrow screens. One short source note and a collapsed Try a question disclosure replace the repeated explanations and visible suggestion row. Answers expand in document flow, with source links and a short list of conversation ideas.
 
 FORM: Local extension; no concept seed or replacement visual world. Clear loading, empty, unavailable-provider and error states. Cancellation and source navigation remain keyboard accessible. No decorative animation or generated images.
 
@@ -20,11 +20,19 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 
 This is an ordinary extension of the shipped Circle interface. `components/circle/CircleApp.tsx` places `GraphQuestions` above the existing Connections graph for family members; source actions open the existing photo-group detail. `GraphQuestions.tsx` and `graph-questions.css` retain Circle's Atkinson controls, Georgia headings, paper and sage surfaces, Lucide icons, and inherited focus styles. No raster assets or new animation were added.
 
-The labeled native textarea sits beside Ask Recall, stacking below 560px. Answers and attributed source disclosures use two columns, stacking below 900px. Citation buttons open and focus the corresponding native disclosure; sources retain their author's text, attribution and available date. Conversation ideas have their own heading. Loading, cancel, error, no-match, limited-source and provider-unavailable search states are explicit. Clear answer and cancellation return focus to the field; cancellation aborts the request, and the field remains focusable through `readOnly={busy}`. Results reset when the collection revision changes; pending requests are aborted on revision change or unmount.
+The labeled native textarea sits beside Ask, stacking below 560px. Answers and attributed source disclosures use two columns, stacking below 900px. Citation buttons open and focus the corresponding native disclosure; sources retain their author's text, attribution and available date. Conversation ideas have their own heading. Loading, cancel, error, no-match, limited-source and provider-unavailable search states are explicit. Clear answer and cancellation return focus to the field; cancellation aborts the request, and the field remains focusable through `readOnly={busy}`. Results reset when the collection revision changes; pending requests are aborted on revision change or unmount.
+
+The 2026-09-20 minimalist refinement removes the enclosing card, decorative heading icon, large serif introduction and redundant field instruction. A bottom divider separates the form from the graph. The textarea remains resizable, starts at 48px high, and uses 16px text; controls and example-question targets remain at least 44px high. Example questions retain their existing behavior inside a native disclosure. The source note is shortened to “From shared stories, with sources.” The answer, citation and request logic is unchanged.
 
 Scope follows the user's 2026-09-20 authorization: shared household collection, the member's approved contributions, and patient words only with valid share-confirmation and current dashboard access. Unshared call words remain excluded. Answers and conversation ideas are ephemeral and cannot create memories or initiate calls. These are access and service requirements; frontend source inspection alone does not establish their enforcement.
 
+The base-graph extension keeps the compact layout and changes its label to “Ask about your family,” with “People, places, and stories, with sources.” The first example asks how the family is connected. Provider instructions explicitly accept graph records without a story. Query sources now include collection people, places and person/photo-group/location links across all graph pages, plus sourced people, places, events and valid relationships from joint setup and the member's own confirmed graph contributions. The agreed setup graph can be read before call storage exists. Original patient accounts still use the existing share-confirmation chain; their derived entities do not bypass it. Photo-group links retain metadata attribution and never establish attendance.
+
 ## Verification and limits
+
+For the base-graph extension, TypeScript, all 655 tests (including 24 family-query tests), the language lint and provenance verification passed in an isolated checkout. Provenance verification retains the five existing placeholder-asset/timing warnings. Live Muse checks with fictional sources returned cited answers for both a story question and a graph-only relationship/photo-group question with no recorded stories. No household data was used for the live check. This change updates copy within the existing layout; a rendered browser check remains unavailable.
+
+For the minimalist refinement, TypeScript, all 15 family graph query tests, the language lint and stylesheet parsing passed. The supplied screenshot established the previous visual state; no browser was available for a rendered check of the revised desktop or mobile layout.
 
 Documentation was checked against `PRODUCT.md`, `DESIGN.md`, this direction contract, the component, its stylesheet, Circle's actual stylesheet, and its mounting point. Source inspection confirms the native labels and disclosures, status/alert roles, keyboard-operable actions, focus handling, wrapping rules and responsive declarations described above. This is not a rendered accessibility or visual signoff: the browser runtime reported no available browser, so desktop/mobile screenshots, measured layout, zoom behavior and live keyboard interaction could not be checked.
 

@@ -1,24 +1,24 @@
 .circle-graph-questions {
   min-width: 0;
-  margin-bottom: 28px;
-  padding: 24px;
-  border: 1px solid var(--recall-line);
-  border-radius: 14px;
-  background: #fffefa;
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--recall-line);
 }
-.circle-graph-question-heading { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 20px; }
-.circle-graph-question-heading > svg { flex: 0 0 auto; margin-top: 4px; color: var(--recall-focus); }
-.circle-app .circle-graph-question-heading h2 { margin: 0 0 7px; font-size: 28px; }
-.circle-graph-question-heading p { color: var(--recall-muted); max-width: 68ch; }
-.circle-graph-questions label { display: block; margin-bottom: 8px; font-weight: 600; }
-.circle-graph-question-field { display: flex; align-items: flex-end; gap: 12px; }
-.circle-graph-question-field textarea { flex: 1; width: 100%; min-width: 0; min-height: 78px; max-height: 220px; padding: 12px 14px; border: 1px solid var(--recall-muted); border-radius: 8px; background: var(--recall-bg); color: var(--recall-ink); resize: vertical; caret-color: var(--recall-focus); }
+.circle-app .circle-graph-question-title { margin: 0 0 10px; font-family: inherit; font-size: 16px; font-weight: 600; letter-spacing: normal; line-height: 1.5; text-wrap: wrap; }
+.circle-graph-question-field { display: flex; align-items: flex-start; gap: 8px; }
+.circle-app .circle-graph-question-field textarea { flex: 1; width: 100%; min-width: 0; min-height: 48px; max-height: 220px; padding: 11px 14px; border: 1px solid var(--recall-muted); border-radius: 8px; background: transparent; color: var(--recall-ink); font-size: 16px; line-height: 24px; resize: vertical; caret-color: var(--recall-focus); }
 .circle-graph-question-field textarea::placeholder { color: var(--recall-muted); opacity: 1; }
-.circle-graph-question-field .circle-button { flex: 0 0 auto; min-height: 46px; }
+.circle-graph-question-field .circle-button { flex: 0 0 auto; min-height: 48px; }
+.circle-graph-question-field .circle-button,
+.circle-graph-question-field .circle-button:hover { box-shadow: none; transform: none; }
 .circle-graph-question-hint { color: var(--recall-muted); font-size: 13px; line-height: 1.6; }
-.circle-graph-questions form > .circle-graph-question-hint { margin-top: 9px; }
-.circle-graph-question-suggestions { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 16px; }
-.circle-graph-question-suggestions button { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 4px 0; border: 0; background: none; color: var(--recall-focus); text-align: left; text-decoration: underline; text-underline-offset: 4px; text-decoration-color: var(--recall-line); }
+.circle-graph-question-meta { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 20px; margin-top: 8px; }
+.circle-graph-question-examples { color: var(--recall-focus); font-size: 13px; }
+.circle-graph-question-examples[open] { flex-basis: 100%; }
+.circle-graph-question-examples summary { width: fit-content; min-height: 44px; padding-block: 10px; cursor: pointer; }
+.circle-graph-question-examples summary:focus-visible { outline: 3px solid var(--recall-focus); outline-offset: 3px; }
+.circle-graph-question-suggestions { display: flex; flex-wrap: wrap; gap: 4px 20px; }
+.circle-graph-question-suggestions button { display: inline-flex; align-items: center; min-height: 44px; padding: 4px 0; border: 0; background: none; color: var(--recall-focus); text-align: left; text-decoration: underline; text-underline-offset: 4px; text-decoration-color: var(--recall-line); }
 .circle-graph-question-suggestions button:hover { text-decoration-color: currentColor; }
 .circle-graph-question-status:empty { display: none; }
 .circle-graph-question-status { margin-top: 16px; color: var(--recall-muted); }
@@ -54,8 +54,6 @@
   .circle-graph-question-result { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 560px) {
-  .circle-graph-questions { padding: 18px; }
   .circle-graph-question-field { align-items: stretch; flex-direction: column; }
   .circle-graph-question-field .circle-button { align-self: flex-start; }
-  .circle-app .circle-graph-question-heading h2 { font-size: 25px; }
 }
