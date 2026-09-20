@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowUpRight, AudioLines, ChevronDown, Images, LockKeyhole, MapPin, Network, Plus, Settings } from "lucide-react";
+import { ArrowUpRight, AudioLines, BookOpen, ChevronDown, Images, LockKeyhole, MapPin, Network, Plus, Settings } from "lucide-react";
 import { api, ApiError } from "@/client/api";
 import type { ToolOutput } from "@/lib/tools/contracts";
 import type { RecallService } from "@/lib/service/recall-service";
@@ -12,6 +12,7 @@ import { SignOut } from "./AccessGate";
 import { MemoryForm } from "./MemoryForm";
 import { FamilyArchive, type ArchiveSection } from "@/components/archive/FamilyArchive";
 import { RecallWordmark } from "@/components/recall/RecallFrame";
+import { RecordPrintout } from "@/components/recall/RecordPrintout";
 import { SessionBookshelf } from "@/components/recall/SessionBookshelf";
 
 type Dashboard = {
@@ -39,6 +40,7 @@ export function FamilyDashboard() {
   const [uploadRequest, setUploadRequest] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
+  const [printJob, setPrintJob] = useState<{ name: string; text: string } | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const operator = session?.principal?.role === "operator";
   const canManage = session?.can_manage_setup ?? operator;
@@ -108,35 +110,47 @@ export function FamilyDashboard() {
     return () => window.removeEventListener("focus", onFocus);
   }, [refresh]);
 
-  async function download() {
+  async function exportRecord() {
     setExporting(true);
     setExportError("");
     try {
       const response = await fetch("/api/family/export", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ member }) });
       if (!response.ok) { const body = await response.json(); throw new Error(body.error || "The record could not be exported."); }
-      const url = URL.createObjectURL(await response.blob());
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "recall-record.txt";
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setPrintJob({ name: data?.info.person_name ?? "family", text: await response.text() });
     } catch (e) {
       setExportError(e instanceof Error ? e.message : "The record could not be exported.");
     } finally { setExporting(false); }
   }
 
-  return <div className="care-portal-layout">
+  // The printed page is the record itself, so the document title becomes the
+  // suggested filename when the member chooses "Save as PDF".
+  useEffect(() => {
+    if (!printJob) return;
+    const previousTitle = document.title;
+    document.title = `Recall record - ${printJob.name} - ${new Date().toISOString().slice(0, 10)}`;
+    const done = () => setPrintJob(null);
+    window.addEventListener("afterprint", done);
+    const timer = setTimeout(() => window.print(), 0);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("afterprint", done);
+      document.title = previousTitle;
+    };
+  }, [printJob]);
+
+  return <>
+    <div className="care-portal-layout">
     <a className="care-skip-link" href="#caregiver-content">Skip to content</a>
     <aside className="care-portal-rail">
       <Link href="/caregiver" className="care-rail-brand" aria-label="Recall home"><RecallWordmark /></Link>
       <div className="care-family-identity">
-        <span className="care-family-initial" aria-hidden="true">{data?.info.person_name.trim().slice(0, 1) || <Images size={24} />}</span>
-        <div><strong>{data ? `${data.info.person_name}’s family` : "Your family"}</strong><span>Family collection</span></div>
+        <span className="care-family-initial" aria-hidden="true">{data?.info.person_name.trim().slice(0, 1) || <Images size={18} />}</span>
+        <strong>{data ? `${data.info.person_name}’s family` : "Your family"}</strong>
       </div>
       <label className="care-mobile-navigation"><span className="archive-viz-sr">Caregiver section</span><select value={section} onChange={(event) => { if (event.target.value === "settings") window.location.assign("/onboarding/manage"); else navigate(event.target.value as Section); }}>{([ ["moments", "Moments"], ["places", "Places"], ["connections", "Connections"], ["stories", "Stories"], ["sessions", "Recall sessions"] ] as const).map(([value, label]) => <option value={value} key={value}>{label}</option>)}{canManage && <option value="settings">Family settings</option>}</select></label>
       <nav className="care-portal-nav" aria-label="Caregiver sections">
         {([{ id: "moments", label: "Moments", icon: Images }, { id: "places", label: "Places", icon: MapPin }, { id: "connections", label: "Connections", icon: Network }, { id: "stories", label: "Stories", icon: AudioLines }] as const).map((item) => <a key={item.id} href={`#${item.id}`} aria-current={section === item.id ? "page" : undefined} onClick={(event) => { event.preventDefault(); navigate(item.id); }}><item.icon size={22} aria-hidden="true" />{item.label}</a>)}
-        <a href="#sessions" aria-current={section === "sessions" ? "page" : undefined} onClick={(event) => { event.preventDefault(); navigate("sessions"); }}><AudioLines size={22} aria-hidden="true" />Recall sessions</a>
+        <a href="#sessions" aria-current={section === "sessions" ? "page" : undefined} onClick={(event) => { event.preventDefault(); navigate("sessions"); }}><BookOpen size={22} aria-hidden="true" />Recall sessions</a>
         {canManage && <Link href="/onboarding/manage"><Settings size={22} aria-hidden="true" />Family settings</Link>}
       </nav>
       <div className="care-rail-account">
@@ -171,7 +185,10 @@ export function FamilyDashboard() {
             {data.topic_record.status === "ok" ? <>
               <SessionBookshelf sessions={data.info.sessions} recordWindow={data.info.record_window_calls} minimumCalls={data.info.min_calls_to_show} contribution={<aside className="care-session-invitation"><h2>Keep the conversation going.</h2><p>A familiar photo or a memory of your own can give Recall a little context.</p><button className="care-text-action" onClick={addMemory}>Share a memory<ArrowUpRight size={20} aria-hidden="true" /></button><p className="care-caption">For a question or a story, call {data.info.person_name} directly.</p></aside>} />
               {data.topic_record.topics.length > 0 && <details className="session-topic-records"><summary>Topic details</summary><div className="care-topics">{data.topic_record.topics.map((topic) => <details className="care-topic" key={topic.topic_name}><summary><strong>{topic.topic_name}</strong><span>{topic.calls_counted} recent calls</span><ChevronDown size={22} aria-hidden="true" /></summary><div className="care-topic-detail">{topic.lines.map((line) => <p key={line.script_id}>{line.text}</p>)}{topic.last_call_on && <p>Most recent call: {topic.last_call_on}</p>}</div></details>)}</div>{data.topic_record.change_lines.map((line, i) => <p key={i}>{line.text}</p>)}{data.topic_record.summary_line && <p>{data.topic_record.summary_line.text}</p>}</details>}
-              {data.info.sessions.length > 0 && <button className="care-text-action" onClick={() => void download()} disabled={exporting}>{exporting ? "Preparing file…" : "Export record for a doctor"}</button>}
+              {data.info.sessions.length > 0 && <div className="care-record-export">
+                <button className="care-text-action" onClick={() => void exportRecord()} disabled={exporting}>{exporting ? "Preparing record…" : "Print or save a PDF for a doctor"}</button>
+                <p className="care-caption">Opens your print dialog. Choose “Save as PDF” to share the file.</p>
+              </div>}
               {exportError && <p role="alert">{exportError}</p>}
             </> : <p className="care-record-context">Your family view includes the weekly note. Per-topic call details are only shown when agreed in setup.</p>}
           </>}
@@ -181,5 +198,7 @@ export function FamilyDashboard() {
       </>}
     </main>
     </div>
-  </div>;
+  </div>
+  {printJob && <RecordPrintout name={printJob.name} text={printJob.text} />}
+  </>;
 }

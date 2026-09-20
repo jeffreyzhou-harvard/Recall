@@ -5,6 +5,11 @@ import { ArrowLeft, ArrowRight, MoveHorizontal } from "lucide-react";
 import { sessionSupport, type SessionSummary } from "@/lib/family/session-summary";
 
 const envelope = [.12, .21, .32, .27, .46, .58, .49, .73, .86, 1, .82, .69, .77, .51, .43, .32, .38, .21, .12];
+// A closed spine reads its unaided count as height. The shortest measured book keeps
+// most of the tallest one's height, so the shelf stays legible without exaggerating
+// a difference of one or two calls. A topic without enough history sits just below.
+const MEASURED_FLOOR = .6;
+const UNMEASURED_SCALE = .55;
 const shortDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 const fullDate = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
 const dateLabel = (date: string, full = false) => (full ? fullDate : shortDate).format(new Date(date + "T12:00:00Z"));
@@ -73,7 +78,7 @@ export function SessionBookshelf({ sessions: allSessions, children, contribution
         const closed = Math.min(1, Math.abs(distance));
         const openness = 1 - closed * closed * (3 - 2 * closed);
         const count = sessions[index]?.unaidedCalls;
-        const restingScale = count === null || count === undefined ? .37 : (80 + Math.min(1, Math.max(0, count / Math.max(1, recordWindow))) * 288) / 368;
+        const restingScale = count === null || count === undefined ? UNMEASURED_SCALE : MEASURED_FLOOR + (1 - MEASURED_FLOOR) * Math.min(1, Math.max(0, count / Math.max(1, recordWindow)));
         const heightScale = restingScale + (1 - restingScale) * openness;
         // Keep the snap target untransformed; only its visual child moves.
         if (placements.current[index]) placements.current[index]!.style.transform = reduced.current ? "none" : `translateX(${Math.sign(distance) * closed * 112 + shelfOffset}px)`;
@@ -223,7 +228,7 @@ export function SessionBookshelf({ sessions: allSessions, children, contribution
                 <span className="session-book-date"><time dateTime={session.date}>{dateLabel(session.date)}</time><span>Recall</span></span>
                 </span>
               </span>
-              <span className="session-book-spine" data-unmeasured={session.unaidedCalls === null} data-light={session.unaidedCalls !== null && session.unaidedCalls < recordWindow / 2}><time dateTime={session.date}>{dateLabel(session.date)}</time></span>
+              <span className="session-book-spine" data-unmeasured={session.unaidedCalls === null}><time dateTime={session.date}>{dateLabel(session.date)}</time></span>
               <span className="session-book-back" />
             </span>
             </span>
@@ -236,9 +241,8 @@ export function SessionBookshelf({ sessions: allSessions, children, contribution
         <div className="session-timeline-dates" aria-hidden="true"><time dateTime={firstDate}>{dateLabel(firstDate!)}</time><span>Call dates</span><time dateTime={lastDate}>{dateLabel(lastDate!)}</time></div>
       </div>
       <div className="session-shelf-legend" id="session-shelf-instructions">
-        <span><svg viewBox="0 0 36 28" aria-hidden="true"><rect x="2" y="18" width="7" height="8" rx="1" /><rect x="14" y="10" width="7" height="16" rx="1" /><rect x="26" y="2" width="7" height="24" rx="1" /></svg>More without a cue</span>
-        <span><svg viewBox="0 0 24 28" aria-hidden="true" className="session-legend-outline"><rect x="5" y="3" width="14" height="23" rx="1" /></svg>Fewer than {minimumCalls} calls</span>
-        <p>Height counts calls without a cue · same topic, up to {recordWindow} recent calls.</p>
+        <span><svg viewBox="0 0 36 28" aria-hidden="true"><rect x="2" y="18" width="7" height="8" rx="1" /><rect x="14" y="10" width="7" height="16" rx="1" /><rect x="26" y="2" width="7" height="24" rx="1" /></svg>Taller book: more of these calls needed no cue</span>
+        <span><svg viewBox="0 0 24 28" aria-hidden="true" className="session-legend-outline"><rect x="5" y="3" width="14" height="23" rx="1" /></svg>Dashed spine: fewer than {minimumCalls} calls, not counted yet</span>
       </div>
       <p className="session-sr-only">One book per call. Taller closed spines show more calls without a cue. The open cover expands for reading. Use left and right arrow keys, Home, or End to choose a call.</p>
       <p className="session-sr-only" role="status" aria-live="polite">{announcement}</p>
