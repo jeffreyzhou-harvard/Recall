@@ -1966,11 +1966,19 @@
   color: #8b907e;
 }
 .circle-landing-art {
+  display: grid;
+  gap: 28px;
+  min-width: 0;
+}
+.circle-landing-collage {
   position: relative;
-  height: 570px;
+  width: 100%;
+  aspect-ratio: 1.06;
+  min-height: 400px;
   perspective: 1100px;
 }
 .circle-landing-art figure {
+  --photo-lift: -8px;
   position: absolute;
   width: 55%;
   margin: 0;
@@ -1980,22 +1988,36 @@
   transform: rotate(-12deg);
   left: 0;
   top: 16%;
-  animation: circle-float 7s ease-in-out infinite;
+  animation: circle-photo-drift 8s ease-in-out infinite paused;
 }
 .circle-landing-art figure:nth-child(2) {
+  --photo-lift: -6px;
   left: 35%;
   top: 2%;
   transform: rotate(9deg);
   z-index: 2;
+  animation-duration: 9.5s;
   animation-delay: -2s;
 }
 .circle-landing-art figure:nth-child(3) {
+  --photo-lift: -10px;
   left: 30%;
-  top: 46%;
+  top: 40%;
   transform: rotate(5deg);
   z-index: 3;
   width: 56%;
+  animation-duration: 11s;
   animation-delay: -4s;
+}
+.circle-landing-art[data-floating="true"] figure {
+  animation-play-state: running;
+}
+@keyframes circle-photo-drift {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 var(--photo-lift); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .circle-landing-art figure { animation: none; translate: none; }
 }
 .circle-landing-art img {
   aspect-ratio: 1.2;
@@ -2010,16 +2032,21 @@
   padding-top: 14px;
 }
 .circle-art-caption {
-  position: absolute;
-  bottom: 0;
-  left: 10px;
+  justify-self: start;
+  max-width: 100%;
   display: flex;
   align-items: center;
   gap: 10px;
   font:
     italic 17px Georgia,
     serif;
+  background: #fff;
+  padding: 14px 18px;
+  border-radius: 999px;
+  box-shadow: 0 6px 24px #303d2710;
+  line-height: 1.4;
 }
+.circle-art-caption > svg { flex-shrink: 0; }
 
 .circle-delete-actions { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px 20px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #e5e6dd; }
 .circle-delete-actions .circle-text-button { min-height: 44px; color: #8a4138; }
@@ -2147,7 +2174,6 @@
     font-size: 49px;
   }
   .circle-landing-art {
-    height: 390px;
     max-width: 480px;
     width: 100%;
     margin: auto;
@@ -2232,18 +2258,6 @@
   display: flex;
   align-items: center;
   color: #242c28;
-}
-
-.circle-art-caption {
-  bottom: -23px;
-  z-index: 5;
-  background: #f8f7f3e8;
-  padding: 8px 15px;
-  border-radius: 30px;
-}
-
-@media (min-width: 761px) {
-  .circle-art-caption { left: clamp(-96px, -6vw, -48px); }
 }
 
 .circle-ask-story {

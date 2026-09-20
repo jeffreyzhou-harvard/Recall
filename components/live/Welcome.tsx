@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { RecallFrame, RecallHeader, RecallWordmark, RecallMark } from "@/components/recall/RecallFrame";
@@ -63,6 +63,25 @@ export function Welcome() {
   const router = useRouter();
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  const artRef = useRef<HTMLDivElement>(null);
+  const hasSession = session !== null;
+  useEffect(() => {
+    const art = artRef.current;
+    if (!art || typeof IntersectionObserver === "undefined") return;
+    let visible = false;
+    const syncMotion = () => { art.dataset.floating = String(visible && !document.hidden); };
+    const observer = new IntersectionObserver(([entry]) => {
+      visible = entry?.isIntersecting ?? false;
+      syncMotion();
+    });
+    observer.observe(art);
+    document.addEventListener("visibilitychange", syncMotion);
+    return () => {
+      observer.disconnect();
+      document.removeEventListener("visibilitychange", syncMotion);
+      art.dataset.floating = "false";
+    };
+  }, [hasSession]);
   async function demo() {
     setBusy(true);
     setError("");
@@ -148,26 +167,29 @@ export function Welcome() {
         </section>
         <div
           className="circle-landing-art"
+          ref={artRef}
           aria-label="Illustrative sample family photographs"
         >
-          <figure>
-            <img
-              src="/preview/princeton-kitchen.png"
-              alt="A family moment in the kitchen"
-            />
-            <figcaption>The little things.</figcaption>
-          </figure>
-          <figure>
-            <img
-              src="/sample-family/beach-01.jpg"
-              alt="A family day beside the ocean"
-            />
-            <figcaption>A whole afternoon, together.</figcaption>
-          </figure>
-          <figure>
-            <img src="/preview/princeton-garden.png" alt="A familiar garden" />
-            <figcaption>Somewhere that feels like home.</figcaption>
-          </figure>
+          <div className="circle-landing-collage">
+            <figure>
+              <img
+                src="/preview/princeton-kitchen.png"
+                alt="A family moment in the kitchen"
+              />
+              <figcaption>The little things.</figcaption>
+            </figure>
+            <figure>
+              <img
+                src="/sample-family/beach-01.jpg"
+                alt="A family day beside the ocean"
+              />
+              <figcaption>A whole afternoon, together.</figcaption>
+            </figure>
+            <figure>
+              <img src="/preview/princeton-garden.png" alt="A familiar garden" />
+              <figcaption>Somewhere that feels like home.</figcaption>
+            </figure>
+          </div>
           <div className="circle-art-caption">
             <RecallMark size={23} />
             <span>Every picture has more to tell.</span>
