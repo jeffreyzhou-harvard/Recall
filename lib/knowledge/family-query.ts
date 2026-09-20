@@ -1,7 +1,7 @@
 /** The only source fields sent to Muse or rendered by family graph questions. */
 export type FamilyQuerySource = {
   id: string;
-  kind: "moment" | "story" | "relationship";
+  kind: "person" | "place" | "event" | "moment" | "story" | "relationship";
   title: string;
   text: string;
   attribution: string;

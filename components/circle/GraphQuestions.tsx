@@ -5,7 +5,7 @@ import { ArrowRight, X } from "lucide-react";
 import type { FamilyQueryResult } from "@/lib/knowledge/family-query";
 import "./graph-questions.css";
 
-const suggestions = ["Find stories about our family", "What could we talk about together?"];
+const suggestions = ["How is our family connected?", "What could we talk about together?"];
 
 export function GraphQuestions({ revision, onOpenMoment }: { revision: string; onOpenMoment: (id: string) => void }) {
   const uid = useId();
@@ -59,7 +59,7 @@ export function GraphQuestions({ revision, onOpenMoment }: { revision: string; o
 
   return <section className="circle-graph-questions" aria-labelledby={`${uid}-title`}>
     <form onSubmit={event => { event.preventDefault(); void ask(question); }}>
-      <h2 id={`${uid}-title`} className="circle-graph-question-title"><label htmlFor={`${uid}-question`}>Ask your family’s stories</label></h2>
+      <h2 id={`${uid}-title`} className="circle-graph-question-title"><label htmlFor={`${uid}-question`}>Ask about your family</label></h2>
       <div className="circle-graph-question-field">
         <textarea id={`${uid}-question`} ref={field} value={question} onChange={event => setQuestion(event.target.value)} maxLength={600} rows={1}
           placeholder="Ask about a person, place, or memory…" aria-describedby={`${uid}-hint`} readOnly={busy} />
@@ -67,7 +67,7 @@ export function GraphQuestions({ revision, onOpenMoment }: { revision: string; o
           : <button type="submit" className="circle-button primary" disabled={question.trim().length < 2}>Ask<ArrowRight size={17} aria-hidden="true" /></button>}
       </div>
       <div className="circle-graph-question-meta">
-        <p id={`${uid}-hint`} className="circle-graph-question-hint">From shared stories, with sources.</p>
+        <p id={`${uid}-hint`} className="circle-graph-question-hint">People, places, and stories, with sources.</p>
         {!result && !busy && !error && <details className="circle-graph-question-examples">
           <summary>Try a question</summary>
           <div className="circle-graph-question-suggestions" aria-label="Example questions">
@@ -76,15 +76,15 @@ export function GraphQuestions({ revision, onOpenMoment }: { revision: string; o
         </details>}
       </div>
     </form>
-    <div role="status" className="circle-graph-question-status">{busy ? "Looking through your shared stories…" : result ? `${result.sources.length} ${result.sources.length === 1 ? "source" : "sources"} found.` : ""}</div>
+    <div role="status" className="circle-graph-question-status">{busy ? "Looking through your family’s connections…" : result ? `${result.sources.length} ${result.sources.length === 1 ? "source" : "sources"} found.` : ""}</div>
     {error && <p className="circle-graph-question-error" role="alert">{error}</p>}
     {result && <div className="circle-graph-question-result">
       <div className="circle-graph-answer">
         <div className="circle-graph-answer-heading"><h3>{asked}</h3><button type="button" className="circle-text-button" onClick={() => { setResult(null); setAsked(""); field.current?.focus(); }}>Clear answer</button></div>
-        {result.mode === "search" && <p className="circle-graph-question-hint">Story search is available. Muse Spark isn’t connected for answers and conversation ideas yet.</p>}
+        {result.mode === "search" && <p className="circle-graph-question-hint">People, places, and story search are available. Muse Spark isn’t connected for answers and conversation ideas yet.</p>}
         {result.answer.map((paragraph, index) => <p key={index}>{paragraph.text}{paragraph.citations.map(citation => <button key={citation.sourceId + citation.quote} type="button"
           className="circle-graph-citation" aria-label={`Read source ${sourceNumber(citation.sourceId)}`} onClick={() => showSource(citation.sourceId)}>[{sourceNumber(citation.sourceId)}]</button>)}</p>)}
-        {!result.answer.length && <p>{result.sources.length ? "Here are shared sources to explore." : "No matching shared sources were found. Ask about another person, place, or moment, or add a family story."}</p>}
+        {!result.answer.length && <p>{result.sources.length ? "Here are shared sources to explore." : "No matching sources were found. Ask about another person, place, connection, or moment."}</p>}
         {result.limited && <p className="circle-graph-question-hint">This answer uses a selection of sources. A name, place, or date can help narrow your question.</p>}
         {result.ideas.length > 0 && <div className="circle-graph-ideas"><h4>Something to talk about together</h4><ul>{result.ideas.map((idea, index) => <li key={index}>{idea.question}<span>{idea.sourceIds.map(id => <button key={id} type="button" className="circle-graph-citation" aria-label={`Read source ${sourceNumber(id)}`} onClick={() => showSource(id)}>[{sourceNumber(id)}]</button>)}</span></li>)}</ul></div>}
       </div>
@@ -94,7 +94,7 @@ export function GraphQuestions({ revision, onOpenMoment }: { revision: string; o
           {source.momentId && <button type="button" className="circle-text-button" onClick={() => onOpenMoment(source.momentId!)}>Open photo group<ArrowRight size={15} aria-hidden="true" /></button>}
         </div>
       </details>)}</div>}
-      <p className="circle-graph-answer-credit">{result.mode === "muse" ? "Answered with Muse Spark · Sources remain in their authors’ words." : "Matching sources from your family collection."}</p>
+      <p className="circle-graph-answer-credit">{result.mode === "muse" ? "Answered with Muse Spark · Sources include graph records and original accounts." : "Matching sources from your family graph and collection."}</p>
     </div>}
   </section>;
 }
