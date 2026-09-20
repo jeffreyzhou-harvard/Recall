@@ -4,7 +4,7 @@ Mode: Operate. Extension of Circle's Connections view, authorized by the user on
 
 ## Direction contract
 
-THESIS: Let a family ask a question and follow the answer back to an attributed story or photo group.
+THESIS: Let a family ask about people, places, events or connections and follow the answer back to an attributed graph record, story or photo group; a recorded story is not required.
 
 OWN-WORLD: Inherit the current Circle paper, ink and sage tokens, Atkinson controls, serif headings, and Lucide icons. Preserve the existing graph and its animation.
 
@@ -26,7 +26,11 @@ The 2026-09-20 minimalist refinement removes the enclosing card, decorative head
 
 Scope follows the user's 2026-09-20 authorization: shared household collection, the member's approved contributions, and patient words only with valid share-confirmation and current dashboard access. Unshared call words remain excluded. Answers and conversation ideas are ephemeral and cannot create memories or initiate calls. These are access and service requirements; frontend source inspection alone does not establish their enforcement.
 
+The base-graph extension keeps the compact layout and changes its label to “Ask about your family,” with “People, places, and stories, with sources.” The first example asks how the family is connected. Provider instructions explicitly accept graph records without a story. Query sources now include collection people, places and person/photo-group/location links across all graph pages, plus sourced people, places, events and valid relationships from joint setup and the member's own confirmed graph contributions. The agreed setup graph can be read before call storage exists. Original patient accounts still use the existing share-confirmation chain; their derived entities do not bypass it. Photo-group links retain metadata attribution and never establish attendance.
+
 ## Verification and limits
+
+For the base-graph extension, TypeScript, all 655 tests (including 24 family-query tests), the language lint and provenance verification passed in an isolated checkout. Provenance verification retains the five existing placeholder-asset/timing warnings. Live Muse checks with fictional sources returned cited answers for both a story question and a graph-only relationship/photo-group question with no recorded stories. No household data was used for the live check. This change updates copy within the existing layout; a rendered browser check remains unavailable.
 
 For the minimalist refinement, TypeScript, all 15 family graph query tests, the language lint and stylesheet parsing passed. The supplied screenshot established the previous visual state; no browser was available for a rendered check of the revised desktop or mobile layout.
 
