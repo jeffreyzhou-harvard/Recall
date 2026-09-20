@@ -23,7 +23,7 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { CALL_SCRIPT, FAMILY_COPY, FAMILY_SEED, GOLDEN_TRANSCRIPT, JUDGED_TIMING, MANIFEST, POLICY, RECORD_THRESHOLDS, SAFETY_PHRASES } from "@/fixtures";
+import { CALL_SCRIPT, FAMILY_COPY, FAMILY_SEED, GOLDEN_TRANSCRIPT, JUDGED_TIMING, MANIFEST, POLICY, RECORD_THRESHOLDS, SAFETY_PHRASES, SAFETY_THRESHOLDS } from "@/fixtures";
 import { FixtureClock, SystemClock } from "@/lib/clock";
 import { MemoryGraphStore } from "@/lib/graph/memory-store";
 import { buildGraph } from "@/lib/graph/seed";
@@ -125,6 +125,7 @@ export async function createLiveRecall(config: LiveConfig): Promise<LiveRecall> 
     copy: FAMILY_COPY,
     thresholds: RECORD_THRESHOLDS,
     safetyPhrases: SAFETY_PHRASES,
+    safetyThresholds: SAFETY_THRESHOLDS,
     alerts,
     // Only ever invoked by the orchestrator, and only after the joint setup has granted the call.
     callDriver: prerecorded ? () => new FixtureCallDriver(GOLDEN_TRANSCRIPT, fixtureClock!, JUDGED_TIMING.call_connect_delay_ms) : null,
@@ -141,6 +142,7 @@ export async function createLiveRecall(config: LiveConfig): Promise<LiveRecall> 
     const next = queue.then(async () => {
       if (config.callMode === "none") return null;
       await refreshSetup();
+      await service.tickSafetyEscalations();
       const run = await service.runScheduledCall(`session:live:${clock.iso()}:${++sessions}`);
       return run?.recording ?? null;
     });

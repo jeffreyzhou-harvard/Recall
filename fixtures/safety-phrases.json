@@ -60,5 +60,13 @@
   "alert": {
     "id": "SAFETY-ALERT",
     "text": "Recall safety note, {time}: during a Recall call, {name} said something on Recall's safety list ({category}). Recall is not an emergency service and cannot tell what is happening. Please call {name}."
+  },
+  "ack_prompt": {
+    "id": "SAFETY-ACK-01",
+    "text": "Reply 1 to let Recall know you've seen this."
+  },
+  "missed_calls_alert": {
+    "id": "SAFETY-ALERT-MISSED",
+    "text": "Recall safety note, {time}: {name} has not answered {count} scheduled calls. Recall is not an emergency service and cannot tell what is happening. Please call {name}."
   }
 }

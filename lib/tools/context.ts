@@ -9,7 +9,7 @@
  * leak guarantee is this type, not a filter that could fail.
  */
 import type { Clock } from "@/lib/clock";
-import type { FamilyCopy, RecordThresholds } from "@/lib/family/copy";
+import type { FamilyCopy, RecordThresholds, SafetyThresholds } from "@/lib/family/copy";
 import type { FamilyView } from "@/lib/family/projection";
 import type { CandidateSubgraph, RelationFact } from "@/lib/graph/retrieval";
 import type { GraphStore } from "@/lib/graph/store";
@@ -118,6 +118,7 @@ export interface ToolContext {
   /** The receipt's fixed lines live with the rest of the family-side copy. */
   copy: FamilyCopy;
   safetyPhrases: SafetyPhrases;
+  safetyThresholds: SafetyThresholds;
   /** The one way anything is ever sent to family: a fixed-text safety alert to the designated caregivers (rule 15). */
   alerts: AlertChannel;
   /** The reducer's state so far. Read-only. */
@@ -135,4 +136,5 @@ export interface FamilyToolContext {
   script: CallScript;
   copy: FamilyCopy;
   thresholds: RecordThresholds;
+  safetyThresholds: SafetyThresholds;
 }

@@ -71,7 +71,22 @@ export const policySchema = z
     speech: z.strictObject({ pace: z.enum(["slow", "standard"]), max_call_minutes: z.number().int().positive().max(10) }),
     review: z.strictObject({ store_confirmation_required: z.literal(true), share_confirmation_required: z.literal(true) }),
     safety: z.strictObject({
-      designated_caregivers: z.array(z.strictObject({ person_id: z.string().min(1), alert_channel: z.string().min(1) })).min(1),
+      designated_caregivers: z
+        .array(
+          z.strictObject({
+            person_id: z.string().min(1),
+            alert_channel: z.string().min(1),
+            /** Registered number for the reply-1 acknowledgment. Optional: dashboard-only caregivers have none. */
+            phone: z
+              .string()
+              .regex(/^\+[1-9]\d{6,14}$/, "a phone number in international form, like +16095550123")
+              .nullable()
+              .default(null),
+          }),
+        )
+        .min(1),
+      /** Optional second tier. If unset, a missed ack is not escalated. */
+      backup_caregiver_id: z.string().min(1).nullable().default(null),
       emergency_number: z.string().min(1),
     }),
     /** Rule 16: what a family member has attested before Recall's first call. `place_recall_call` refuses without every one of them. */
@@ -103,6 +118,10 @@ export const policySchema = z
   .refine((p) => p.established_by.includes(p.person_id), { message: "the joint setup is hers too: she must be one of the people who established it", path: ["established_by"] })
   .refine((p) => p.approved_people.includes(p.recall_set_up_by), { message: "the person named as having set Recall up must be an approved person", path: ["recall_set_up_by"] })
   .refine((p) => p.safety.designated_caregivers.every((c) => p.approved_people.includes(c.person_id)), { message: "designated caregivers must be approved people", path: ["safety", "designated_caregivers"] })
+  .refine((p) => p.safety.backup_caregiver_id === null || (p.approved_people.includes(p.safety.backup_caregiver_id) && p.safety.backup_caregiver_id !== p.person_id), {
+    message: "the backup caregiver must be an approved person, and cannot be her",
+    path: ["safety", "backup_caregiver_id"],
+  })
   // A revoked grant stays on the record after its member stops being approved: it is revoked, never deleted.
   .refine((p) => p.dashboard.grants.every((g) => g.revoked_at !== null || p.approved_people.includes(g.member_id)), { message: "the family view can be granted to approved people only", path: ["dashboard", "grants"] })
   .refine((p) => p.discovery.photo_access_granted_by.every((g) => g === p.person_id || p.approved_people.includes(g)), {

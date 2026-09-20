@@ -1,5 +1,5 @@
 /**
- * The nineteen tool contracts (AGENTS.md section 6), numbered as the brief
+ * The twenty-one tool contracts (AGENTS.md section 6), numbered as the brief
  * numbers them.
  *
  * Each schema is the single source for three things: the TypeScript types,
@@ -316,13 +316,23 @@ export const contracts = {
     output: z.strictObject({ turn_id: z.string().nullable(), category: z.string().nullable() }),
   },
   send_safety_alert: {
-    description: "Send the fixed alert text for the category, through the channel chosen in the joint setup, to the designated caregivers only. At most once per category per call. Category and time, never her words or audio. Logs a SafetyEvent.",
+    description: "Send the fixed alert text for the category, through the channel chosen in the joint setup, to the designated caregivers only. At most once per category per call. Starts the acknowledgment timer when a backup caregiver is named. Category and time, never her words or audio. Logs a SafetyEvent.",
     input: z.strictObject({ category: id, caregiver_ids: z.array(id).min(1) }),
     output: z.strictObject({
       sent: z.array(z.strictObject({ alert_id: id, caregiver_id: id, channel: z.string(), script_id: id })),
       skipped: z.array(z.strictObject({ caregiver_id: id, reason: z.enum(["not_a_designated_caregiver", "already_alerted_this_call"]) })),
       safety_event_id: z.string().nullable(),
     }),
+  },
+  record_alert_ack: {
+    description: "Mark a pending safety alert acknowledged when a designated caregiver replies 1. Idempotent: a second reply, or a reply after ack or escalation, does nothing and sends no text back.",
+    input: z.strictObject({ alert_id: id, caregiver_id: id }),
+    output: z.strictObject({ status: z.enum(["acknowledged", "noop"]), alert_id: id, acknowledged_at: iso.nullable() }),
+  },
+  escalate_safety_alert: {
+    description: "If the acknowledgment timeout elapses with no reply, send the same fixed alert text to the backup caregiver by SMS. One backup tier only. No-op when there is no backup, or the alert is already acknowledged or escalated.",
+    input: z.strictObject({ alert_id: id }),
+    output: z.strictObject({ status: z.enum(["escalated", "noop"]), alert_id: id, backup_caregiver_id: z.string().nullable() }),
   },
 } as const;
 
@@ -336,8 +346,12 @@ export type DetailLevelName = (typeof DETAIL_LEVELS)[number];
 /** The family flows. They never enter the call sequence, and they run on a context that has no graph in it. */
 export const FAMILY_TOOLS = ["receive_family_contribution", "handle_family_query", "build_weekly_note", "get_topic_record", "export_record_for_clinician"] as const;
 export type FamilyToolName = (typeof FAMILY_TOOLS)[number];
-export type CallToolName = Exclude<ToolName, FamilyToolName>;
+/** Inbound SMS ack and the backup escalation. Outside the call sequence and the family flows. */
+export const OPS_TOOLS = ["record_alert_ack", "escalate_safety_alert"] as const;
+export type OpsToolName = (typeof OPS_TOOLS)[number];
+export type CallToolName = Exclude<ToolName, FamilyToolName | OpsToolName>;
 export const isFamilyTool = (tool: ToolName): tool is FamilyToolName => (FAMILY_TOOLS as readonly string[]).includes(tool);
+export const isOpsTool = (tool: ToolName): tool is OpsToolName => (OPS_TOOLS as readonly string[]).includes(tool);
 
 /**
  * The enforceable order of a call (AGENTS.md section 6). Index in this list is the tool's step number.

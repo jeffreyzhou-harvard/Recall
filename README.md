@@ -61,7 +61,7 @@ Family flows sit outside that reducer: a query is redirected, a contribution is 
 | Piece | Where it lives |
 | --- | --- |
 | Reducer and transition table | `lib/state` — one source of truth; every pane keys off the same transitions |
-| 19 tools and hard gates | `lib/tools` — topic pick, place call, graph query, evidence, ladder, capture, store- and share-confirmation, family redirect, weekly note, topic record, clinician export, safety check |
+| 21 tools and hard gates | `lib/tools` — topic pick, place call, graph query, evidence, ladder, capture, store- and share-confirmation, family redirect, weekly note, topic record, clinician export, safety check, missed-call alert, caregiver ack |
 | Memory graph + retrieval layer | `lib/graph` — 18 node types, provenance on every claim and edge, a thinner per-cue effectiveness layer that never decides whether to climb, only which cue to try |
 | Trims, hashes, receipts | `lib/provenance` — an edit-decision list that can only express silence and disfluency trims; hash-chained PROV-style log |
 | Onboarding database | `lib/onboarding` — households, the people in them, stated ties, invitations, and every version of the joint setup, append-only. SQLite (`node:sqlite`) with an in-memory twin; the same rules run over both |
@@ -111,7 +111,7 @@ Cast is fixed: Susan, Maya (daughter), Priya (sister), Anika (granddaughter), Ca
 
 ## What is built, and what is not
 
-**Built, and covered by `npm run check`:** the recall loop end to end on fixtures - topic pick, the call gate, the five-rung ladder, capture, store- and share-confirmation, commit last, the retrieval layer - plus the safety handoff, the AI-identity line, all 19 tools, and the family side as an engine: the redirect-only ask box, the contribution path, the Weekly Note, the per-topic record with change lines, and the export, all behind a whitelist projection. `/present` runs the whole golden path, family beats included, as a plain engine check. The fixtures (`call-script.json`, `family-copy.json`, `record-thresholds.json`, `safety-phrases.json`) exist. `EVIDENCE.md` records the design choices that were checked against the literature.
+**Built, and covered by `npm run check`:** the recall loop end to end on fixtures - topic pick, the call gate, the five-rung ladder, capture, store- and share-confirmation, commit last, the retrieval layer - plus the safety handoff, missed-call tiering, caregiver ack/escalation, the AI-identity line, all 21 tools, and the family side as an engine: the redirect-only ask box, the contribution path, the Weekly Note, the per-topic record with change lines, and the export, all behind a whitelist projection. `/present` runs the whole golden path, family beats included, as a plain engine check. The fixtures (`call-script.json`, `family-copy.json`, `record-thresholds.json`, `safety-thresholds.json`, `safety-phrases.json`) exist.
 
 **Not built:**
 

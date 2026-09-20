@@ -14,6 +14,10 @@ export const safetyPhrasesSchema = z.strictObject({
   description: z.string(),
   categories: z.record(z.string().regex(/^[a-z_]+$/), z.strictObject({ label: z.string().min(1), phrases: z.array(z.string().min(1)).min(1) })),
   alert: z.strictObject({ id: z.string().min(1), text: z.string().min(1) }),
+  /** Appended to every alert SMS. The reply itself is the acknowledgment; there is no link. */
+  ack_prompt: z.strictObject({ id: z.string().min(1), text: z.string().min(1) }),
+  /** Fixed text for a missed-call streak alert. Category + count + time, never a cause. */
+  missed_calls_alert: z.strictObject({ id: z.string().min(1), text: z.string().min(1) }),
 });
 export type SafetyPhrases = z.infer<typeof safetyPhrasesSchema>;
 
