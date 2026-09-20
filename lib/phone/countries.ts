@@ -147,7 +147,7 @@ export const PHONE_COUNTRIES: PhoneCountry[] = [
 export const DEFAULT_PHONE_COUNTRY = "US";
 
 export function countryByIso(iso: string): PhoneCountry {
-  return PHONE_COUNTRIES.find((country) => country.iso === iso) ?? PHONE_COUNTRIES[0];
+  return PHONE_COUNTRIES.find((country) => country.iso === iso) ?? PHONE_COUNTRIES[0]!;
 }
 
 export function isNanp(country: PhoneCountry): boolean {

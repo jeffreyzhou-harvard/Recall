@@ -4,6 +4,7 @@ import { issueAccount, revokeAccount } from "@/server/accounts";
 import { firstSetupConfigured } from "@/server/household-access";
 import { sameOrigin, sessionCookie } from "@/server/session";
 import { bodyOf, optional, respond, text } from "../shared";
+import { saveLogin, loginAvailable } from "@/server/circle/access";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const person = (value: unknown): Record<string, unknown> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -14,6 +15,12 @@ export async function POST(request: Request): Promise<Response> {
   const body = await bodyOf(request);
   if (!body) return Response.json({ error: "Enter the person’s name, phone number, and your name." }, { status: 400 });
   const participant = person(body.participant), caregiver = person(body.caregiver);
+  const email = typeof body.email === 'string' ? body.email.trim() : '';
+  const password = typeof body.password === 'string' ? body.password : '';
+  if (email || password) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length>254 || password.length<10 || password.length>128) return Response.json({error:'Use an email and a password of at least 10 characters.'},{status:400});
+    if (!loginAvailable(email)) return Response.json({error:'That email already has an account. Sign in instead.'},{status:409});
+  }
   let cookie = "", member: string | undefined, issuedKey: string | undefined;
   const result = await respond(async () => {
     try {
@@ -23,6 +30,7 @@ export async function POST(request: Request): Promise<Response> {
       }, async (created) => {
         member = created.caregiver.person_id;
         issuedKey = issueAccount(created.household.household_id, member, "family");
+        if(email) await saveLogin(member, email, password);
         cookie = sessionCookie({ role: "family", member_id: member }, request);
       });
       return { household: made.household, participant_id: made.participant.person_id, caregiver_id: made.caregiver.person_id };

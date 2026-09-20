@@ -49,10 +49,11 @@ export function countryFromE164(value: string, preferredIso?: string): PhoneCoun
   const preferred = preferredIso ? countryByIso(preferredIso) : null;
   if (preferred && digits.startsWith(preferred.dial)) return preferred;
   const matches = PHONE_COUNTRIES.filter((country) => digits.startsWith(country.dial)).sort((a, b) => b.dial.length - a.dial.length);
-  if (matches.length === 0) return null;
-  if (matches[0].dial === "1") return matches.find((country) => country.iso === "US") ?? matches[0];
-  if (matches[0].dial === "7") return matches.find((country) => country.iso === "RU") ?? matches[0];
-  return matches[0];
+  const first = matches[0];
+  if (!first) return null;
+  if (first.dial === "1") return matches.find((country) => country.iso === "US") ?? first;
+  if (first.dial === "7") return matches.find((country) => country.iso === "RU") ?? first;
+  return first;
 }
 
 export function nationalFromE164(value: string, country: PhoneCountry): string {
@@ -70,9 +71,6 @@ export function parsePhoneInput(raw: string, preferredIso = DEFAULT_PHONE_COUNTR
   const country = countryByIso(preferredIso);
   let national = digitsOnly(trimmed);
   if (isNanp(country) && national.length === 11 && national.startsWith("1")) national = national.slice(1);
-  if (!isNanp(country) && national.startsWith(country.dial) && national.length > country.dial.length + 3) {
-    national = national.slice(country.dial.length);
-  }
   return { country, national: national.slice(0, nationalLimit(country)) };
 }
 
@@ -80,7 +78,7 @@ export function caretIndex(formatted: string, digitsBefore: number): number {
   if (digitsBefore <= 0) return 0;
   let seen = 0;
   for (let i = 0; i < formatted.length; i++) {
-    if (/\d/.test(formatted[i])) {
+    if (/\d/.test(formatted.charAt(i))) {
       seen += 1;
       if (seen === digitsBefore) return i + 1;
     }
