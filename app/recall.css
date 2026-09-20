@@ -496,14 +496,13 @@ html:has(.recall-workspace)::-webkit-scrollbar-track { background: #fafaf7; }
 .session-book-spine::before, .session-book-spine::after { content: ""; position: absolute; left: 4px; right: 4px; height: 1px; background: currentColor; opacity: .4; }
 .session-book-spine::before { top: 12%; }
 .session-book-spine::after { bottom: 12%; }
-.session-book-spine[data-light="true"] { background: var(--recall-soft); color: var(--recall-ink); border-color: var(--recall-muted); }
 .session-book-spine[data-unmeasured="true"] { background: var(--recall-bg); color: var(--recall-ink); border-style: dashed; }
 .session-book-title { font-size: 27px; font-weight: 650; line-height: 1.15; letter-spacing: -.015em; text-wrap: balance; min-height: 64px; }
 .session-book-cover svg { width: 100%; height: 106px; flex: 1; min-height: 70px; }
 .session-book-count { display: block; font-size: 16px; line-height: 1.25; padding-top: 8px; }
 .session-book-date { display: flex; justify-content: space-between; gap: 8px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--recall-line); font-size: 17px; line-height: 1.3; }
 .session-book-date > span { align-self: flex-end; font-weight: 650; }
-.session-shelf-stop:hover .session-book-spine:not([data-unmeasured="true"]):not([data-light="true"]) { background: var(--recall-muted); }
+.session-shelf-stop:hover .session-book-spine:not([data-unmeasured="true"]) { background: var(--recall-muted); }
 .session-shelf-stop:focus-visible { outline: none; }
 .session-shelf-stop:focus-visible .session-book-cover, .session-shelf-stop:focus-visible .session-book-spine { outline: 3px solid var(--recall-focus); outline-offset: 4px; }
 .session-wave-bar { fill: var(--recall-ink); }
@@ -520,7 +519,6 @@ html:has(.recall-workspace)::-webkit-scrollbar-track { background: #fafaf7; }
 .session-shelf-legend > span { display: inline-flex; align-items: center; gap: 10px; }
 .session-shelf-legend svg { width: 36px; height: 28px; fill: var(--recall-ink); flex: none; }
 .session-shelf-legend .session-legend-outline { width: 24px; fill: none; stroke: var(--recall-muted); stroke-width: 1.5; stroke-dasharray: 3 2; }
-.session-shelf-legend p { flex-basis: 100%; font-size: 17px; margin-top: 2px; }
 .session-overview { border-top: 1px solid var(--recall-line); padding-top: 28px; }
 .session-receipt-heading { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 20px; color: var(--recall-muted); font-size: 17px; }
 .session-receipt-content { min-height: 208px; animation: session-arrive 180ms ease-out; }
@@ -539,7 +537,7 @@ html:has(.recall-workspace)::-webkit-scrollbar-track { background: #fafaf7; }
 .session-topic-records .care-topics { margin-top: 16px; }
 .session-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .recall-workspace[data-large-text="true"] .session-support, .recall-workspace[data-large-text="true"] .session-count { font-size: 24px; }
-.recall-workspace[data-large-text="true"] .session-shelf-legend, .recall-workspace[data-large-text="true"] .session-shelf-legend p, .recall-workspace[data-large-text="true"] .session-topic-filter, .recall-workspace[data-large-text="true"] .session-timeline-dates, .recall-workspace[data-large-text="true"] .session-shelf-toolbar > p, .recall-workspace[data-large-text="true"] .session-receipt-heading, .recall-workspace[data-large-text="true"] .session-count span, .recall-workspace[data-large-text="true"] .care-session-record > .care-record-context { font-size: 20px; }
+.recall-workspace[data-large-text="true"] .session-shelf-legend, .recall-workspace[data-large-text="true"] .session-topic-filter, .recall-workspace[data-large-text="true"] .session-timeline-dates, .recall-workspace[data-large-text="true"] .session-shelf-toolbar > p, .recall-workspace[data-large-text="true"] .session-receipt-heading, .recall-workspace[data-large-text="true"] .session-count span, .recall-workspace[data-large-text="true"] .care-session-record > .care-record-context { font-size: 20px; }
 .recall-workspace[data-large-text="true"] .session-shelf { --book-height: 390px; }
 .recall-workspace[data-large-text="true"] .session-book-count { font-size: 20px; }
 @keyframes session-arrive { from { opacity: .55; } to { opacity: 1; } }

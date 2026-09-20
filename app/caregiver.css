@@ -4,10 +4,9 @@
 .care-portal > .recall-access { max-width: 620px; margin: 64px auto; padding-inline: 24px; }
 .care-portal-layout { display: grid; grid-template-columns: 224px minmax(0, 1fr); min-height: 100svh; }
 .care-portal-rail { display: flex; flex-direction: column; gap: 36px; padding: 32px 16px 24px; position: sticky; top: 0; height: 100svh; overflow-y: auto; align-self: start; border-right: 1px solid var(--recall-line); background: var(--recall-tint); }
-.care-family-identity { display: flex; align-items: center; gap: 12px; padding: 16px 12px; border: 1px solid var(--recall-line); border-radius: 12px; background: var(--recall-bg); overflow-wrap: anywhere; }
-.care-family-initial { display: grid; place-items: center; flex: none; width: 42px; height: 42px; background: var(--recall-soft); border-radius: 50%; font-size: 24px; font-weight: 650; }
-.care-family-identity strong { display: block; font-size: 20px; font-weight: 650; line-height: 1.25; }
-.care-family-identity div > span { display: block; margin-top: 8px; font-size: 16px; color: var(--recall-muted); line-height: 1.4; }
+.care-family-identity { display: flex; align-items: center; gap: 10px; }
+.care-family-initial { display: grid; place-items: center; flex: none; width: 30px; height: 30px; background: var(--recall-soft); border-radius: 50%; font-size: 17px; font-weight: 650; }
+.care-family-identity strong { min-width: 0; font-size: 18px; font-weight: 650; line-height: 1.25; overflow-wrap: break-word; }
 .care-portal-nav { display: grid; gap: 8px; }
 .care-portal-nav a { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 12px; border: 1px solid transparent; border-radius: 8px; font-size: 18px; line-height: 1.3; }
 .care-portal-nav svg { flex: none; }
@@ -43,6 +42,22 @@
 .care-portal .care-privacy { margin-top: 40px; padding-top: 20px; }
 .care-skip-link { position: absolute; top: -100px; left: 24px; z-index: 10; padding: 12px 18px; background: var(--recall-ink); color: var(--recall-bg); }
 .care-skip-link:focus { top: 16px; }
+.care-record-export { margin-top: 24px; }
+.care-record-export .care-caption { margin-top: 8px; font-size: 17px; }
+.care-record-print { display: none; }
+@page { margin: 18mm; }
+/* Print the record alone. It is portalled to the body, so dropping its siblings
+   leaves no blank sheets and works wherever the dashboard is mounted. */
+@media print {
+  body > *:not(.care-record-print) { display: none; }
+  body { background: #fff; }
+  .care-record-print { display: block; color: #000; background: #fff; font-size: 12pt; line-height: 1.55; }
+  .care-record-print h1 { font-size: 20pt; font-weight: 650; letter-spacing: -.01em; }
+  .care-record-print-subject { margin-top: 4pt; font-size: 13pt; font-weight: 650; }
+  .care-record-print p { margin-top: 8pt; max-width: none; break-inside: avoid; }
+  .care-record-print-detail { margin-top: 2pt; padding-left: 16pt; }
+  .care-record-print-gap { display: block; height: 10pt; }
+}
 .recall-workspace[data-large-text="true"] .care-portal-nav a,
 .recall-workspace[data-large-text="true"] .care-rail-account,
 .recall-workspace[data-large-text="true"] .care-session-invitation > p { font-size: 22px; }
@@ -60,9 +75,7 @@
   .care-portal > .recall-masthead { min-height: 80px; padding: 16px 20px; }
   .care-portal-layout { display: block; }
   .care-portal-rail { position: static; height: auto; overflow: visible; padding: 18px 20px 0; gap: 16px; border-right: 0; border-bottom: 1px solid var(--recall-line); }
-  .care-family-identity { padding: 0; border: 0; background: transparent; align-items: center; }
-  .care-family-identity div > span { display: none; }
-  .care-family-initial { width: 36px; height: 40px; font-size: 22px; }
+  .care-family-initial { width: 32px; height: 32px; font-size: 18px; }
   .care-portal-nav { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-inline: -4px; }
   .care-portal-nav a { padding: 10px 6px; gap: 8px; min-height: 48px; border-radius: 0; border: 0; border-bottom: 2px solid transparent; font-size: 18px; }
   .care-portal-nav a[aria-current="page"] { background: transparent; border-bottom-color: var(--recall-ink); }
