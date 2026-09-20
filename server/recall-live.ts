@@ -3,6 +3,7 @@ import { MuseGraphExtractor } from "@/lib/providers/muse/graph";
 import { CallAttempts } from "./call-attempts";
 import { MediaStore } from "./media";
 import { WebCall, LiveTranscription } from "./web-call";
+import { callPhotoSource } from "./call-photos";
 import { DurableAlerts } from "./alerts";
 import { dataDirectory } from "./data-directory";
 /** The live service uses the jointly configured household and persistent graph.
@@ -16,7 +17,7 @@ import { MemoryGraphStore } from "@/lib/graph/memory-store";
 import { buildGraph } from "@/lib/graph/seed";
 import { FixtureCallDriver } from "@/lib/orchestrator/call-driver";
 import { AssetIndex } from "@/lib/provenance/assets";
-import { MuseAnswerInterpreter, museScaffoldAdvisor } from "@/lib/providers/muse/reasoning";
+import { MuseAnswerInterpreter, museScaffoldAdvisor, museConversationAdvisor } from "@/lib/providers/muse/reasoning";
 import { MuseSpark, requireMuseKey } from "@/lib/providers/muse/spark";
 import { FixtureTranscription } from "@/lib/providers/transcription";
 import { MemoryAlertChannel } from "@/lib/safety/alert";
@@ -26,6 +27,7 @@ import { SetupStore, type ScaffoldAdvisor } from "@/lib/tools";
 import { SqliteGraphStore } from "./graph-store";
 import { activeHousehold } from "./active-household";
 import { openOnboarding } from "./onboarding";
+import { readCircle } from "./circle/store";
 
 // One live recall per server process: it holds the graph, and a call in progress must outlive a request.
 const cache = globalThis as unknown as { __recallLive?: Promise<LiveRecall>; __recallLiveKey?: string };
@@ -60,6 +62,8 @@ export interface LiveConfig {
   household?: string;
   /** Where that database is, as a path from the project root. */
   onboardingDb?: string;
+  /** Local, fictional household only; never selects the deployment's active household or sends alerts. */
+  sampleDemo?: boolean;
 }
 
 export function configFromEnv(env: NodeJS.ProcessEnv, root: string): LiveConfig {
@@ -99,6 +103,7 @@ const loudly =
     });
 
 export async function createLiveRecall(config: LiveConfig): Promise<LiveRecall> {
+  if (config.sampleDemo && (process.env.NODE_ENV !== "development" || !config.household || !readCircle(config.household).demo)) throw new Error("Sample calls require a local sample family.");
   if (!config.household && !config.fixture) throw new SetupRequiredError();
   if (config.household && config.callMode === "prerecorded") throw new Error("Real households cannot use prerecorded calls.");
   const assets = new AssetIndex(config.fixture ? MANIFEST : { version: 1, generated_by: "live", assets: [] });
@@ -122,7 +127,7 @@ export async function createLiveRecall(config: LiveConfig): Promise<LiveRecall> 
       if (graph instanceof SqliteGraphStore) await graph.seed(buildGraph(await onboarding.graphSeed(config.household!), assets));
     }
   };
-  const alerts = config.household ? new DurableAlerts(config.root, config.household) : new MemoryAlertChannel();
+  const alerts = config.household && !config.sampleDemo ? new DurableAlerts(config.root, config.household) : new MemoryAlertChannel();
   const media = config.household ? new MediaStore(config.root, config.household, assets, graph instanceof SqliteGraphStore ? graph : undefined) : null;
   media?.reconcile(new Set((await graph.nodesOfType("Artifact")).map((n) => n.prov.asset_id)), setup.current().person_id);
   const attempts = config.household ? new CallAttempts(config.root, config.household) : null;
@@ -136,6 +141,9 @@ export async function createLiveRecall(config: LiveConfig): Promise<LiveRecall> 
   const service = new RecallService({
     graph,
     knowledgeQuestions: !config.fixture,
+    openingPhotos: !!config.sampleDemo,
+    conversationalRepairs: !config.fixture,
+    ...(!config.fixture && spark ? { conversationAdvisor: museConversationAdvisor(spark) } : {}),
     ...(!config.fixture ? { enrichKnowledge: () => knowledge.process(1).catch(() => ({ failed: 1 })) } : {}),
     callAttempts: () => attempts?.all() ?? [],
     onContributionCommitted: async (ctx) => { if (ctx.session.stored) await webCall?.retainConfirmed({ contribution_hash: ctx.session.stored.contribution_hash, store: ctx.session.store_confirmation, share: ctx.session.share_confirmation, share_audio: ctx.session.share_audio_window }); },
@@ -156,6 +164,13 @@ export async function createLiveRecall(config: LiveConfig): Promise<LiveRecall> 
       const policy = setup.current();
       attempts?.record(currentSession, clock.iso());
       webCall = new WebCall(policy.person_id, media, transcription, graph, policy.speech.pace, policy.speech.max_call_minutes);
+      const photos = callPhotoSource(graph, media, setup, () => clock.iso());
+      webCall.photoSource = config.sampleDemo ? async context => {
+        const state = readCircle(config.household!);
+        const moment = state.moments.find(moment => state.demoCall?.topics[moment.id] === context.topic_id);
+        if (!state.demo || !moment) return [];
+        return (await photos(context)).filter(photo => moment.photoIds.some(id => photo.id.startsWith(`artifact:sample-photo:${id}:`)));
+      } : photos;
       webCall.topicLabel = topicLabel ?? "";
       return webCall;
     } : null,

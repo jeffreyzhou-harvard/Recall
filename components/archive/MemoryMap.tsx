@@ -45,7 +45,7 @@ export function MemoryMap({ moments, photos, onSelect }: Props) {
         center: [located[0]!.longitude, located[0]!.latitude], zoom: 5, attributionControl: false, scrollZoom: false,
       });
       map.current = instance;
-      instance.getCanvas().setAttribute("aria-label", "Map of places named in your contributions");
+      instance.getCanvas().setAttribute("aria-label", "Map of places in your photographs");
       instance.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
       instance.addControl(new maplibregl.AttributionControl({ compact: false }), "bottom-left");
       instance.on("error", () => { setMapError(true); setMapLoading(false); });
@@ -87,17 +87,17 @@ export function MemoryMap({ moments, photos, onSelect }: Props) {
     else onSelect(moment);
   };
 
-  return <section className="archive-atlas" aria-label="Places in your contributions">
+  return <section className="archive-atlas" aria-label="Places in your photographs">
     <div className="archive-atlas-map" ref={element} />
-    <div className="archive-atlas-title"><h2>Somewhere worth remembering.</h2><p>Places you named in your memories.</p></div>
+    <div className="archive-atlas-title"><h2>Somewhere worth remembering.</h2><p>Places found in your photographs.</p></div>
     {located.length > 0 && <button className="archive-atlas-reset" type="button" onClick={() => { setSelected(null); fitAll(); }} aria-label="Show all places on the map"><RotateCcw size={22} aria-hidden="true" /><span>All places</span></button>}
     {mapLoading && located.length > 0 && !mapError && <p className="archive-map-message" role="status">Opening the map…</p>}
     {mapError && <p className="archive-map-message" role="status">The base map is unavailable. You can still open your memories below.</p>}
-    {!located.length && <div className="archive-atlas-empty"><MapPin size={32} aria-hidden="true" /><h3>{moments.length ? "No places pinned yet." : "Your places start with a memory."}</h3><p>{moments.length ? "Your memories are listed below. A named town or landmark can give them a place on the map." : "Places you add to your contributions will appear here."}</p></div>}
+    {!located.length && <div className="archive-atlas-empty"><MapPin size={32} aria-hidden="true" /><h3>{moments.length ? "No places pinned yet." : "Your places start with a memory."}</h3><p>{moments.length ? "Your memories are listed below. Photos with location information will appear on the map." : "Places you add to your contributions will appear here."}</p></div>}
     {moments.length > 0 && <div className="archive-atlas-cards" role="list" aria-label="Memories by place">{moments.map((moment) => <article key={moment.id} role="listitem" className={`archive-atlas-card${selected === moment.id ? " is-selected" : ""}`}>
       <button type="button" className="archive-atlas-fly" onClick={() => fly(moment)} aria-label={hasCoordinates(moment) ? `Show ${moment.place || moment.title} on the map` : `Open ${moment.title}`}>
         <PlacePhoto photo={photos.find((photo) => photo.id === moment.coverId)} />
-        <span><strong>{moment.place || "Place not added"}</strong><span className="archive-atlas-moment-title">{moment.title}</span></span>
+        <span><strong>{moment.place || "Location from photograph"}</strong><span className="archive-atlas-moment-title">{moment.title}</span></span>
       </button>
       <button type="button" className="archive-atlas-open" aria-label={`Open ${moment.title}`} onClick={() => onSelect(moment)}><ArrowUpRight size={24} aria-hidden="true" /></button>
     </article>)}</div>}

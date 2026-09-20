@@ -12,6 +12,7 @@ import { contextExclusion } from "@/lib/graph/retrieval";
 import { cueHints, preferCues } from "@/lib/graph/retrieval-layer";
 import type { GraphEdge, GraphNode } from "@/lib/graph/types";
 import { tokens, turnText } from "@/lib/providers/transcription";
+import { conversationalRepair } from "@/lib/providers/conversation";
 import { allScriptLines, containsPhrase, fill, firstPhraseIn, slotsOf, stopPhraseIn, ScriptError, type ScriptLine } from "@/lib/script/call-script";
 import { endsInOpenQuestion, lintConduct, lintLines } from "@/lib/script/lint";
 import { FAMILY_SOURCED_MAX_RUNG, type Rung } from "@/lib/state/machine";
@@ -91,6 +92,20 @@ export const assess_conversation_state: ToolImpl<"assess_conversation_state"> = 
     record({ turn_id: turn.turn_id, state, silent: false, evidence: { transcript, span: { start_ms: turn.start_ms, end_ms: turn.end_ms }, matched_rule: rule, matched_ids: matched.sort(), conduct_signal: conduct, response_format: format, response_latency_ms: latency } });
 
   if (conduct) return done("no_answer", `conduct:${conduct}`);
+  if (ctx.conversationalRepairs && format === "open") {
+    if (ctx.script.affirm_phrases.some(phrase => tokens(phrase).join(" ") === said.join(" "))) return done("recalled", "said_she_is_with_it");
+    const repair = conversationalRepair(transcript);
+    if (ctx.script.unsure_phrases.some(phrase => tokens(phrase).join(" ") === said.join(" "))) return done("no_answer", "said_unsure");
+    // Clear requests are immediate. Ambiguous replies can use Muse, with a deterministic fallback on failure.
+    const intent = (repair === "detail" ? null : repair)
+      ?? await ctx.conversationAdvisor?.({ topic: ctx.session.topic.label, question: onTheTable?.text ?? "", reply: transcript }).catch(() => null)
+      ?? repair;
+    if (intent === "repeat") return done("asked_repeat", "conversation:repeat");
+    if (intent === "clarification" || intent === "unrelated" || intent === "continuing") return done("no_answer", `conversation:${intent}`);
+    if (intent === "unsure") return done("no_answer", "said_unsure");
+    if (intent === "detail" && novel.length > 0) return done("new_detail_offered", "conversation:detail");
+    if (intent === "acknowledgment") return done("recalled", "said_she_is_with_it");
+  }
   // Saying she does not remember is never a detail of hers, however many words it takes ("I do not remember", "I have no clue, dear").
   if (firstPhraseIn(transcript, ctx.script.unsure_phrases) || SAYS_SHE_CANNOT.test(said.join(" "))) return done("no_answer", "said_unsure");
 

@@ -1,11 +1,11 @@
 /* Live household setup uses the shared Recall brand and reading preferences. */
 .live-setup { width: 100%; max-width: 720px; padding: 24px 32px 64px; margin-inline: auto; line-height: 1.45; overflow-wrap: anywhere; }
 .care-main > .live-setup { padding-inline: 0; }
-.live-setup h1 { max-width: 16ch; margin-top: 28px; font-size: clamp(36px, 5vw, 48px); font-weight: 650; line-height: 1.13; letter-spacing: -.02em; }
+.live-setup h1 { max-width: 16ch; margin-top: 24px; font-size: clamp(36px, 5vw, 48px); font-weight: 650; line-height: 1.13; letter-spacing: -.02em; }
 .live-setup h2, .live-setup legend { font-size: 27px; font-weight: 600; line-height: 1.25; }
 .live-setup h3 { font-size: 22px; font-weight: 600; }
 .live-setup p { max-width: 60ch; }
-.live-setup .setup-intro { margin-bottom: 32px; font-size: var(--recall-body-size); color: var(--recall-muted); }
+.live-setup .setup-intro { margin-block: 12px 32px; font-size: var(--recall-body-size); color: var(--recall-muted); }
 .live-setup .setup-back { margin-bottom: 8px; }
 .live-setup-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-block: 24px 32px; padding-block: 18px; border-block: 1px solid var(--recall-line); list-style: none; }
 .live-setup-steps li { display: flex; align-items: center; gap: 8px; font-size: 17px; color: var(--recall-muted); }
@@ -13,15 +13,26 @@
 .live-setup-steps span { display: grid; place-items: center; width: 26px; height: 26px; border: 1px solid currentColor; border-radius: 50%; flex: none; font-size: 16px; text-decoration: none; }
 .live-setup-steps [aria-current="step"] span { background: var(--recall-soft); }
 .live-setup-fields { display: grid; gap: 24px; min-width: 0; }
-.live-setup-fields > label, .live-setup-pair > label { display: grid; gap: 8px; font-size: var(--recall-body-size); font-weight: 500; }
+.live-setup-fields > label, .live-setup-pair > label, .live-setup-phone-country, .live-setup-phone-number { display: grid; gap: 8px; font-size: var(--recall-body-size); font-weight: 500; }
+.live-setup-phone-country > label, .live-setup-phone-number > label { font: inherit; }
+.live-setup-phone { display: grid; gap: 12px; min-width: 0; }
+.live-setup-phone-heading { font-size: var(--recall-body-size); font-weight: 500; }
+.live-setup-phone-controls { display: grid; gap: 12px; min-width: 0; }
+.live-setup-phone-country select { text-overflow: ellipsis; }
+.live-setup-phone-number-row { display: flex; align-items: stretch; min-height: 54px; border: 1.5px solid var(--recall-ink); border-radius: 6px; background: var(--recall-bg); }
+.live-setup-phone-code { display: grid; place-items: center; flex: none; padding: 0 14px; color: var(--recall-muted); border-right: 1px solid var(--recall-line); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.live-setup-phone-number-row input { border: none; min-height: 51px; font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+.live-setup-phone-number-row input:focus-visible { outline: none; }
+.live-setup-phone-number-row:focus-within { outline: 3px solid var(--recall-ink); outline-offset: 3px; }
+.live-setup-phone-number-row:has(input:disabled) { background: var(--recall-tint); border-color: var(--recall-muted); color: var(--recall-muted); }
 .live-setup input:not([type="checkbox"]), .live-setup select, .live-setup textarea { width: 100%; min-width: 0; max-width: 100%; min-height: 54px; padding: 12px; border: 1.5px solid var(--recall-ink); border-radius: 6px; background: var(--recall-bg); color: var(--recall-ink); font: inherit; font-weight: 400; caret-color: var(--recall-ink); }
 .live-setup textarea { resize: vertical; line-height: 1.45; }
 .live-setup input::placeholder, .live-setup textarea::placeholder { color: var(--recall-muted); opacity: 1; }
 .live-setup input:disabled, .live-setup select:disabled { background: var(--recall-tint); color: var(--recall-muted); border-color: var(--recall-muted); opacity: 1; cursor: not-allowed; }
 .live-setup .live-setup-hint { display: block; color: var(--recall-muted); font-size: max(18px, calc(var(--recall-body-size) - 2px)); font-weight: 400; line-height: 1.45; }
 .live-setup > .live-setup-hint, .live-setup form > .live-setup-hint { margin-top: 24px; }
-.live-setup-section { margin-block: 32px; padding-top: 28px; border-top: 1px solid var(--recall-line); min-width: 0; }
-.live-setup-section > legend { float: left; width: 100%; margin-bottom: 18px; }
+.live-setup-section { margin-block: 32px; padding-top: 32px; border-top: 1px solid var(--recall-line); min-width: 0; }
+.live-setup-section > legend { float: left; width: 100%; margin-bottom: 16px; }
 .live-setup-section > legend + * { clear: both; }
 .live-setup-section > h2 { margin-bottom: 12px; }
 .live-setup-section > p + .live-setup-check { margin-top: 18px; }
@@ -40,7 +51,7 @@
 .live-setup-summary dd { font-weight: 500; }
 .live-setup-agreements { margin-top: 28px; padding: 18px; border: 1px solid var(--recall-muted); border-radius: 8px; background: var(--recall-tint); }
 .live-setup-agreements .live-setup-check + .live-setup-check { margin-top: 12px; }
-.live-setup .setup-actions { gap: 18px; margin: 32px 0 0; }
+.live-setup .setup-actions { gap: 16px; margin: 32px 0 0; }
 .live-setup .recall-button { font-size: 23px; min-height: 64px; padding: 16px; }
 .live-setup .setup-actions > .recall-secondary { flex-basis: 150px; }
 .live-setup .setup-error, .live-setup-status { margin-block: 24px; padding: 18px; border: 1px solid var(--recall-muted); border-radius: 6px; color: var(--recall-ink); background: var(--recall-tint); font-size: var(--recall-body-size); }
@@ -63,7 +74,7 @@
   .live-setup h1 { margin-top: 24px; }
   .live-setup-steps { gap: 8px; margin-block: 18px 28px; }
   .live-setup-steps li { flex-direction: column; align-items: flex-start; gap: 8px; font-size: 16px; }
-  .live-setup-pair { gap: 18px; }
+  .live-setup-pair { grid-template-columns: 1fr; gap: 24px; }
   .live-setup-summary > div { grid-template-columns: 1fr; gap: 5px; }
   .live-setup .setup-actions > .recall-secondary { flex: 0 1 120px; }
   .live-setup .setup-actions .recall-button { font-size: 21px; padding: 12px; gap: 8px; }
@@ -75,4 +86,54 @@
   .live-setup-pair { grid-template-columns: 1fr; }
   .live-setup .setup-actions { gap: 12px; }
   .live-setup .setup-actions > .recall-secondary { flex-basis: 102px; }
+}
+
+/* The grouped phone field owns its border and height. */
+.live-setup .live-setup-phone .live-setup-phone-number-row input { border: 0; min-height: 52px; border-radius: 0 6px 6px 0; }
+
+/* Joint setup groups related choices across the available desktop width. */
+.recall-setup-shell { max-width: 1160px; }
+.recall-setup-shell .recall-masthead-compact { padding-inline: 32px; }
+.recall-setup-main { padding: 24px 32px 64px; }
+.live-setup.live-setup-flow { max-width: none; padding: 0; }
+.live-setup-flow h1 { max-width: 26ch; margin-block: 32px 0; }
+.live-setup-flow .setup-intro { margin-block: 16px 40px; }
+.live-setup-flow .live-setup-steps { margin-block: 24px 32px; padding-block: 20px; }
+.live-setup-columns { display: grid; gap: 32px; align-items: start; }
+.live-setup-columns > .live-setup-section { margin: 0; padding-top: 24px; }
+.live-setup-flow .live-setup-section > legend { float: none; width: auto; margin-bottom: 24px; }
+.live-setup-people > fieldset { align-content: start; }
+.live-setup-people > fieldset > legend { margin-bottom: 24px; }
+.live-setup-contact { display: grid; gap: 12px; min-width: 0; }
+.live-setup-flow .live-setup-disclosure { margin-block: 32px; }
+.live-setup-flow .live-setup-disclosure > summary { padding-block: 20px; }
+.live-setup-flow .live-setup-options { padding-block: 8px 24px; }
+.live-setup-flow .live-setup-summary > div { gap: 12px; padding-block: 24px; }
+.live-setup-flow .live-setup-agreements { margin-top: 32px; padding: 24px; }
+.live-setup-flow .setup-actions { align-items: center; justify-content: flex-end; margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--recall-line); }
+.live-setup-flow .setup-actions > .recall-primary { flex: 0 1 280px; }
+.live-setup-flow .setup-actions > .recall-secondary { flex: 0 1 150px; margin-right: auto; }
+.live-setup-flow .setup-complete > .recall-button { margin-inline: 0; }
+
+@media (min-width: 960px) {
+  .live-setup-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 48px; }
+  .live-setup-people > fieldset + fieldset { border-left: 1px solid var(--recall-line); padding-left: 48px; }
+  .live-setup-flow .live-setup-options { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 48px; }
+  .live-setup-full-row { grid-column: 1 / -1; }
+  .live-setup-flow .live-setup-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 48px; }
+  .live-setup-flow .live-setup-summary > div { grid-template-columns: 1fr; align-content: start; }
+}
+@media (max-width: 959px) {
+  .live-setup-people > fieldset + fieldset { padding-top: 32px; border-top: 1px solid var(--recall-line); }
+}
+@media (max-width: 600px) {
+  .recall-setup-shell .recall-masthead-compact { padding-inline: 24px; }
+  .care-main.recall-setup-main { padding: 20px 24px 48px; }
+  .live-setup-flow h1 { margin-top: 24px; }
+  .live-setup-flow .setup-intro { margin-bottom: 32px; }
+  .live-setup-flow .live-setup-steps { margin-block: 16px 24px; }
+  .live-setup-flow .live-setup-agreements { padding: 16px; }
+  .live-setup-flow .setup-actions { align-items: stretch; margin-top: 32px; }
+  .live-setup-flow .setup-actions > .recall-primary,
+  .live-setup-flow .setup-actions > .recall-secondary { flex: none; margin-right: 0; }
 }

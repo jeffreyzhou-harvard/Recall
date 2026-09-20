@@ -1,6 +1,12 @@
 # Caregiver collection integration
 
-The caregiver workspace extends Recall’s existing identity and backend. `components/live/FamilyDashboard.tsx` mounts the contributor collection and retains the separate Recall sessions view. `components/archive` implements the photo collection; `app/caregiver.css`, `app/family-archive.css` and `app/archive-visualizations.css` provide its responsive presentation. `DESIGN.md` records the shared visual rules, while `.impeccable/surfaces/caregiver-overview.md` records the supplied reference’s surface direction.
+`CircleApp` now hosts Moments, People, Places, Connections, Stories and Recall sessions in one rail at `/caregiver`, `/family` and `/conversations`. The conversations route opens the sessions section; old section hashes still work. Family settings links directly to `/onboarding/manage`. On small screens all sections are available through a native picker. The retired `FamilyDashboard` shell is removed.
+
+`components/circle/RecallSessions.tsx` consumes the existing dashboard, export and pause endpoints. `SessionHistory.tsx` retains the keyboard-accessible animated bookshelf, with a narrow height range, a visible legend, a date timeline and a flat reduced-motion alternative. Every count has its denominator, every factual record sentence comes from the family copy fixture or record tools, and server-supplied thresholds drive the view. Weekly-note access cannot reveal history, topic counts or export controls. Shared patient quotations stay out of this counts-only view.
+
+The sample family's record and export endpoints resolve the same durable household store as its patient call demo, using the signed caregiver account. Record and export tools, access checks and export logging are unchanged. The normal deployment still uses its existing live service. `RecordPrintout.tsx` portals the returned export text to the body; `sessions.css` isolates it for printing and the print effect restores the page title afterwards.
+
+The following archive details describe the earlier contributor-library implementation; current Circle photos and stories use `/api/circle` (see `docs/PHOTO_FIRST_SCOPE.md`).
 
 ## Connected features
 

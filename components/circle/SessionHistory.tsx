@@ -1,17 +1,23 @@
 "use client";
 
-import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { ArrowLeft, ArrowRight, MoveHorizontal } from "lucide-react";
-import { sessionSupport, type SessionSummary } from "@/lib/family/session-summary";
+import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import type { SessionSummary } from "@/lib/family/session-summary";
+import familyCopy from "@/fixtures/family-copy.json";
+import thresholds from "@/fixtures/record-thresholds.json";
 
-const envelope = [.12, .21, .32, .27, .46, .58, .49, .73, .86, 1, .82, .69, .77, .51, .43, .32, .38, .21, .12];
-const shortDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-const fullDate = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
+// A closed spine reads its unaided count as height. The shortest measured book keeps
+// most of the tallest one's height, so the shelf stays legible without exaggerating
+// a difference of one or two calls. Insufficient history uses a dashed outline.
+const MEASURED_FLOOR = .5;
+const MEASURED_CEILING = .82;
+const UNMEASURED_SCALE = .5;
+const shortDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+const fullDate = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
 const dateLabel = (date: string, full = false) => (full ? fullDate : shortDate).format(new Date(date + "T12:00:00Z"));
 
-export function SessionBookshelf({ sessions: allSessions, children, contribution, recordWindow = 8, minimumCalls = 3 }: { sessions: SessionSummary[]; children?: ReactNode; contribution?: ReactNode; recordWindow?: number; minimumCalls?: number }) {
+export function SessionHistory({ sessions: allSessions, recordWindow = thresholds.record_window_calls, minimumCalls = thresholds.min_calls_to_show }: { sessions: SessionSummary[]; recordWindow?: number; minimumCalls?: number }) {
   const [topicFilter, setTopicFilter] = useState("all");
-  const sessions = useMemo(() => allSessions.filter((session) => topicFilter === "all" || session.topicId === topicFilter), [allSessions, topicFilter]);
+  const sessions = useMemo(() => allSessions.filter((session) => topicFilter === "all" || session.topicId === topicFilter).sort((a, b) => a.date.localeCompare(b.date)), [allSessions, topicFilter]);
   const topics = [...new Map(allSessions.map((session) => [session.topicId, session.topicName])).entries()];
   const [selectedId, setSelectedId] = useState(sessions.at(-1)?.id);
   const found = sessions.findIndex((session) => session.id === selectedId);
@@ -73,7 +79,7 @@ export function SessionBookshelf({ sessions: allSessions, children, contribution
         const closed = Math.min(1, Math.abs(distance));
         const openness = 1 - closed * closed * (3 - 2 * closed);
         const count = sessions[index]?.unaidedCalls;
-        const restingScale = count === null || count === undefined ? .37 : (80 + Math.min(1, Math.max(0, count / Math.max(1, recordWindow))) * 288) / 368;
+        const restingScale = count === null || count === undefined ? UNMEASURED_SCALE : MEASURED_FLOOR + (MEASURED_CEILING - MEASURED_FLOOR) * Math.min(1, Math.max(0, count / Math.max(1, recordWindow)));
         const heightScale = restingScale + (1 - restingScale) * openness;
         // Keep the snap target untransformed; only its visual child moves.
         if (placements.current[index]) placements.current[index]!.style.transform = reduced.current ? "none" : `translateX(${Math.sign(distance) * closed * 112 + shelfOffset}px)`;
@@ -119,7 +125,7 @@ export function SessionBookshelf({ sessions: allSessions, children, contribution
             setNavigationTarget(null);
           }
           const session = sessions[activeRef.current];
-          if (session) setAnnouncement(`${dateLabel(session.date)}. ${session.topicName}. ${sessionSupport(session.outcome)}`);
+          if (session) setAnnouncement(`${dateLabel(session.date)}. ${session.topicName}. ${recordCount(session)}`);
         }, 180);
       });
     };
@@ -184,79 +190,71 @@ export function SessionBookshelf({ sessions: allSessions, children, contribution
     event.preventDefault(); select(next, true);
   }
 
-  if (!selected) return <div className="care-overview"><div><p>No calls to explore yet. A session will appear here after a Recall conversation.</p>{children}</div>{contribution}</div>;
+  if (!selected) return <p className="circle-record-empty">No Recall calls yet.</p>;
 
   return <>
-    <div className="session-shelf" aria-label="Recall session history">
-      <div className="session-shelf-toolbar">
-        <p><MoveHorizontal size={21} aria-hidden="true" />Scroll to explore</p>
-        <div className="session-shelf-controls">
-          <span className="session-shelf-position">Call {active + 1} of {sessions.length}</span>
-          <button type="button" aria-label="Previous Recall session" disabled={(navigationTarget ?? active) === 0} onClick={() => select((targetRef.current ?? activeRef.current) - 1)}><ArrowLeft size={21} aria-hidden="true" /></button>
-          <button type="button" aria-label="Next Recall session" disabled={(navigationTarget ?? active) === sessions.length - 1} onClick={() => select((targetRef.current ?? activeRef.current) + 1)}><ArrowRight size={21} aria-hidden="true" /></button>
+    <div className="circle-session-shelf" aria-label="Recall session history">
+      <div className="circle-session-shelf-toolbar">
+        <p>Scroll to explore</p>
+        <div className="circle-session-shelf-controls">
+
+          <button type="button" aria-label="Previous Recall session" disabled={(navigationTarget ?? active) === 0} onClick={() => select((targetRef.current ?? activeRef.current) - 1)}>Previous</button>
+          <button type="button" aria-label="Next Recall session" disabled={(navigationTarget ?? active) === sessions.length - 1} onClick={() => select((targetRef.current ?? activeRef.current) + 1)}>Next</button>
         </div>
       </div>
-      <div className="session-topic-filter" role="group" aria-label="Filter sessions by topic">
+      <div className="circle-session-topic-filter" role="group" aria-label="Filter sessions by topic">
         {[["all", "All calls"], ...topics].map(([id, name]) => <button type="button" key={id} aria-pressed={topicFilter === id} onClick={() => setTopicFilter(id!)}>{name}</button>)}
       </div>
-      <div className="session-shelf-window">
-        <div className="session-shelf-track" ref={track} role="group" aria-label="Choose a session" aria-describedby="session-shelf-instructions">
-          <span className="session-shelf-space" aria-hidden="true" />
-          {sessions.map((session, index) => <button type="button" className="session-shelf-stop" key={session.id}
+      <div className="circle-session-shelf-window">
+        <div className="circle-session-shelf-track" ref={track} role="group" aria-label="Choose a session" aria-describedby="circle-session-shelf-instructions">
+          <span className="circle-session-shelf-space" aria-hidden="true" />
+          {sessions.map((session, index) => <button type="button" className="circle-session-shelf-stop" key={session.id}
             ref={(element) => { buttons.current[index] = element; }}
-            tabIndex={active === index ? 0 : -1} aria-pressed={active === index} aria-controls="selected-session"
-            aria-label={`${dateLabel(session.date)}: ${session.topicName}. ${session.unaidedCalls === null ? "Not enough calls yet" : `${session.unaidedCalls} of ${session.recentCalls} recent calls unaided`}`}
+            tabIndex={active === index ? 0 : -1} aria-pressed={active === index} aria-controls="selected-circle-session"
+            aria-label={`${dateLabel(session.date)}: ${session.topicName}. ${recordCount(session)}`}
             onClick={() => select(index)} onKeyDown={(event) => keySelect(event, index)}>
-            <span className="session-book-placement" aria-hidden="true" ref={(element) => { placements.current[index] = element; }}>
-            <span className="session-book" ref={(element) => { books.current[index] = element; }}>
-              <span className="session-book-cover">
-                <span className="session-book-content">
-                <span className="session-book-title">{session.topicName}</span>
-                <svg viewBox="0 0 144 184" preserveAspectRatio="none" focusable="false">
-              <line x1="0" y1="92" x2="144" y2="92" className="session-wave-axis" />
-              {envelope.map((level, bar) => {
-                const height = session.unaidedCalls === null ? 12 : 8 + Math.min(1, session.unaidedCalls / Math.max(1, recordWindow)) * 160 * level;
-                return <rect key={bar} x={bar * 7 + 6} y={92 - height / 2} width="4" height={height} rx="2" className={session.unaidedCalls === null ? "session-wave-unmeasured" : "session-wave-bar"} />;
-              })}
-                </svg>
-                <span className="session-book-count">{session.unaidedCalls === null ? "Not enough calls yet" : `${session.unaidedCalls} of ${session.recentCalls} calls unaided`}</span>
-                <span className="session-book-date"><time dateTime={session.date}>{dateLabel(session.date)}</time><span>Recall</span></span>
+            <span className="circle-session-book-placement" aria-hidden="true" ref={(element) => { placements.current[index] = element; }}>
+            <span className="circle-session-book" ref={(element) => { books.current[index] = element; }}>
+              <span className="circle-session-book-cover">
+                <span className="circle-session-book-content">
+                <span className="circle-session-book-title">{session.topicName}</span>
+                <span className="circle-session-book-count">{recordCount(session)}</span>
+                <span className="circle-session-book-date"><time dateTime={session.date}>{dateLabel(session.date)}</time><span>Recall</span></span>
                 </span>
               </span>
-              <span className="session-book-spine" data-unmeasured={session.unaidedCalls === null} data-light={session.unaidedCalls !== null && session.unaidedCalls < recordWindow / 2}><time dateTime={session.date}>{dateLabel(session.date)}</time></span>
-              <span className="session-book-back" />
+              <span className="circle-session-book-spine" data-unmeasured={session.unaidedCalls === null}><time dateTime={session.date}>{dateLabel(session.date)}</time></span>
+              <span className="circle-session-book-back" />
             </span>
             </span>
           </button>)}
-          <span className="session-shelf-space" aria-hidden="true" />
+          <span className="circle-session-shelf-space" aria-hidden="true" />
         </div>
       </div>
-      <div className="session-timeline" aria-label={`Call dates: ${dateLabel(firstDate!)} to ${dateLabel(lastDate!)}. Selected ${dateLabel(selected.date)}.`}>
-        <div className="session-timeline-line" aria-hidden="true"><span className="session-timeline-marker" style={{ left: `${timelinePosition}%` }} /></div>
-        <div className="session-timeline-dates" aria-hidden="true"><time dateTime={firstDate}>{dateLabel(firstDate!)}</time><span>Call dates</span><time dateTime={lastDate}>{dateLabel(lastDate!)}</time></div>
+      <div className="circle-session-timeline" aria-label={`Call dates: ${dateLabel(firstDate!)} to ${dateLabel(lastDate!)}. Selected ${dateLabel(selected.date)}.`}>
+        <div className="circle-session-timeline-line" aria-hidden="true"><span className="circle-session-timeline-marker" style={{ left: `${timelinePosition}%` }} /></div>
+        <div className="circle-session-timeline-dates" aria-hidden="true"><time dateTime={firstDate}>{dateLabel(firstDate!)}</time><span>Call dates</span><time dateTime={lastDate}>{dateLabel(lastDate!)}</time></div>
       </div>
-      <div className="session-shelf-legend" id="session-shelf-instructions">
-        <span><svg viewBox="0 0 36 28" aria-hidden="true"><rect x="2" y="18" width="7" height="8" rx="1" /><rect x="14" y="10" width="7" height="16" rx="1" /><rect x="26" y="2" width="7" height="24" rx="1" /></svg>More without a cue</span>
-        <span><svg viewBox="0 0 24 28" aria-hidden="true" className="session-legend-outline"><rect x="5" y="3" width="14" height="23" rx="1" /></svg>Fewer than {minimumCalls} calls</span>
-        <p>Height counts calls without a cue · same topic, up to {recordWindow} recent calls.</p>
+      <div className="circle-session-shelf-legend" id="circle-session-shelf-instructions">
+        <span><svg viewBox="0 0 36 28" aria-hidden="true"><rect x="2" y="12" width="7" height="14" rx="1" /><rect x="14" y="8" width="7" height="18" rx="1" /><rect x="26" y="3" width="7" height="23" rx="1" /></svg>Closed spine height: calls unaided for this topic, within the last {recordWindow} calls</span>
+        <span><svg viewBox="0 0 24 28" aria-hidden="true" className="circle-session-legend-outline"><rect x="5" y="3" width="14" height="23" rx="1" /></svg>Dashed outline: fewer than {minimumCalls} calls</span>
       </div>
-      <p className="session-sr-only">One book per call. Taller closed spines show more calls without a cue. The open cover expands for reading. Use left and right arrow keys, Home, or End to choose a call.</p>
-      <p className="session-sr-only" role="status" aria-live="polite">{announcement}</p>
+      <p className="circle-session-shelf-help">One book per call. The selected cover opens for reading. Use Left / Right, Home / End, or scroll to choose a call. The timeline dot marks its date.</p>
+      <p className="circle-session-motion-help">Reduced motion: equal-sized covers show the counts in words. The outlined cover is selected.</p>
+      <p className="circle-session-sr-only" role="status" aria-live="polite">{announcement}</p>
     </div>
-    <div className="care-overview session-overview">
-      <div>
-        <section className="session-receipt" id="selected-session" aria-labelledby="selected-session-title">
-          <div className="session-receipt-heading"><time dateTime={selected.date}>{dateLabel(selected.date, true)}</time><span>Recall call</span></div>
-          <div className="session-receipt-content" key={selected.id}>
-            <h3 id="selected-session-title">{selected.topicName}</h3>
-            <p className="session-support">{sessionSupport(selected.outcome)}</p>
-            <p className="session-count">{selected.unaidedCalls === null ? <><strong>Not enough calls yet</strong><span>This topic needs at least {minimumCalls} calls before a peak is shown.</span></> : <><strong>{selected.unaidedCalls} of {selected.recentCalls} recent calls unaided</strong><span>For this topic, up to {dateLabel(selected.date)}.</span></>}</p>
-          </div>
-          <p className="care-caption session-privacy">A brief account of the support used. Personal words stay private.</p>
-        </section>
-        {children}
+    <section className="circle-session-receipt" id="selected-circle-session" aria-labelledby="selected-circle-session-title">
+      <div className="circle-session-receipt-heading"><time dateTime={selected.date}>{dateLabel(selected.date, true)}</time><span>Selected call</span></div>
+      <div className="circle-session-receipt-content">
+        <h3 id="selected-circle-session-title">{selected.topicName}</h3>
+        <p className="circle-session-count">{recordCount(selected)}</p>
       </div>
-      {contribution}
-    </div>
+    </section>
   </>;
+}
+
+/** All factual record sentences come from the same fixed copy as the record tools. */
+function recordCount(session: SessionSummary) {
+  const template = session.unaidedCalls === null ? familyCopy.lines.record_not_enough : familyCopy.lines.record_unaided;
+  const slots: Record<string, string> = { topic: session.topicName, unaided: String(session.unaidedCalls), calls: String(session.recentCalls) };
+  return template.text.replace(/\{(\w+)\}/g, (_, key: string) => slots[key] ?? "");
 }

@@ -27,13 +27,17 @@
   },
   "dependencies": {
     "@ladybugdb/core": "^0.20.4",
+    "@vladmandic/face-api": "1.7.15",
+    "exifr": "^7.1.3",
     "framer-motion": "^13.4.0",
     "graphology": "^0.26.0",
+    "heic-convert": "^2.1.0",
     "lucide-react": "^1.47.0",
     "maplibre-gl": "^6.10.0",
     "next": "^16.3.5",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
+    "sharp": "^0.35.4",
     "zod": "^4.6.5",
     "zustand": "^5.0.15"
   },

@@ -278,9 +278,11 @@ export const record_retrieval_outcome: ToolImpl<"record_retrieval_outcome"> = as
   const interrupted = machine.state === "stopped" || machine.state === "safety_handoff";
   if (rungs_fired.length === 0 || interrupted) return { topic_outcome_id: null, retrieval_record_ids: [], first_rung_reached_unaided: null, highest_rung_used: null };
 
-  const highest = Math.max(...rungs_fired);
+  const openingPhoto = ctx.session.opening_photo_cue_id;
+  const highest = Math.max(...rungs_fired, openingPhoto ? 3 : 1);
+  const reached = reached_at_rung === null ? null : Math.max(reached_at_rung, openingPhoto ? 3 : 1);
   const outcomeId = `outcome:${ctx.session.session_id}`;
-  await ctx.graph.putNode({ id: outcomeId, type: "TopicOutcome", label: "Topic outcome", props: { session_id: sessionNodeId, topic_id: topic.topic_id, first_rung_reached_unaided: reached_at_rung, highest_rung_used: highest, timestamp: at }, prov });
+  await ctx.graph.putNode({ id: outcomeId, type: "TopicOutcome", label: "Topic outcome", props: { session_id: sessionNodeId, topic_id: topic.topic_id, first_rung_reached_unaided: reached, highest_rung_used: highest, timestamp: at }, prov });
   await link("OUTCOME_OF", outcomeId, sessionNodeId);
   await link("RECALLED_IN", topic.topic_id, sessionNodeId);
 
@@ -293,5 +295,5 @@ export const record_retrieval_outcome: ToolImpl<"record_retrieval_outcome"> = as
     await link(effective ? "CUE_EFFECTIVE_FOR" : "CUE_INEFFECTIVE_FOR", id, topic.topic_id);
     records.push(id);
   }
-  return { topic_outcome_id: outcomeId, retrieval_record_ids: records, first_rung_reached_unaided: reached_at_rung, highest_rung_used: highest };
+  return { topic_outcome_id: outcomeId, retrieval_record_ids: records, first_rung_reached_unaided: reached, highest_rung_used: highest };
 };

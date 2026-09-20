@@ -1,0 +1,204 @@
+[
+  {
+    "file": "beach-01.jpg",
+    "date": "2025-07-12T17:14:00.000Z",
+    "lat": 38.9351,
+    "lon": -74.906,
+    "contributor": "Maya",
+    "event": "Our Cape May summer",
+    "people": [
+      "Susan",
+      "Maya",
+      "Anika"
+    ],
+    "width": 1448,
+    "height": 1086,
+    "synthetic": true,
+    "sha256": "c0b87a34c09eddbdd1801911ffd067eb9369218d61bfdf272f7274edc308dc07"
+  },
+  {
+    "file": "beach-02.jpg",
+    "date": "2025-07-13T14:23:00.000Z",
+    "lat": 38.9348,
+    "lon": -74.907,
+    "contributor": "Maya",
+    "event": "Our Cape May summer",
+    "people": [
+      "Susan",
+      "Maya",
+      "Anika"
+    ],
+    "width": 1448,
+    "height": 1086,
+    "synthetic": true,
+    "sha256": "14104478498692753f58cc04c5b94fe68f59e9e7d186d68685e5fdbfd62c090b"
+  },
+  {
+    "file": "birthday-01.jpg",
+    "date": "2025-03-09T19:14:00.000Z",
+    "lat": 40.3573,
+    "lon": -74.6672,
+    "contributor": "Maya",
+    "event": "A birthday around the table",
+    "people": [
+      "Susan",
+      "Maya",
+      "Anika"
+    ],
+    "width": 1086,
+    "height": 1448,
+    "synthetic": true,
+    "sha256": "36e34c7c473e9f7f966a6544d43d6c8ed07d54a1287b34a4ad52fcf8226fbfad"
+  },
+  {
+    "file": "birthday-02.jpg",
+    "date": "2025-03-09T19:28:00.000Z",
+    "lat": 40.3573,
+    "lon": -74.6672,
+    "contributor": "Maya",
+    "event": "A birthday around the table",
+    "people": [
+      "Susan",
+      "Maya",
+      "Anika"
+    ],
+    "width": 1086,
+    "height": 1448,
+    "synthetic": true,
+    "sha256": "a8dc3c8f82b739c5d11c620112a0d0dcc148cb85a99b5fb19b22e24e17fd5a9a"
+  },
+  {
+    "file": "holiday-01.jpg",
+    "date": "2025-10-20T22:15:00.000Z",
+    "lat": 40.3574,
+    "lon": -74.6671,
+    "contributor": "Maya",
+    "event": "The kitchen before Diwali",
+    "people": [
+      "Susan",
+      "Maya"
+    ],
+    "width": 1086,
+    "height": 1448,
+    "synthetic": true,
+    "sha256": "200b537fe59a4403bb05c8f718f2090455ef89012200aa336e98d3db1e79fdb9"
+  },
+  {
+    "file": "acadia-01.jpg",
+    "date": "2025-09-06T15:10:00.000Z",
+    "lat": 44.3222,
+    "lon": -68.2533,
+    "contributor": "Maya",
+    "event": "A long weekend in Acadia",
+    "people": [
+      "Susan",
+      "Maya"
+    ],
+    "width": 1086,
+    "height": 1448,
+    "synthetic": true,
+    "sha256": "6acbd0073816c49e2c98e0f4c484f11e653f957a896556bfdff7c28da2a94422"
+  },
+  {
+    "file": "beach-03.jpg",
+    "date": "2025-07-13T17:30:00.000Z",
+    "lat": 38.935,
+    "lon": -74.906,
+    "contributor": "Maya",
+    "event": "Our Cape May summer",
+    "people": [
+      "Susan",
+      "Maya",
+      "Anika"
+    ],
+    "width": 1086,
+    "height": 1448,
+    "synthetic": true,
+    "sha256": "75a90c18b5cfbdb29fc3c89f72c011f173787f624cc2aee0aec6906fc19c89ef"
+  },
+  {
+    "file": "acadia-02.jpg",
+    "date": "2025-09-06T17:32:00.000Z",
+    "lat": 44.3218,
+    "lon": -68.253,
+    "contributor": "Maya",
+    "event": "A long weekend in Acadia",
+    "people": [
+      "Susan",
+      "Maya",
+      "Anika"
+    ],
+    "width": 1086,
+    "height": 1448,
+    "synthetic": true,
+    "sha256": "6f651af4bcdd8ee4085a10bb525902e24ef48f77a173a1fb70b228f1aff6778a"
+  },
+  {
+    "file": "holiday-02.jpg",
+    "date": "2025-10-20T23:17:00.000Z",
+    "lat": 40.3574,
+    "lon": -74.6671,
+    "contributor": "Maya",
+    "event": "The kitchen before Diwali",
+    "people": [
+      "Susan",
+      "Maya",
+      "Priya"
+    ],
+    "width": 1086,
+    "height": 1448,
+    "synthetic": true,
+    "sha256": "8bd18012d260fca30bc50b4afdaa68e369867f74649e57b60b3f0c7a773a6f5b"
+  },
+  {
+    "file": "birthday-03.jpg",
+    "date": "2025-03-09T20:18:00.000Z",
+    "lat": 40.3573,
+    "lon": -74.6672,
+    "contributor": "Maya",
+    "event": "A birthday around the table",
+    "people": [
+      "Susan",
+      "Maya",
+      "Anika"
+    ],
+    "width": 1086,
+    "height": 1448,
+    "synthetic": true,
+    "sha256": "864006a844a0fb7b8efbc9c5eb30b641ffc5e17e86211ea080d8038c8588a701"
+  },
+  {
+    "file": "holiday-03.jpg",
+    "date": "2025-10-21T00:11:00.000Z",
+    "lat": 40.3574,
+    "lon": -74.6671,
+    "contributor": "Maya",
+    "event": "The kitchen before Diwali",
+    "people": [
+      "Susan",
+      "Maya",
+      "Priya",
+      "Anika"
+    ],
+    "width": 1086,
+    "height": 1448,
+    "synthetic": true,
+    "sha256": "56f2fe22552b742402b2954fa8931d395262449c549ce86bfb19f149eaf4f863"
+  },
+  {
+    "file": "acadia-03.jpg",
+    "date": "2025-09-07T18:09:00.000Z",
+    "lat": 44.3231,
+    "lon": -68.2538,
+    "contributor": "Maya",
+    "event": "A long weekend in Acadia",
+    "people": [
+      "Susan",
+      "Maya"
+    ],
+    "width": 1086,
+    "height": 1448,
+    "synthetic": true,
+    "sha256": "97598743a3ba37d9d27522e85cbd6fed18d9608f511fdd7a4d6df989454a14e5"
+  }
+]

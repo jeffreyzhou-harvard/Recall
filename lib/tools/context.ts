@@ -9,6 +9,7 @@
  * leak guarantee is this type, not a filter that could fail.
  */
 import type { Clock } from "@/lib/clock";
+import type { ConversationAdvisor } from "@/lib/providers/conversation";
 import type { FamilyCopy, RecordThresholds, SafetyThresholds } from "@/lib/family/copy";
 import type { FamilyView } from "@/lib/family/projection";
 import type { CandidateSubgraph, RelationFact } from "@/lib/graph/retrieval";
@@ -35,6 +36,8 @@ export interface AccessibilityTelemetry {
 
 /** Layer 3: ephemeral session state. Discarded at call end except what she confirmed. */
 export interface SessionRecord {
+  /** The sample browser demo presents a visual cue with its opening question. Never count it as unaided. */
+  opening_photo_cue_id?: string;
   /** Original final audio for the separate share question; private confirmation evidence only. */
   share_audio_window?: import("@/lib/providers/transcription").AudioWindow | null;
   session_id: string;
@@ -108,6 +111,9 @@ export interface ScaffoldChoice {
 export type ScaffoldAdvisor = (advice: ScaffoldAdvice) => Promise<ScaffoldChoice>;
 
 export interface ToolContext {
+  openingPhotos?: boolean;
+  conversationalRepairs?: boolean;
+  conversationAdvisor?: ConversationAdvisor;
   knowledgeQuestions?: boolean;
   /** Live transport stop, checked inside the atomic commit boundary. */
   isCallStopped?: () => boolean;

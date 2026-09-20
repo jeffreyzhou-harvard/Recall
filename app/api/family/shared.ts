@@ -1,5 +1,11 @@
 import { isFamily } from "@/server/operator";
 import { getLiveRecall, type LiveRecall } from "@/server/recall-live";
+import { browserPrincipal } from "@/server/session";
+import { accountForMember } from "@/server/accounts";
+import { activeHousehold } from "@/server/active-household";
+import { localSampleRequest } from "@/server/sample-access";
+import { getSampleRecall } from "@/server/sample-call";
+import { readCircle } from "@/server/circle/store";
 
 export const guard = (request: Request, memberId?: string): Response | null => (isFamily(request, memberId) ? null : Response.json({ error: "not allowed" }, { status: 403 }));
 
@@ -12,9 +18,22 @@ export async function bodyOf(request: Request): Promise<Record<string, unknown> 
   }
 }
 
-/** The live Recall, with the joint setup re-read first: a revocation is in force before the next dashboard load (rule 12). */
-export async function liveRecall(): Promise<LiveRecall> {
-  const recall = await getLiveRecall();
+/** Bind the local rehearsal to the signed caregiver's sample, never a caller-supplied household. */
+function sampleHousehold(request?: Request): string | null {
+  if (!request || !localSampleRequest(request)) return null;
+  const principal = browserPrincipal(request);
+  if (principal?.role !== "family") return null;
+  const account = accountForMember(principal.member_id);
+  return account?.role === "family" && readCircle(account.household_id).demo ? account.household_id : null;
+}
+export function familyHousehold(request: Request): string | null {
+  return sampleHousehold(request) ?? activeHousehold() ?? null;
+}
+
+/** Re-read setup before every load; the same tools enforce revocations in both transports. */
+export async function liveRecall(request?: Request): Promise<LiveRecall> {
+  const sample = sampleHousehold(request);
+  const recall = sample ? await getSampleRecall(sample) : await getLiveRecall();
   await recall.refreshSetup();
   return recall;
 }

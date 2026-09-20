@@ -8,7 +8,8 @@ export async function POST(request: Request) {
     const call = live.currentCall();
     if (!call) return Response.json({ error: "The call has ended." }, { status: 409 });
     const url = new URL(request.url), id = url.searchParams.get("step") ?? "", action = url.searchParams.get("action");
-    if (action === "audio") await call.receive(id, () => limitedBody(request), url.searchParams.get("stop") === "true");
+    if (action === "caption") call.receiveCaption(id, await limitedBody(request, 192000), Number(url.searchParams.get("rate")), Number(url.searchParams.get("sequence")));
+    else if (action === "audio") await call.receive(id, () => limitedBody(request), url.searchParams.get("stop") === "true");
     else if (action === "stop") call.stop();
     else if (action === "ack") call.acknowledge(id);
     else return Response.json({ error: "Unknown call action." }, { status: 400 });

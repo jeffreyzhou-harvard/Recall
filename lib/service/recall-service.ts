@@ -40,6 +40,9 @@ import { createRecallStore } from "@/lib/state/store";
 import { GateKeeper, TOOL_IMPLS, ToolRuntime, dashboardAccess, newSession, type FamilyToolContext, type Fault, type ScaffoldAdvisor, type SetupStore, type ToolContext, type ToolInput, type ToolName, type ToolOutput } from "@/lib/tools";
 
 export interface RecallDeps {
+  openingPhotos?: boolean;
+  conversationalRepairs?: boolean;
+  conversationAdvisor?: import("@/lib/providers/conversation").ConversationAdvisor;
   knowledgeQuestions?: boolean;
   enrichKnowledge?: () => Promise<unknown>;
   isCallStopped?: () => boolean;
@@ -135,6 +138,9 @@ export class RecallService {
     const store = createRecallStore();
     const personId = deps.setup.current().person_id;
     const ctx: ToolContext = {
+      openingPhotos: deps.openingPhotos,
+      conversationalRepairs: deps.conversationalRepairs,
+      conversationAdvisor: deps.conversationAdvisor,
       knowledgeQuestions: deps.knowledgeQuestions,
       isCallStopped: deps.isCallStopped,
       callAttempts: deps.callAttempts,

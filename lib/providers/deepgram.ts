@@ -44,6 +44,8 @@ export function requireDeepgramKey(key: string | undefined): string {
 export interface DeepgramOptions {
   /** Words worth listening for: the names and dishes in this ask. Biasing only; it cannot put a word in her mouth. */
   keyterms?: string[];
+  /** Match the actual microphone PCM rate; the call recorder usually requests 16 kHz. */
+  sampleRate?: number;
 }
 
 /** A finished stretch of her speech. Times are milliseconds into the audio that was sent. */
@@ -81,6 +83,8 @@ export interface SocketLike {
 }
 
 export interface LiveHandlers {
+  /** Display-only captions. Interim words must never classify a turn or authorize storage. */
+  onTranscript?: (text: string, final: boolean) => void;
   /** She started speaking. Lets a caller tell silence from a pause mid-sentence. */
   onSpeechStarted?: (atMs: number) => void;
   /** A final, endpointed turn. The only event Recall acts on. */
@@ -137,9 +141,10 @@ export class DeepgramLive {
     createSocket: (url: string, protocols: string[]) => SocketLike = (url, protocols) => new WebSocket(url, protocols) as unknown as SocketLike,
     private readonly timers: TimersLike = REAL_TIMERS,
   ) {
-    const url = `wss://${HOST}?${query(options, { encoding: "linear16", sample_rate: String(DEEPGRAM_SAMPLE_RATE), channels: "1", interim_results: "true", endpointing: "500", utterance_end_ms: "1500", vad_events: "true" })}`;
+    const url = `wss://${HOST}?${query(options, { encoding: "linear16", sample_rate: String(options.sampleRate ?? DEEPGRAM_SAMPLE_RATE), channels: "1", interim_results: "true", endpointing: "500", utterance_end_ms: "1500", vad_events: "true", mip_opt_out: "true" })}`;
     this.socket = createSocket(url, ["token", apiKey]);
     this.socket.onopen = () => {
+      if (this.ended || this.closed) { this.socket.close(); return; }
       this.open = true;
       for (const chunk of this.backlog.splice(0)) this.socket.send(chunk);
       this.keepAlive = this.timers.setInterval(() => this.socket.send(JSON.stringify({ type: "KeepAlive" })), KEEP_ALIVE_MS);
@@ -157,7 +162,7 @@ export class DeepgramLive {
   }
 
   private receive(data: unknown): void {
-    if (typeof data !== "string") return;
+    if (this.closed || typeof data !== "string") return;
     let raw: { type?: unknown; timestamp?: unknown; last_word_end?: unknown };
     try {
       raw = JSON.parse(data) as typeof raw;
@@ -167,7 +172,9 @@ export class DeepgramLive {
     if (raw.type === "SpeechStarted" && typeof raw.timestamp === "number") return this.handlers.onSpeechStarted?.(Math.round(raw.timestamp * 1000));
     if (raw.type === "UtteranceEnd") return this.utteranceEnd(typeof raw.last_word_end === "number" && raw.last_word_end >= 0 ? Math.round(raw.last_word_end * 1000) : null);
     const parsed = results.safeParse(raw);
-    if (!parsed.success || !parsed.data.is_final) return; // interim results are never acted on
+    if (!parsed.success) return;
+    this.handlers.onTranscript?.(parsed.data.channel.alternatives[0]!.transcript, !!parsed.data.is_final);
+    if (!parsed.data.is_final) return; // interim results never reach the call engine
     const words = toWords(parsed.data.channel.alternatives[0]!.words);
     this.pending.push(...words);
     const owed = this.owedThroughMs;

@@ -28,12 +28,21 @@ export class CallUnavailableError extends Error {
   }
 }
 
+/** Only verified artifacts for the selected topic. Null removes the current visual cue. */
+export interface CallPhotoContext {
+  topic_id: string;
+  artifact_ids: string[];
+}
+
 export interface SpokenPrompt {
   prompt_id: string;
   text: string;
+  photos?: CallPhotoContext | null;
 }
 
 export interface CallDriver {
+  /** Photo artifacts offered to the patient by the browser transport during this call. */
+  readonly offeredPhotoIds?: ReadonlySet<string>;
   readonly call_asset_id: string;
   /** Browser hang-up after a final recording: safety is checked before honoring it. */
   readonly stopped?: boolean;
