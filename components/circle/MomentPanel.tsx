@@ -10,6 +10,7 @@ import {
   Pencil,
   Info,
   Users,
+  Trash2,
   X,
 } from "lucide-react";
 import { ArchiveDialog } from "@/components/archive/ArchiveDialog";
@@ -46,6 +47,26 @@ export function MomentPanel({
     [link, setLink] = useState(""),
     [recipient, setRecipient] = useState(""),
     [delivery, setDelivery] = useState("");
+  const [deleting, setDeleting] = useState<"photo" | "moment" | null>(null);
+  const selectedPhoto = photos[Math.min(index, Math.max(0, photos.length - 1))];
+  const affectedGroups = deleting === "moment" ? [m.id] : data.moments.filter((moment) => moment.photoIds.length === 1 && moment.photoIds[0] === selectedPhoto?.id).map((moment) => moment.id);
+  const deletedStoryCount = data.stories.filter((story) => affectedGroups.includes(story.eventId)).length;
+  async function remove() {
+    if (!deleting || busy) return;
+    setBusy(true); setError("");
+    try {
+      const result = await post<{ removedMomentIds: string[]; warning: string | null }>("delete", { kind: deleting, id: deleting === "moment" ? m.id : selectedPhoto?.id, momentId: m.id, revision: m.revision, storyCount: deletedStoryCount });
+      setDeleting(null); setLightbox(false); setIndex(Math.max(0, index - 1));
+      if (result.removedMomentIds.includes(m.id)) onClose();
+      await onChanged();
+      if (result.warning) setError(result.warning);
+    } catch (e) { setError(e instanceof Error ? e.message : "The photograph could not be deleted."); }
+    finally { setBusy(false); }
+  }
+  const deleteControls = data.canManage && <div className="circle-delete-actions">
+    <button className="circle-text-button" onClick={() => { setError(""); setDeleting("photo"); }} disabled={busy || !selectedPhoto}><Trash2 size={16} aria-hidden="true" />Delete this photo</button>
+    <button className="circle-text-button" onClick={() => { setError(""); setDeleting("moment"); }} disabled={busy}>Delete photo group</button>
+  </div>;
   async function save() {
     setBusy(true);
     setError("");
@@ -71,13 +92,22 @@ export function MomentPanel({
   }
   return (
     <ArchiveDialog
-      title={m.title}
+      title={deleting ? deleting === "moment" ? "Delete photo group" : "Delete photograph" : m.title}
       drawer={!lightbox}
-      onClose={() => (lightbox ? setLightbox(false) : onClose())}
+      onClose={() => (deleting ? setDeleting(null) : lightbox ? setLightbox(false) : onClose())}
       busy={busy}
-      focusKey={lightbox ? "photo" : editing ? "edit" : "moment"}
+      focusKey={deleting ? `delete-${deleting}` : lightbox ? "photo" : editing ? "edit" : "moment"}
     >
-      {lightbox ? (
+      {deleting ? <section className="circle-delete-confirm">
+        <Trash2 size={28} aria-hidden="true" />
+        <h2>{deleting === "moment" ? `Delete “${m.title}”?` : "Delete this photograph?"}</h2>
+        <p>{deleting === "moment" ? `This removes the photo group and its ${photos.length} ${photos.length === 1 ? "photograph" : "photographs"} from your family collection. Photos also kept in another group will stay there.` : "This removes the selected photograph from your family collection and People."}</p>
+        {deleting === "photo" && affectedGroups.length > 0 && <p>This is the last photograph in its group, so the empty group will also be removed.</p>}
+        {deletedStoryCount > 0 && <p>The {deletedStoryCount} {deletedStoryCount === 1 ? "story" : "stories"} in {affectedGroups.length === 1 ? "this group" : "these groups"}, including any recordings, will also be deleted.</p>}
+        <p>You can’t undo this in Recall.</p>
+        {error && <p className="circle-error" role="alert">{error}</p>}
+        <div><button className="circle-button secondary" disabled={busy} onClick={() => setDeleting(null)}>Keep {deleting === "moment" ? "photo group" : "photograph"}</button><button className="circle-button circle-danger-button" disabled={busy} onClick={() => void remove()}>{busy ? "Deleting…" : deleting === "moment" ? "Delete group" : "Delete photo"}</button></div>
+      </section> : lightbox ? (
         <div className="circle-lightbox">
           <img
             src={photos[index]?.url}
@@ -105,6 +135,7 @@ export function MomentPanel({
             </button>
           </div>
           <p>{photos[index]?.caption || m.title}</p>
+          {deleteControls}
         </div>
       ) : (
         <>
@@ -233,6 +264,7 @@ export function MomentPanel({
                 ))}
               </div>
             )}
+            {deleteControls}
             <section className="circle-story-invitation">
               <h3>
                 {m.question ||

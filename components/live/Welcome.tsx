@@ -3,24 +3,26 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { RecallFrame, RecallHeader } from "@/components/recall/RecallFrame";
-import { accountDestination, SessionLoading, SignOut } from "./AccessGate";
+import { RecallFrame, RecallHeader, RecallWordmark, RecallMark } from "@/components/recall/RecallFrame";
+import { accountDestination, SignOut } from "./AccessGate";
 import { useLive } from "./LiveProvider";
 import "@/app/welcome.css";
 import "@/components/circle/circle.css";
-import { Flower2, ArrowRight, Images } from "lucide-react";
+import { ArrowRight, Images } from "lucide-react";
 import { post } from "@/components/circle/types";
 
 export function WelcomeLayout({
   children,
   back = false,
+  wide = false,
 }: {
   children: ReactNode;
   back?: boolean;
+  wide?: boolean;
 }) {
   return (
     <RecallFrame family>
-      <div className="recall-welcome-shell">
+      <div className={`recall-welcome-shell${wide ? " recall-welcome-shell-wide" : ""}`}>
         <RecallHeader family compact />
         <main className="recall-welcome-main" id="main-content">
           {back && (
@@ -78,9 +80,10 @@ export function Welcome() {
   }
   if (!session)
     return (
-      <WelcomeLayout>
-        <SessionLoading />
-      </WelcomeLayout>
+      <main className="circle-landing"><header>
+        <Link className="circle-entry-brand" href="/" aria-label="Recall home"><RecallWordmark /></Link>
+        <span role="status">Opening Recall…</span>
+      </header></main>
     );
   const role = session.principal?.role;
   const destination = role ? accountDestination(role) : null;
@@ -89,8 +92,7 @@ export function Welcome() {
     <main className="circle-landing">
       <header>
         <Link className="circle-entry-brand" href="/" aria-label="Recall home">
-          <Flower2 />
-          recall<span>·</span>
+          <RecallWordmark />
         </Link>
         <Link className="circle-button secondary" href={destination || "/sign-in"}>
           {destination ? returnLabel : "Sign in"}
@@ -114,7 +116,8 @@ export function Welcome() {
             <ArrowRight size={19} />
           </Link>
           {destination && <div className="circle-home-account"><SignOut /></div>}
-          {!destination && process.env.NODE_ENV === "development" && (
+          {process.env.NODE_ENV === "development" && (
+            <>
             <button
               className="circle-text-button"
               onClick={() => void demo()}
@@ -123,6 +126,11 @@ export function Welcome() {
               {busy ? "Opening a sample family…" : "Explore a sample family"}
               <ArrowRight size={17} />
             </button>
+            <Link className="circle-text-button" href="/demo/call" target="_blank" rel="noopener">
+              Try the patient call demo
+              <ArrowRight size={17} />
+            </Link>
+            </>
           )}
           {error && (
             <p className="circle-error" role="alert">
@@ -151,7 +159,7 @@ export function Welcome() {
           </figure>
           <figure>
             <img
-              src="/preview/family-beach.png"
+              src="/sample-family/beach-01.jpg"
               alt="A family day beside the ocean"
             />
             <figcaption>A whole afternoon, together.</figcaption>
@@ -161,7 +169,7 @@ export function Welcome() {
             <figcaption>Somewhere that feels like home.</figcaption>
           </figure>
           <div className="circle-art-caption">
-            <Flower2 size={23} />
+            <RecallMark size={23} />
             <span>Every picture has more to tell.</span>
           </div>
         </div>

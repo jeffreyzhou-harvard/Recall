@@ -23,7 +23,7 @@ export type CircleState = {
   faceIndex?: FaceIndex;
   photos: CirclePhoto[];
   moments: CircleMoment[];
-  stories: (Story & { owner: string; requestId: string })[];
+  stories: (Story & { owner: string; requestId: string; sharedFromCall?: string })[];
   imports: {
     id: string;
     at: string;
@@ -36,6 +36,7 @@ export type CircleState = {
     warning?: string | null;
   }[];
   demo: boolean;
+  demoCall?: { topics: Record<string, string>; sharedContributions: string[] };
   drafts?: {
     id: string;
     owner: string;

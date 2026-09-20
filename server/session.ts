@@ -93,7 +93,7 @@ function signingKey(
           return a?.role === principal.role ? a.verifier : undefined;
         })();
 }
-export function sessionCookie(principal: Principal, request: Request): string {
+export function sessionCookie(principal: Principal, request: Request, cookieName = SESSION_COOKIE): string {
   const key = signingKey(principal, request);
   if (!key) throw new Error("No credential for this session");
   const payload = Buffer.from(
@@ -105,7 +105,7 @@ export function sessionCookie(principal: Principal, request: Request): string {
   const signature = createHmac("sha256", key)
     .update(payload)
     .digest("base64url");
-  return `${SESSION_COOKIE}=${payload}.${signature}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${lifetime}${
+  return `${cookieName}=${payload}.${signature}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${lifetime}${
     new URL(request.url).protocol === "https:" ||
     (request.headers.get("x-forwarded-proto") === "https" &&
       request.headers.get("host") ===
@@ -124,7 +124,7 @@ export function sessionCookie(principal: Principal, request: Request): string {
       : ""
   }`;
 }
-export function browserPrincipal(request: Request): Principal | null {
+export function browserPrincipal(request: Request, cookieName = SESSION_COOKIE): Principal | null {
   if (
     !["GET", "HEAD", "OPTIONS"].includes(request.method) &&
     !sameOrigin(request)
@@ -134,8 +134,8 @@ export function browserPrincipal(request: Request): Principal | null {
     .get("cookie")
     ?.split(";")
     .map((v) => v.trim())
-    .find((v) => v.startsWith(`${SESSION_COOKIE}=`))
-    ?.slice(SESSION_COOKIE.length + 1);
+    .find((v) => v.startsWith(`${cookieName}=`))
+    ?.slice(cookieName.length + 1);
   if (!value || value.length > 2048) return null;
   try {
     const [payload, signature, extra] = value.split(".");

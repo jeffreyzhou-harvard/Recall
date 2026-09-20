@@ -16,7 +16,7 @@
   [data-sidebar-collapsed="true"] .sidebar-resizer { display: none; }
   [data-sidebar-collapsed="true"] .circle-rail-header, [data-sidebar-collapsed="true"] .care-rail-header { flex-direction: column; align-items: center; gap: 12px; padding-inline: 0; margin-bottom: 24px; }
   [data-sidebar-collapsed="true"] .circle-rail-header .circle-brand, [data-sidebar-collapsed="true"] .care-rail-brand .recall-wordmark { font-size: 0 !important; gap: 0; padding: 0; }
-  [data-sidebar-collapsed="true"] .circle-brand > span,
+  [data-sidebar-collapsed="true"] .recall-brand-name,
   [data-sidebar-collapsed="true"] .circle-family-badge,
   [data-sidebar-collapsed="true"] .circle-nav-label,
   [data-sidebar-collapsed="true"] .circle-rail-note,

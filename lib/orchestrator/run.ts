@@ -25,7 +25,7 @@ import { IN_CALL, TERMINAL, type RecallEvent, type Rung } from "@/lib/state/mach
 import type { MachineState } from "@/lib/state/reducer";
 import type { RecallStore } from "@/lib/state/store";
 import { GateError, ToolTimeoutError, type ToolContext, type ToolOutput, type ToolRuntime } from "@/lib/tools";
-import { CallUnavailableError, type CallDriver } from "./call-driver";
+import { CallUnavailableError, type CallDriver, type CallPhotoContext } from "./call-driver";
 
 export interface RunEnv {
   person_id: string;
@@ -82,6 +82,7 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
   const ended = (): boolean => TERMINAL.has(machine().state);
   let driver: CallDriver | null = null;
   let connected = false;
+  let photosOffered = false;
   /** Something whoever runs Recall must hear about, but only once the call has been closed and recorded properly. */
   let surfaceAfterwards: unknown = null;
 
@@ -95,8 +96,10 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
   };
 
   /** Say a rendered line on the call, and record that it was actually said. */
-  const speak = async (prompt: Prompt): Promise<void> => {
-    await driver!.speak(prompt);
+  const speak = async (prompt: Prompt, photos?: CallPhotoContext): Promise<void> => {
+    const closing = [fixed.close_warm, fixed.close_kind, fixed.close_not_stored, fixed.narrowing, fixed.stop_ack, fixed.safety].some((line) => line?.prompt_id === prompt.prompt_id);
+    await driver!.speak({ ...prompt, ...(closing ? { photos: null } : photos ? { photos } : {}) });
+    if (photos?.artifact_ids.length) photosOffered = true;
     ctx.session.spoken.push({ prompt_id: prompt.prompt_id, script_id: prompt.script_id, rung: prompt.rung, text: prompt.text, at: ctx.clock.iso() });
     if (prompt.rung !== null) ctx.session.telemetry.rungs_fired.push({ rung: prompt.rung, script_id: prompt.script_id, latency_after_ms: null });
   };
@@ -139,6 +142,13 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
     if (support.conflicts.length > 0) dispatch({ type: "CLAIMS_CONFLICT", claim_ids: support.conflicts.flatMap((c) => [c.a, c.b]) });
     const verified = support.verified.map((v) => v.claim_id);
     if (!verified.includes(topicId)) throw new GateError("evidence", "the topic itself could not be verified");
+    const photoIds: string[] = [];
+    for (const candidate of retrieval.candidates) {
+      if (!verified.includes(candidate.root_id)) continue;
+      const node = await ctx.graph.getNode(candidate.root_id);
+      if (node?.type === "Artifact" && node.props.kind === "photo") photoIds.push(node.id);
+    }
+    const photosForTopic = (preferred?: string): CallPhotoContext => ({ topic_id: topicId, artifact_ids: [...photoIds].sort((a, b) => Number(b === preferred) - Number(a === preferred)) });
 
     const line = (key: FixedLineKey): Promise<Prompt> => runtime.call("render_prompt", { topic_id: topicId, scaffold_id: ctx.script.lines[key].id, slot_ids: {}, citations: [] });
     for (const key of ["greeting", "identity", "store_question", "share_question", "close_warm", "close_kind", "close_not_stored", "narrowing", "stop_ack", "safety"] as const) fixed[key] = await line(key);
@@ -249,7 +259,8 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
           dispatch({ type: "LADDER_EXHAUSTED", reason: "the ladder has nothing more that is verified to offer" });
         } else {
           const prompt = await runtime.call("render_prompt", { topic_id: topicId, scaffold_id: pick.scaffold_id, slot_ids: pick.slot_ids, citations: pick.citations });
-          await speak(prompt);
+          // Photographs are association cues: never reveal one during unaided recall or the context rung.
+          await speak(prompt, pick.rung >= 3 ? photosForTopic(pick.cue?.cue_id) : undefined);
           dispatch({ type: "RUNG_DELIVERED", rung: pick.rung as Rung, prompt_id: prompt.prompt_id, citations: pick.citations, cue_id: pick.cue?.cue_id ?? null });
         }
       }
@@ -261,6 +272,8 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
       if (machine().state !== "recalled") continue;
       if (machine().context.answer_turn_id === null) {
         // She is with it. Ask the open follow-up, and capture what she says next - in her words, not Recall's.
+        // A bare acknowledgement is not a memory yet. Keep any existing association photo,
+        // but do not introduce a new cue while the unaided follow-up is still being answered.
         await speak(fixed.elaborate!);
         continue;
       }
@@ -275,7 +288,7 @@ async function walk(env: RunEnv, openLine: OpenLine): Promise<RunResult> {
 
       // She hears exactly what would be kept - her own recording, never a synthesis - and then the question.
       await driver.playback({ asset_id: window.asset_id, spans: captured.kept });
-      await speak(fixed.store_question!);
+      await speak(fixed.store_question!, photosOffered ? undefined : photosForTopic());
       const storeReply = await hearReply(fixed.store_question!);
       if (!storeReply) break;
       if (storeReply === "stop") {

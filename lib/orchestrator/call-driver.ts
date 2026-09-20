@@ -28,9 +28,16 @@ export class CallUnavailableError extends Error {
   }
 }
 
+/** Only verified artifacts for the selected topic. Null removes the current visual cue. */
+export interface CallPhotoContext {
+  topic_id: string;
+  artifact_ids: string[];
+}
+
 export interface SpokenPrompt {
   prompt_id: string;
   text: string;
+  photos?: CallPhotoContext | null;
 }
 
 export interface CallDriver {

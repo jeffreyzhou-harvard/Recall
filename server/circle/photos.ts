@@ -13,6 +13,7 @@ import {
   type CircleMoment,
 } from "./store";
 import { analyzePhotos, type PhotoGroup } from "./ai";
+import { sampleKitGroups, sampleKitPhoto } from "./sample-kit";
 const replayReceipt = (receipt: ReturnType<typeof readCircle>["imports"][number]) => ({
   ...receipt, rejected: receipt.rejected ?? [], momentIds: receipt.momentIds ?? [], warning: receipt.warning ?? null,
 });
@@ -79,6 +80,7 @@ export function mergeGroups(
   groups: PhotoGroup[],
   photos: CirclePhoto[],
   ai: boolean,
+  sample = false,
 ): string[] {
   const momentIds: string[] = [];
   for (const group of groups) {
@@ -92,7 +94,10 @@ export function mergeGroups(
     const gps = items.find((p) => p.latitude !== null && p.longitude !== null);
     const names = [...new Set(items.flatMap((p) => p.namedPeople))];
     // Never fuse unrelated undated uploads merely because they have similar names.
-    const previous = dates.length
+    const previous = sample ? state.moments.find((moment) => moment.photoIds.some((id) => {
+      const photo = state.photos.find((photo) => photo.id === id);
+      return photo && sampleKitPhoto(photo.hash)?.event === group.title;
+    })) : dates.length
       ? state.moments.find(
           (m) =>
             m.startAt &&
@@ -122,7 +127,7 @@ export function mergeGroups(
       question: group.question,
       titleSource: ai ? "ai" : "metadata",
       peopleCount: group.peopleCount,
-      analysis: ai ? "complete" : "unavailable",
+      analysis: ai || sample ? "complete" : "unavailable",
       participantIds: [],
       evidence: [],
     };
@@ -148,6 +153,7 @@ export function mergeGroups(
         ...(dates.length ? ["Capture dates"] : []),
         ...(gps ? ["Photo locations"] : []),
         ...(ai ? ["Visible setting & activities"] : []),
+        ...(sample ? ["Sample photo kit"] : []),
       ]),
     ];
     if (!previous) state.moments.push(moment);
@@ -238,18 +244,20 @@ export async function uploadPhotos(
         .catch(() => null);
       const date = exif?.DateTimeOriginal || exif?.CreateDate;
       const fixture = fixtureMetadata?.[file.name];
+      const sample = snapshot.demo ? sampleKitPhoto(hash) : undefined;
       const capturedAt =
+        sample?.date ||
         fixture?.date ||
         (date instanceof Date && Number.isFinite(date.getTime())
           ? date.toISOString()
           : null);
       const latitude =
-          fixture?.latitude ??
+          sample?.lat ?? fixture?.latitude ??
           (typeof exif?.latitude === "number" && Math.abs(exif.latitude) <= 90
             ? exif.latitude
             : null),
         longitude =
-          fixture?.longitude ??
+          sample?.lon ?? fixture?.longitude ??
           (typeof exif?.longitude === "number" &&
           Math.abs(exif.longitude) <= 180
             ? exif.longitude
@@ -275,6 +283,7 @@ export async function uploadPhotos(
           contributor: name,
           capturedAt,
           addedAt: new Date().toISOString(),
+          ...(sample ? { demo: true } : {}),
           width: meta.width,
           height: meta.height,
           latitude,
@@ -309,12 +318,15 @@ export async function uploadPhotos(
       moments: 0,
       warning: null,
     };
-  const groups: PhotoGroup[] = [];
+  const sampleGroups = snapshot.demo ? sampleKitGroups(prepared.map(({ photo }) => photo)) : [];
+  const sampleIds = new Set(sampleGroups.flatMap((group) => group.photoIds));
+  const groups: PhotoGroup[] = [...sampleGroups];
   let warning: string | null = null;
   const fallbackIds = new Set<string>();
   // Up to four independent batches run together, within the HTTP upload timeout.
   const batches = [];
-  for (let i = 0; i < prepared.length; i += 20) batches.push(prepared.slice(i, i + 20));
+  const ordinary = prepared.filter(({ photo }) => !sampleIds.has(photo.id));
+  for (let i = 0; i < ordinary.length; i += 20) batches.push(ordinary.slice(i, i + 20));
   const analyzed = await Promise.all(batches.map(async (chunk) => {
     try {
       return await analyzePhotos(
@@ -353,7 +365,8 @@ export async function uploadPhotos(
             state,
             [limited],
             fresh.map((p) => p.photo),
-            !limited.photoIds.some((id) => fallbackIds.has(id)),
+            !limited.photoIds.some((id) => fallbackIds.has(id) || sampleIds.has(id)),
+            limited.photoIds.every((id) => sampleIds.has(id)),
           ),
         );
     }

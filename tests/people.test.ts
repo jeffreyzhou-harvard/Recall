@@ -88,6 +88,14 @@ describe("private People photo grouping", () => {
     expect(view.groups).toHaveLength(2);
   });
 
+  it("allows modest variation across photos while keeping more distant faces separate", () => {
+    const view = saveFaceScan(household, batch([[face(1)], [face(1.5)], [face(1.54)]]));
+    expect(view.groups.map(group => group.photoIds.length)).toEqual([2, 1]);
+    const joined = view.groups.find(group => group.photoIds.length === 2)!;
+    expect(joined.photoIds).toEqual(photoIds.slice(0, 2));
+    expect(view.groups.find(group => group.photoIds.length === 1)!.photoIds).toEqual([photoIds[2]]);
+  });
+
   it("leaves an ambiguous match separate and prevents transitive chains", () => {
     const ambiguous = saveFaceScan(household, batch([[face(1)], [face(1.8)], [face(1.4)]]));
     expect(ambiguous.groups).toHaveLength(3);

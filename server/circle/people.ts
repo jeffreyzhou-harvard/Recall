@@ -6,6 +6,9 @@ import { mediaFolder } from "./photos";
 import { emptyFaceIndex, FACE_MODEL, type FaceIndex, type PeopleView } from "@/lib/people/types";
 import { CircleError, readCircle, updateCircle, type CircleState } from "./store";
 
+// A larger descriptor distance permits slightly more variation between photos.
+const FACE_MATCH_DISTANCE = 0.52;
+
 const box = z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1), width: z.number().positive().max(1), height: z.number().positive().max(1) })
   .refine(b => b.x + b.width <= 1.00001 && b.y + b.height <= 1.00001, "Face must fit inside the photo.");
 const scanSchema = z.object({
@@ -53,7 +56,7 @@ export function saveFaceScan(household: string, input: unknown) {
           const faces = index.faces.filter(f => f.groupId === group.id);
           if (!faces.length || faces.some(f => f.photoId === photo.photoId)) return [];
           const distance = Math.max(...faces.map(f => faceDistance(f.descriptor, detection.descriptor)));
-          return distance < 0.48 ? [{ group, distance }] : [];
+          return distance < FACE_MATCH_DISTANCE ? [{ group, distance }] : [];
         }).sort((a, b) => a.distance - b.distance);
         const best = candidates[0];
         const group = best && (!candidates[1] || candidates[1].distance - best.distance >= 0.06) ? best.group : { id: randomUUID(), name: "" };

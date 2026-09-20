@@ -1,12 +1,13 @@
 "use client";
+import { RecallWordmark } from "@/components/recall/RecallFrame";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   ArrowRight,
+  AudioLines,
   BookOpen,
-  Flower2,
   Camera,
   Check,
   Images,
@@ -14,6 +15,7 @@ import {
   Network,
   Plus,
   Search,
+  Settings,
   ShieldCheck,
   Info,
   Users,
@@ -25,6 +27,7 @@ import { PhotoUpload } from "./PhotoUpload";
 import { FamilyPanel } from "./FamilyPanel";
 import { MomentPanel } from "./MomentPanel";
 import { PeoplePanel } from "./PeoplePanel";
+import { RecallSessions } from "./RecallSessions";
 import { SidebarResizeHandle, SidebarToggle, useResizableSidebar } from "@/components/navigation/ResizableSidebar";
 import { dateLabel, type CircleView } from "./types";
 import "./circle.css";
@@ -39,11 +42,12 @@ const MemoryMap = dynamic(
     ),
   },
 );
-type Section = "moments" | "people" | "places" | "connections";
-export function CircleApp() {
+type Section = "moments" | "people" | "places" | "connections" | "stories" | "sessions";
+const sectionNames: Record<Section, string> = { moments: "Moments", people: "People", places: "Places", connections: "Connections", stories: "Stories", sessions: "Recall sessions" };
+export function CircleApp({ initialSection = "moments" }: { initialSection?: Section }) {
   const [data, setData] = useState<CircleView | null>(null),
     [error, setError] = useState(""),
-    [section, setSection] = useState<Section>("moments"),
+    [section, setSection] = useState<Section>(initialSection),
     [search, setSearch] = useState(""),
     [filter, setFilter] = useState<"all" | "stories">("all"),
     [modal, setModal] = useState<"upload" | "sample" | "family" | null>(null),
@@ -66,19 +70,21 @@ export function CircleApp() {
   useEffect(() => {
     void refresh().catch((e) => setError(e.message));
     const focus = () => void refresh().catch(() => {});
-    const interval = setInterval(focus, 30000);
+    const interval = setInterval(focus, data?.demo ? 3000 : 30000);
     window.addEventListener("focus", focus);
     return () => {
       clearInterval(interval);
       window.removeEventListener("focus", focus);
     };
-  }, [refresh]);
+  }, [refresh, data?.demo]);
   useEffect(() => {
     const update = () => {
       const h = location.hash.slice(1);
-      if (["moments", "people", "places", "connections"].includes(h))
+      if (Object.hasOwn(sectionNames, h))
         setSection(h as Section);
-      else if (!h) setSection("moments");
+      else if (h === "topic-record") setSection("sessions");
+      else if (h === "memories" || h === "suggestions") setSection("moments");
+      else if (!h) setSection(initialSection);
     };
     update();
     window.addEventListener("hashchange", update);
@@ -87,7 +93,7 @@ export function CircleApp() {
       window.removeEventListener("hashchange", update);
       window.removeEventListener("popstate", update);
     };
-  }, []);
+  }, [initialSection]);
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(""), 4200);
@@ -123,7 +129,7 @@ export function CircleApp() {
   return (
     <div className="circle-app" {...sidebar.layoutProps}>
       <a href="#circle-main" className="care-skip-link">
-        Skip to your collection
+        Skip to content
       </a>
       <aside className="circle-rail" id="collection-sidebar">
         <div className="circle-rail-header">
@@ -132,8 +138,7 @@ export function CircleApp() {
           aria-label="Recall home"
           href="/"
         >
-          <Flower2 />
-          recall<span>·</span>
+          <RecallWordmark />
         </Link>
         <SidebarToggle sidebar={sidebar} controls="collection-sidebar" />
         </div>
@@ -149,14 +154,16 @@ export function CircleApp() {
             <span>A shared collection</span>
           </div>
         </div>
-        <p className="circle-nav-label">YOUR COLLECTION</p>
-        <nav aria-label="Your collection">
+        <p className="circle-nav-label">YOUR CIRCLE</p>
+        <nav aria-label="Your circle">
           {(
             [
               { id: "moments", name: "Moments", Icon: Images },
               { id: "people", name: "People", Icon: UsersRound },
               { id: "places", name: "Places", Icon: MapPin },
               { id: "connections", name: "Connections", Icon: Network },
+              { id: "stories", name: "Stories", Icon: AudioLines },
+              { id: "sessions", name: "Recall sessions", Icon: BookOpen },
             ] as const
           ).map(({ id, name, Icon }) => (
             <a
@@ -182,7 +189,18 @@ export function CircleApp() {
               )}
             </a>
           ))}
+          {data?.canManage && <Link href="/onboarding/manage" aria-label="Family settings" title="Family settings"><Settings size={19} aria-hidden="true" /><span>Family settings</span></Link>}
         </nav>
+        <label className="circle-mobile-navigation">
+          <span>In your circle</span>
+          <select aria-label="Circle section" value={section} onChange={event => {
+            if (event.target.value === "settings") window.location.assign("/onboarding/manage");
+            else navigate(event.target.value as Section);
+          }}>
+            {Object.entries(sectionNames).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+            {data?.canManage && <option value="settings">Family settings</option>}
+          </select>
+        </label>
         <div className="circle-rail-note">
           <BookOpen size={24} aria-hidden="true" />
           <p>
@@ -212,15 +230,14 @@ export function CircleApp() {
       <div className="circle-workspace">
         <header className="circle-topbar">
           <Link className="circle-mobile-brand circle-entry-brand" href="/" aria-label="Recall home">
-            <Flower2 aria-hidden="true" />recall<span>·</span>
+            <RecallWordmark />
           </Link>
           <span className="circle-breadcrumb">
             {data?.personName ? `${data.personName}’s circle` : "Your family"}
             <i>/</i>
-            {section.charAt(0).toUpperCase() + section.slice(1)}
+            {sectionNames[section]}
           </span>
           <div>
-            <Link className="circle-conversations-link" href="/conversations">Conversations</Link>
             {data?.demo && (
               <span className="circle-demo-label">Sample family</span>
             )}
@@ -255,10 +272,10 @@ export function CircleApp() {
             </div>
           ) : (
             <>
-              <header className="circle-heading">
+              <header className={`circle-heading${section === "sessions" ? " circle-sessions-heading" : ""}`}>
                 <div>
                   <h1 ref={heading} tabIndex={-1}>
-                    {section === "moments"
+                    {section === "sessions" ? "Recall sessions." : section === "stories" ? "In your own words." : section === "moments"
                       ? "A life, in moments."
                       : section === "people"
                         ? "The people in your photographs."
@@ -267,7 +284,7 @@ export function CircleApp() {
                         : "Everything is connected."}
                   </h1>
                   <p>
-                    {section === "moments"
+                    {section === "sessions" ? "Call history, topic by topic." : section === "stories" ? "Family stories, with the person who shared them." : section === "moments"
                       ? "You bring the photos. We find the moments."
                       : section === "people"
                         ? "Familiar faces, gathered together."
@@ -276,28 +293,37 @@ export function CircleApp() {
                         : "People, places, and all the little things in between."}
                   </p>
                 </div>
-                <button
+                {section !== "sessions" && <button
                   className="circle-button primary"
                   onClick={() => setModal("upload")}
                 >
                   <Plus size={18} />
                   Add photos
-                </button>
+                </button>}
               </header>
-              {section === "people" ? <PeoplePanel data={data} onOpenPhoto={id => {
+              {section === "sessions" ? <RecallSessions key={data.member} member={data.member} demo={data.demo} /> : section === "stories" ? <div className="circle-story-index">
+                {data.stories.length ? [...data.stories].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(story => {
+                  const moment = data.moments.find(m => m.id === story.eventId);
+                  const photo = data.photos.find(p => p.id === moment?.coverId);
+                  return <article key={story.id}>
+                    {photo && <button className="circle-story-thumbnail" onClick={() => openMoment(story.eventId)} aria-label={`Open ${moment?.title}`}><img src={photo.url} alt={photo.caption || moment?.title || "Family photograph"} loading="lazy" /></button>}
+                    <div><p className="circle-story-attribution">{story.author} · <time dateTime={story.createdAt}>{dateLabel(story.createdAt)}</time></p><blockquote>{story.text}</blockquote>{moment && <button className="circle-text-button" onClick={() => openMoment(moment.id)}>Open {moment.title}<ArrowRight size={16} aria-hidden="true" /></button>}</div>
+                  </article>;
+                }) : <div className="circle-record-empty"><p>No shared stories yet.</p><button className="circle-text-button" onClick={() => navigate("moments")}>Start with a moment<ArrowRight size={16} aria-hidden="true" /></button></div>}
+              </div> : section === "people" ? <PeoplePanel key={data.photos.map(photo => photo.id).join("|")} data={data} onOpenPhoto={id => {
                 const moment = data.moments.find(m => m.photoIds.includes(id));
                 if (moment) { openMoment(moment.id); setPhotoId(id); }
               }} /> : data.moments.length === 0 ? (
                 <section className="circle-first-moment">
                   <div className="circle-empty-collage" aria-hidden="true">
                     {[
-                      "family-beach.png",
-                      "princeton-garden.png",
-                      "lincoln-library.png",
+                      "/sample-family/beach-01.jpg",
+                      "/preview/princeton-garden.png",
+                      "/preview/lincoln-library.png",
                     ].map((p, i) => (
                       <motion.img
                         key={p}
-                        src={"/preview/" + p}
+                        src={p}
                         initial={
                           reduced ? false : { opacity: 0, y: 40, rotate: 0 }
                         }
@@ -335,7 +361,7 @@ export function CircleApp() {
                       className="circle-text-button"
                       onClick={() => setModal("sample")}
                     >
-                      Try it with 9 sample photos
+                      Explore the sample photographs
                       <Images size={16} aria-hidden="true" />
                     </button>
                   )}
@@ -610,6 +636,7 @@ export function CircleApp() {
                         moments={data.moments}
                         photos={data.photos}
                         stories={data.stories}
+                        connections={data.connections}
                         onSelect={(m) => openMoment(m.id)}
                       />
                     )}
@@ -629,6 +656,7 @@ export function CircleApp() {
           <PhotoUpload
             key="upload"
             sample={modal === "sample"}
+            demo={data?.demo ?? false}
             onClose={() => {
               setModal(null);
               window.scrollTo({ top: 0, behavior: "smooth" });

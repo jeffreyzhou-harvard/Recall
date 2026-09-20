@@ -17,18 +17,27 @@ import { principalForKey, sessionCookie, browserPrincipal } from "@/server/sessi
 import { isFamily, isOperator } from "@/server/operator";
 import { DurableAlerts } from "@/server/alerts";
 import { attestationsMissing } from "@/lib/tools/policy";
+import { callPhotoSource } from "@/server/call-photos";
+import { edgeId } from "@/lib/graph/seed";
+import { GET as photoGET } from "@/app/api/call/photo/route";
+import { GET as statusGET } from "@/app/api/call/status/route";
+import { POST as actionPOST } from "@/app/api/call/action/route";
+import { CallCaptions } from "@/server/call-captions";
+import type { LiveHandlers } from "@/lib/providers/deepgram";
+import { getLiveRecall } from "@/server/recall-live";
+vi.mock("@/server/recall-live", async (original) => ({ ...await original<typeof import("@/server/recall-live")>(), getLiveRecall: vi.fn() }));
 const folders: string[] = [], stores: Array<{ close(): void }> = [];
 function folder() { const path = mkdtempSync(join(tmpdir(), "recall-web-")); folders.push(path); return path; }
 afterEach(() => { for (const store of stores.splice(0)) store.close(); vi.unstubAllEnvs(); vi.useRealTimers(); for (const path of folders.splice(0)) rmSync(path, { recursive: true, force: true }); });
 const audio = wavFromPcm(new Uint8Array(16000 * 2 * 3));
 const words = (text: string) => text.split(" ").filter(Boolean).map((w, i) => ({ w, start_ms: i * 100, end_ms: i * 100 + 90 }));
-async function rig(replies: string[] = []) {
+async function rig(replies: string[] = [], captions?: CallCaptions) {
   const root = folder(), graph = new SqliteGraphStore(join(root, "recall-graph.db"), "test"); stores.push(graph);
   const fixture = await buildFixtureRig({ graph });
   const media = new MediaStore(root, "test", fixture.assets, graph); stores.push(media);
   const transcript = new LiveTranscription();
   const recognition = vi.fn(async () => ({ transcript: "", words: words(replies.shift() ?? "") }));
-  const driver = new WebCall("person:susan", media, transcript, fixture.graph, "standard", 8, recognition, async () => audio);
+  const driver = new WebCall("person:susan", media, transcript, fixture.graph, "standard", 8, recognition, async () => audio, captions);
   return { ...fixture, safetyThresholds: SAFETY_THRESHOLDS, media, transcript, driver, recognition };
 }
 async function drive(driver: WebCall, done: Promise<unknown>, onListen: (step: string, number: number) => Promise<void>) {
@@ -43,7 +52,141 @@ async function drive(driver: WebCall, done: Promise<unknown>, onListen: (step: s
   if (!ended) driver.stop(); await settled; if (failure) throw failure;
   expect(ended).toBe(true);
 }
+async function topicPhoto(r: Awaited<ReturnType<typeof rig>>) {
+  const topic = await createTopic(r.graph, r.setup.current(), { contributor_id: "person:maya", label: "baking bread", story: "Maya and I baked bread together." });
+  const policy = r.setup.current(); policy.topics.allow = [topic.id]; policy.topics.block = []; r.setup.replace(policy);
+  const bytes = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6lVUAAAAASUVORK5CYII=", "base64");
+  const media = r.media.make(bytes, "person:maya", "image/png", null); await r.media.save(media, true);
+  const id = `artifact:${media.entry.id}`, prov = { ...(await r.graph.getNode(topic.id))!.prov, source_id: id, asset_id: media.entry.id, media_hash: media.entry.sha256 };
+  const claim = (await r.graph.getNode(`claim:${topic.id}`))!;
+  await r.graph.putEdge({ id: edgeId("ABOUT", claim.id, "person:maya"), type: "ABOUT", from: claim.id, to: "person:maya", props: {}, prov: claim.prov });
+  await r.graph.putNode({ id, type: "Artifact", label: "Family photograph", props: { kind: "photo", text: null, alt: null }, prov });
+  for (const [type, to] of [["DEPICTS", topic.id], ["PERMITTED_IN", policy.policy_id]] as const) await r.graph.putEdge({ id: edgeId(type, id, to), type, from: id, to, props: {}, prov });
+  r.driver.photoSource = callPhotoSource(r.graph, r.media, r.setup, () => r.clock.iso());
+  return { topic, id, media, context: { topic_id: topic.id, artifact_ids: [id] } };
+}
 describe("live browser transport", () => {
+  it("exposes interim captions only to the current household patient and never stores them", async () => {
+    let handlers!: LiveHandlers;
+    const stream = { sendAudio: vi.fn(), end: vi.fn() };
+    const r = await rig([], new CallCaptions((_rate, callbacks) => { handlers = callbacks; return stream; }));
+    vi.stubEnv("RECALL_DATA_DIR", folder()); vi.stubEnv("RECALL_HOUSEHOLD", "caption-household");
+    vi.stubEnv("RECALL_FAMILY_CREDENTIALS", "{}"); vi.stubEnv("RECALL_FAMILY_SECRET", "");
+    vi.mocked(getLiveRecall).mockResolvedValue({ currentCall: () => r.driver, setup: r.setup, refreshSetup: async () => {} } as Awaited<ReturnType<typeof getLiveRecall>>);
+    const listening = r.driver.listen().catch(() => undefined), step = r.driver.command!.id;
+    const base = "https://recall.test";
+    const cookie = (household: string, member: string, role: "patient" | "family") => {
+      const key = issueAccount(household, member, role);
+      return sessionCookie(principalForKey(key)!, new Request(base)).split(";")[0]!;
+    };
+    const patient = cookie("caption-household", "person:susan", "patient"), family = cookie("caption-household", "person:maya", "family"), outsider = cookie("other-household", "person:outsider", "patient");
+    const upload = (credential: string, origin = base) => new Request(`${base}/api/call/action?action=caption&step=${step}&rate=16000&sequence=0`, { method: "POST", headers: { cookie: credential, Origin: origin }, body: new Uint8Array(16000) });
+    expect((await actionPOST(upload(family))).status).toBe(403);
+    expect((await actionPOST(upload(outsider))).status).toBe(403);
+    expect((await actionPOST(upload(patient, "https://another.test"))).status).toBe(403);
+    expect((await actionPOST(upload(patient))).status).toBe(200);
+    handlers.onTranscript!("Only the patient can see this draft", false);
+    const status = (credential: string) => statusGET(new Request(`${base}/api/call/status`, { headers: { cookie: credential } }));
+    expect((await (await status(patient)).json()).caption).toMatchObject({ text: "Only the patient can see this draft", final: false });
+    expect((await (await status(family)).json()).caption).toBeUndefined();
+    expect(r.recognition).not.toHaveBeenCalled();
+    expect((await r.graph.nodesOfType("Contribution")).some(node => node.props.literal_transcript.includes("this draft"))).toBe(false);
+    r.driver.stop(); await listening; handlers.onTranscript!("Late words", true);
+    expect((await (await status(patient)).json()).caption).toBeNull();
+    expect((await actionPOST(upload(patient))).status).toBe(409);
+    expect(stream.end).toHaveBeenCalledOnce(); await r.driver.hangUp();
+  });
+  it.each([false, true])("surfaces verified topic photos after free recall and preserves confirmation (support=%s)", async (support) => {
+    const r = await rig([...(support ? ["I don’t remember."] : ["Yes."]), "I mixed the flour with Maya.", "Yes.", "Yes."]);
+    const photo = await topicPhoto(r);
+    const service = new RecallService({ ...r, transcription: r.transcript, callDriver: () => r.driver, script: CALL_SCRIPT, copy: FAMILY_COPY, thresholds: RECORD_THRESHOLDS, safetyPhrases: SAFETY_PHRASES, isCallStopped: () => r.driver.cannotCommit });
+    const run = service.runScheduledCall(`session:photo-${support}`), seen: string[][] = [];
+    await drive(r.driver, run, async (id) => { seen.push((await r.driver.photos()).map((p) => p.id)); await r.driver.receive(id, audio); });
+    expect(seen[0]).toEqual([]);
+    if (!support) expect(seen[1]).toEqual([]); // A bare "yes" must not silently become a photo-assisted answer.
+    expect(seen.slice(support ? 1 : 2)).toEqual([[photo.id], [photo.id], ...(support ? [[photo.id]] : [])]);
+    expect((await run)?.recording.final_state).toBe("stored");
+    expect((await run)?.ctx.session.telemetry.rungs_fired.map((rung) => rung.rung)).toEqual(support ? [1, 3] : [1]);
+    expect(await r.driver.photos()).toEqual([]);
+    expect(await r.driver.photo(r.driver.call_asset_id, photo.id)).toBeNull();
+  });
+  it("limits photo delivery to the current call and rechecks revocation while she is listening", async () => {
+    const r = await rig(), photo = await topicPhoto(r);
+    const source = r.driver.photoSource!;
+    expect(await source({ ...photo.context, topic_id: "event:unrelated" })).toEqual([]);
+    expect(await source({ ...photo.context, artifact_ids: ["artifact:unrelated"] })).toEqual([]);
+    const speaking = r.driver.speak({ prompt_id: "verified-question", text: "What comes to mind?", photos: photo.context });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const visible = await r.driver.photos(); expect(visible).toHaveLength(1);
+    expect(await r.driver.photo("old-call", photo.id)).toBeNull();
+    expect(await r.driver.photo(r.driver.call_asset_id, "other-photo")).toBeNull();
+    expect((await r.driver.photo(r.driver.call_asset_id, photo.id))?.bytes).toEqual(photo.media.bytes);
+    r.driver.acknowledge(r.driver.command!.id); await speaking;
+    const listening = r.driver.listen().catch(() => undefined);
+    expect(await r.driver.photos()).toEqual(visible);
+    const policy = r.setup.current();
+    policy.approved_people = [...new Set([...policy.approved_people, "person:priya"])];
+    policy.recall_set_up_by = "person:priya";
+    policy.safety.designated_caregivers = [{ ...policy.safety.designated_caregivers[0]!, person_id: "person:priya" }];
+    r.setup.replace(policy); r.setup.revokeContributor("person:maya", r.clock.iso());
+    expect(await r.driver.photos()).toEqual([]);
+    expect(await r.driver.photo(r.driver.call_asset_id, photo.id)).toBeNull();
+    r.driver.stop(); await listening; await r.driver.hangUp();
+  });
+  it("rejects missing or mismatched photo evidence and newly blocked topics", async () => {
+    const r = await rig(), photo = await topicPhoto(r), source = r.driver.photoSource!;
+    const get = vi.spyOn(r.media, "get");
+    get.mockReturnValueOnce({ ...photo.media, bytes: Buffer.from("changed evidence") });
+    expect(await source(photo.context)).toEqual([]);
+    get.mockReturnValueOnce({ ...photo.media, owner: "person:someone-else" });
+    expect(await source(photo.context)).toEqual([]);
+    expect(await source(photo.context)).toHaveLength(1);
+    r.setup.revokeTopic(photo.topic.id); expect(await source(photo.context)).toEqual([]);
+    const policy = r.setup.current(); policy.topics.allow = [photo.topic.id]; policy.topics.block = []; r.setup.replace(policy);
+    r.media.remove(photo.media.entry.id); expect(await source(photo.context)).toEqual([]);
+  });
+  it("photo failures and in-flight photo requests cannot reopen a stopped call", async () => {
+    const r = await rig(), photo = await topicPhoto(r);
+    const speaking = r.driver.speak({ prompt_id: "photo", text: "What comes to mind?", photos: photo.context });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    r.driver.photoSource = async () => { throw new Error("image unavailable"); };
+    expect(await r.driver.photos()).toEqual([]);
+    expect(r.driver.command?.kind).toBe("speak");
+    let release!: () => void;
+    r.driver.photoSource = () => new Promise((resolve) => { release = () => resolve([{ id: photo.id, media: photo.media }]); });
+    const pending = r.driver.photos();
+    const stopped = speaking.catch(() => undefined); r.driver.stop(); release();
+    expect(await pending).toEqual([]); await stopped; await r.driver.hangUp();
+  });
+  it("serves photo bytes only to this household's patient through the active call route", async () => {
+    const r = await rig(), photo = await topicPhoto(r);
+    vi.stubEnv("RECALL_DATA_DIR", folder()); vi.stubEnv("RECALL_HOUSEHOLD", "photo-household");
+    vi.stubEnv("RECALL_FAMILY_CREDENTIALS", "{}"); vi.stubEnv("RECALL_FAMILY_SECRET", "");
+    const live = { currentCall: () => r.driver, setup: r.setup, refreshSetup: async () => {} };
+    vi.mocked(getLiveRecall).mockResolvedValue(live as Awaited<ReturnType<typeof getLiveRecall>>);
+    const url = `https://recall.test/api/call/photo?call=${encodeURIComponent(r.driver.call_asset_id)}&photo=${encodeURIComponent(photo.id)}`;
+    const request = (household: string, member: string, role: "patient" | "family") => {
+      const key = issueAccount(household, member, role);
+      const cookie = sessionCookie(principalForKey(key)!, new Request(url)).split(";")[0]!;
+      return new Request(url, { headers: { cookie } });
+    };
+    expect((await photoGET(new Request(url))).status).toBe(403);
+    expect((await photoGET(request("photo-household", "person:maya", "family"))).status).toBe(403);
+    expect((await photoGET(request("other-household", "other-patient", "patient"))).status).toBe(403);
+    expect((await photoGET(request("photo-household", "different-patient", "patient"))).status).toBe(403);
+    const patient = request("photo-household", "person:susan", "patient");
+    expect((await photoGET(patient)).status).toBe(404); // Approved photo, but no visual cue yet.
+    const speaking = r.driver.speak({ prompt_id: "photo", text: "What comes to mind?", photos: photo.context });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const state = await (await statusGET(patient)).json();
+    expect(state.photos).toEqual([{ id: photo.id, url: new URL(url).pathname + new URL(url).search }]);
+    const response = await photoGET(patient);
+    expect(response.status).toBe(200); expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(response.headers.get("content-type")).toBe("image/png");
+    expect(Buffer.from(await response.arrayBuffer())).toEqual(photo.media.bytes);
+    r.driver.acknowledge(r.driver.command!.id); await speaking; await r.driver.hangUp();
+    expect((await photoGET(patient)).status).toBe(404);
+  });
   it("requires the current command, real audio, and completed playback", async () => {
     const r = await rig(["Yes."]); const connect = r.driver.connect();
     expect(() => r.driver.acknowledge("stale")).toThrow(); r.driver.acknowledge(r.driver.command!.id); await connect;

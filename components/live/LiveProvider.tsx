@@ -8,13 +8,13 @@ const Context = createContext<{
   largeText: boolean; setLargeText: (v: boolean) => void; dark: boolean; setDark: (v: boolean) => void;
   member: string; setMember: (v: string) => void;
 } | null>(null);
-export function LiveProvider({ children }: { children: ReactNode }) {
+export function LiveProvider({ children, sessionEndpoint = "/api/session" }: { children: ReactNode; sessionEndpoint?: string }) {
   const [session, setSession] = useState<SessionInfo | null>(null), [sessionError, setSessionError] = useState("");
   const [largeText, setLargeText] = useState(false), [dark, setDark] = useState(false), [member, setMember] = useState("");
   const refreshSession = useCallback(async () => {
-    try { const next = await api<SessionInfo>("/api/session"); setSession(next); setSessionError(""); if (next.principal?.role === "family") setMember(next.principal.member_id); }
+    try { const next = await api<SessionInfo>(sessionEndpoint); setSession(next); setSessionError(""); if (next.principal?.role === "family") setMember(next.principal.member_id); }
     catch (error) { setSession(null); setSessionError(error instanceof Error ? error.message : "Recall could not load your session."); }
-  }, []);
+  }, [sessionEndpoint]);
   useEffect(() => { void refreshSession(); setMember(new URLSearchParams(window.location.search).get("member") ?? ""); }, [refreshSession]);
   return <Context.Provider value={{ session, refreshSession, sessionError, largeText, setLargeText, dark, setDark, member, setMember }}>{children}</Context.Provider>;
 }

@@ -72,7 +72,7 @@
 }
 .circle-brand .recall-wordmark {
   font-size: 27px;
-  gap: 9px;
+  gap: 8px;
 }
 .circle-brand .recall-brand-mark {
   width: 26px;
@@ -1853,18 +1853,13 @@
   margin: 22px auto;
 }
 .circle-entry-brand {
-  font:
-    30px Georgia,
-    serif;
   display: inline-flex;
-  gap: 7px;
   align-items: center;
   text-decoration: none;
-  color: #344d39;
+  color: #242c28;
 }
-.circle-entry-brand > span {
-  color: #9fae83;
-}
+.circle-entry-brand .recall-wordmark { font-size: 27px; gap: 8px; }
+.circle-entry-brand .recall-brand-mark { width: 26px; height: 26px; }
 .circle-invite-art {
   height: 190px;
   position: relative;
@@ -1925,6 +1920,8 @@
   align-items: center;
   justify-content: space-between;
 }
+.circle-landing > header { min-height: 44px; margin-inline: calc(24px - var(--recall-page-inset)); }
+.circle-landing > header .circle-button { min-height: 44px; padding-block: 10px; }
 .circle-landing-layout {
   max-width: 1450px;
   margin: 64px auto;
@@ -2022,6 +2019,26 @@
   font:
     italic 17px Georgia,
     serif;
+}
+
+.circle-delete-actions { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px 20px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #e5e6dd; }
+.circle-delete-actions .circle-text-button { min-height: 44px; color: #8a4138; }
+.circle-delete-confirm { padding: 56px 32px 32px; color: #2b3c31; }
+.circle-delete-confirm > svg { color: #8a4138; margin-bottom: 20px; }
+.circle-delete-confirm h2 { margin: 0 0 20px; font-size: 30px; line-height: 1.2; }
+.circle-delete-confirm p { margin: 12px 0; line-height: 1.65; }
+.circle-delete-confirm > div { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+.circle-danger-button { background: #8a4138; color: #fff; border-color: #8a4138; }
+.circle-danger-button:hover:not(:disabled) { background: #70332c; }
+.circle-patient-navigation { display: flex; align-items: center; justify-content: space-between; gap: 20px; max-width: 1280px; margin: 0 auto 24px; padding-block: 20px; border-block: 1px solid #dce0d5; color: #535e57; font-size: 20px; }
+.circle-patient-navigation .circle-button { min-height: 56px; font-size: 20px; }
+.circle-remember > header .recall-wordmark { color: #242c28; }
+.circle-landing .recall-wordmark, .circle-app .recall-wordmark, .circle-entry .recall-wordmark, .circle-remember .recall-wordmark { --recall-clay: #98513f; }
+@media (max-width: 760px) {
+  .circle-landing > header { margin-inline: 0; }
+  .circle-patient-navigation { align-items: stretch; flex-direction: column; gap: 12px; }
+  .circle-delete-confirm { padding-inline: 24px; }
+  .circle-delete-confirm > div { flex-direction: column; }
 }
 .circle-landing > footer {
   font-size: 12px;
@@ -2200,9 +2217,6 @@
   text-decoration: underline;
 }
 .circle-home-account,
-.circle-remember-back {
-  margin-top: 20px;
-}
 @media (max-width: 760px) {
   .circle-topbar .circle-mobile-brand {
     display: inline-flex;
@@ -2217,17 +2231,7 @@
 .circle-brand {
   display: flex;
   align-items: center;
-  gap: 7px;
-  font:
-    28px Georgia,
-    serif !important;
-}
-.circle-brand > svg {
-  width: 23px;
-  height: 23px;
-}
-.circle-brand > span {
-  color: #90a07f;
+  color: #242c28;
 }
 
 .circle-art-caption {
@@ -2236,6 +2240,10 @@
   background: #f8f7f3e8;
   padding: 8px 15px;
   border-radius: 30px;
+}
+
+@media (min-width: 761px) {
+  .circle-art-caption { left: clamp(-96px, -6vw, -48px); }
 }
 
 .circle-ask-story {
@@ -2405,3 +2413,27 @@
 .circle-stories footer div > span, .circle-another-voice p { color: #637057; }
 .circle-panel :is(input, select, textarea):focus-visible,
 .circle-story-editor textarea:focus-visible { outline: 2px solid #3c5944; outline-offset: 3px; }
+
+/* Stories and calls are direct destinations in the shared rail. */
+.circle-rail { overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--recall-muted) transparent; }
+.circle-rail nav a svg { flex-shrink: 0; }
+.circle-story-index { max-width: 1080px; }
+.circle-story-index article { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 28px; border-top: 1px solid var(--recall-line); padding-block: 28px; }
+.circle-story-thumbnail { border: 0; background: transparent; align-self: start; padding: 0; }
+.circle-story-thumbnail img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; }
+.circle-story-attribution { font-size: 13px; color: var(--recall-muted); }
+.circle-story-index blockquote { margin: 12px 0; font: 21px/1.5 Georgia, serif; white-space: pre-wrap; overflow-wrap: anywhere; max-width: 65ch; }
+.circle-story-index article:has(.circle-story-thumbnail) > div { min-width: 0; }
+.circle-story-index article:not(:has(.circle-story-thumbnail)) > div { grid-column: 1 / -1; }
+@media (max-width: 760px) { .circle-rail { overflow: visible; } }
+@media (max-width: 520px) { .circle-story-index article { grid-template-columns: 1fr; gap: 16px; } .circle-story-thumbnail { width: 140px; } }
+.circle-mobile-navigation { display: none; }
+@media (max-width: 760px) {
+  .circle-rail nav { display: none; }
+  .circle-mobile-navigation { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; padding-right: 8px; }
+  .circle-mobile-navigation > span { color: var(--recall-muted); font-size: 12px; flex-shrink: 0; }
+  .circle-mobile-navigation select { font: inherit; color: var(--recall-ink); background: var(--recall-bg); border: 1px solid var(--recall-line); border-radius: 8px; min-width: 0; width: 100%; min-height: 44px; padding: 8px; }
+  .circle-mobile-navigation select:focus-visible { outline: 2px solid var(--recall-focus); outline-offset: 2px; }
+  .circle-rail-bottom { flex: 0 0 58px; }
+}
+@media (max-width: 380px) { .circle-mobile-navigation > span { display: none; } }

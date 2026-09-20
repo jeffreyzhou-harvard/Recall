@@ -1,0 +1,23 @@
+RELAY FAMILY PHOTO KIT
+
+12 fictional family photographs: 10 portrait, 2 landscape.
+Each JPEG includes synthetic GPS coordinates and original capture dates.
+All people and events are fictional. These are AI-generated demonstration images,
+not real family records. Generation used Codex built-in ImageGen.
+
+Expected grouping: four events, three photos per event.
+- Birthday: Princeton, March 9, 2025
+- Summer beach: Cape May, July 12–13, 2025
+- Hiking weekend: Acadia, September 6–7, 2025
+- Diwali kitchen: Princeton, October 20, 2025
+
+PHONE TEST
+1. AirDrop the JPEG files to your iPhone, or save them into Photos from Files.
+2. Keep original metadata. Avoid screenshots or copying through messaging apps.
+3. In Relay, Add photos and select the JPEGs. Select actual/original size.
+4. If iOS offers location sharing options, include location for the GPS test.
+5. The app should produce four moments. Duplicates should be skipped.
+
+The kit tests metadata grouping and presentation, not real-world face recognition.
+Portrait is the majority because these should feel like an ordinary phone library.
+The manifest supplies ground truth for the expected grouping.

@@ -22,13 +22,16 @@ export function PhotoUpload({
   onClose,
   onDone,
   sample = false,
+  demo = false,
 }: {
   onClose: () => void;
   onDone: () => Promise<void>;
   sample?: boolean;
+  demo?: boolean;
 }) {
   const [files, setFiles] = useState<{ file: File; url: string }[]>([]),
     [busy, setBusy] = useState(false),
+    [grouping, setGrouping] = useState(false),
     [error, setError] = useState(""),
     [receipt, setReceipt] = useState<Receipt | null>(null),
     [sent, setSent] = useState(0),
@@ -67,6 +70,7 @@ export function PhotoUpload({
   async function start(useSample = false) {
     if (busy) return;
     setBusy(true);
+    setGrouping(false);
     setError("");
     setSent(0);
     try {
@@ -114,8 +118,15 @@ export function PhotoUpload({
           xhr.send(form);
         });
       }
+      // Keep the demo's grouping reveal visible even when its fixture upload is instant.
+      if (demo && result.added > 0) {
+        setSent(100);
+        setGrouping(true);
+        await Promise.all([onDone(), new Promise<void>(resolve => window.setTimeout(resolve, 3000))]);
+      } else {
+        await onDone();
+      }
       setReceipt(result);
-      await onDone();
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "Your photos could not be added.",
@@ -195,7 +206,7 @@ export function PhotoUpload({
               <div className="circle-photo-dance">
                 {(sample
                   ? [
-                      "/preview/family-beach.png",
+                      "/sample-family/beach-01.jpg",
                       "/preview/princeton-garden.png",
                       "/preview/lincoln-library.png",
                     ]
@@ -204,7 +215,7 @@ export function PhotoUpload({
                   .slice(0, 6)
                   .map((src, i) => (
                     <motion.img
-                      key={src}
+                      key={`${src}:${grouping ? "grouping" : "uploading"}`}
                       src={src}
                       alt=""
                       initial={{
@@ -222,7 +233,7 @@ export function PhotoUpload({
                         opacity: 1,
                       }}
                       transition={{
-                        duration: reduced ? 0 : 0.8,
+                        duration: reduced ? 0 : grouping ? 2.5 : 0.8,
                         delay: reduced ? 0 : i * 0.1,
                         ease: [0.2, 0.8, 0.2, 1],
                       }}

@@ -23,11 +23,15 @@ import { uploadPhotos, reanalyze, mediaFolder } from "@/server/circle/photos";
 import { publicBase, sendText } from "@/server/circle/messages";
 import { transcribeAudio } from "@/server/circle/ai";
 import { discardAudio, expireAudioDrafts } from "@/server/circle/audio";
+import { deleteCollectionItem } from "@/server/circle/delete";
+import { loadSampleFamily, sampleFamilyConnections } from "@/server/circle/sample";
 import { editPeople, faceThumbnail, getPeople, saveFaceScan } from "@/server/circle/people";
 import { sameOrigin, sessionCookie, browserPrincipal } from "@/server/session";
 import { getOnboarding, newInvitationToken } from "@/server/onboarding";
 import { accountForMember, issueAccount, revokeAccount } from "@/server/accounts";
 import { OnboardingError } from "@/lib/onboarding/types";
+import { openSampleFamily, SAMPLE_PATIENT_COOKIE } from "@/server/sample-access";
+import { prepareSampleCall, syncSampleSharedMemories, visibleSampleStories } from "@/server/sample-call";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 180;
@@ -207,44 +211,17 @@ async function handle(request: Request, context: Context): Promise<Response> {
         },
       );
     }
-    if (action === "demo" && isPost) {
-      if (
-        process.env.NODE_ENV !== "development" ||
-        !["localhost", "127.0.0.1"].includes(
-          new URL(
-            "http://" +
-              (request.headers.get("host") || new URL(request.url).host),
-          ).hostname,
-        )
-      )
-        throw new CircleError(
-          "The sample family is available in the local demo.",
-          404,
-        );
-      limit("demo", 10, 3600_000);
-      const made = await getOnboarding().createHousehold({
-        participant: {
-          display_name: "Susan",
-          phone: "+1555" + String(Date.now()).slice(-7),
-        },
-        caregiver: { display_name: "Maya" },
-      });
-      issueAccount(
-        made.household.household_id,
-        made.caregiver.person_id,
-        "family",
-      );
-      updateCircle(made.household.household_id, (s) => {
-        s.demo = true;
-      });
-      const p = {
-        role: "family" as const,
-        member_id: made.caregiver.person_id,
-      };
-      return Response.json(
-        { ok: true },
-        { headers: { ...noStore, "Set-Cookie": sessionCookie(p, request) } },
-      );
+    if (["demo", "demo-patient"].includes(action) && isPost) {
+      const sample = await openSampleFamily(request);
+      if (!accountForMember(sample.caregiver.person_id)) issueAccount(sample.household, sample.caregiver.person_id, "family");
+      const headers = new Headers(noStore);
+      headers.append("Set-Cookie", sessionCookie({ role: "family", member_id: sample.caregiver.person_id }, request));
+      if (action === "demo-patient") {
+        if (!accountForMember(sample.participant.person_id)) issueAccount(sample.household, sample.participant.person_id, "patient");
+        await prepareSampleCall(sample.household);
+        headers.append("Set-Cookie", sessionCookie({ role: "patient", member_id: sample.participant.person_id }, request, SAMPLE_PATIENT_COOKIE));
+      }
+      return Response.json({ ok: true }, { headers });
     }
     const identity = await circleIdentity(request),
       { household, person, people, canManage } = identity;
@@ -259,6 +236,7 @@ async function handle(request: Request, context: Context): Promise<Response> {
     }
     if (["state", "audio", "media", "story"].includes(action)) await expireAudioDrafts(household);
     if (action === "state" && !isPost) {
+      if (process.env.NODE_ENV === "development" && readCircle(household).demoCall) await syncSampleSharedMemories(household);
       const state = readCircle(household);
       const contacts = withCircleDb((db) =>
         db
@@ -284,9 +262,10 @@ async function handle(request: Request, context: Context): Promise<Response> {
       return reply({
         photos: state.photos.map(({ hash, owner, namedPeople, ...p }) => p),
         moments: state.moments,
-        stories: state.stories,
+        stories: await visibleSampleStories(household, person.person_id, state),
         imports: state.imports.slice(-8).map(({ id, at, added, duplicates, moments }) => ({ id, at, added, duplicates, moments })),
         demo: state.demo,
+        ...(state.demo ? { connections: sampleFamilyConnections(state.moments) } : {}),
         member: person.person_id,
         name: person.display_name,
         personName:
@@ -346,6 +325,7 @@ async function handle(request: Request, context: Context): Promise<Response> {
       });
     }
     if (!isPost) throw new CircleError("Page not found.", 404);
+    if (action === "delete") return reply(await deleteCollectionItem(household, canManage, body));
     if (action === "register") {
       await saveLogin(
         person.person_id,
@@ -375,54 +355,7 @@ async function handle(request: Request, context: Context): Promise<Response> {
       );
     }
     if (action === "sample") {
-      if (!readCircle(household).demo)
-        throw new CircleError("Sample photos belong in a sample family.", 403);
-      const names = [
-        "cape-may-picnic.png",
-        "cape-may-pier.png",
-        "family-beach.png",
-        "lincoln-classroom-window.png",
-        "lincoln-library.png",
-        "lincoln-school.png",
-        "princeton-front-garden.png",
-        "princeton-garden.png",
-        "princeton-kitchen.png",
-      ];
-      const files = await Promise.all(
-        names.map(
-          async (n) =>
-            new File(
-              [await readFile(path.join(process.cwd(), "public/preview", n))],
-              n,
-              { type: "image/png" },
-            ),
-        ),
-      );
-      // Declared fictional camera-roll metadata, supplied to the same organizer as uploaded EXIF.
-      const fixtureMetadata = Object.fromEntries(
-        names.map((n, i) => [
-          n,
-          {
-            date: [
-              "2025-08-16T14:00:00Z",
-              "2025-05-12T10:00:00Z",
-              "2025-06-22T16:00:00Z",
-            ][Math.floor(i / 3)]!,
-            latitude: [38.9351, 42.4259, 40.3573][Math.floor(i / 3)]!,
-            longitude: [-74.906, -71.3039, -74.6672][Math.floor(i / 3)]!,
-          },
-        ]),
-      );
-      return reply(
-        await uploadPhotos(
-          household,
-          person.person_id,
-          person.display_name,
-          files,
-          "sample-photos-v1",
-          fixtureMetadata,
-        ),
-      );
+      return reply(await loadSampleFamily(household, person.person_id, person.display_name));
     }
     if (action === "analyze") {
       limit("photo-analysis:" + household, 30, 3600_000);
@@ -510,6 +443,7 @@ async function handle(request: Request, context: Context): Promise<Response> {
             ...(audioId ? { audioUrl: "/api/circle/media/" + audioId } : {}),
           };
           s.stories.push(story);
+          moment.revision++;
           return story;
         }),
       );

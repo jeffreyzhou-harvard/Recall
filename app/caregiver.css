@@ -34,33 +34,12 @@
 .care-portal .care-save-status { overflow-wrap: anywhere; }
 .care-portal .care-record-context { margin-top: 0; max-width: 78ch; }
 .care-portal-notice { border: 1px solid var(--recall-clay); border-radius: 12px; padding: 18px 20px; margin-bottom: 24px; font-size: 19px; }
-.care-session-invitation { padding: 24px; background: var(--recall-tint); border: 1px solid var(--recall-line); border-radius: 18px; }
-.care-session-invitation h2 { font-size: 25px; font-weight: 650; line-height: 1.2; }
-.care-session-invitation > p { margin-top: 14px; font-size: 19px; }
-.care-session-invitation .care-text-action { margin-top: 14px; }
-.care-session-invitation .care-caption { padding-top: 18px; border-top: 1px solid var(--recall-line); font-size: 17px; }
 .care-portal .care-privacy { margin-top: 40px; padding-top: 20px; }
 .care-skip-link { position: absolute; top: -100px; left: 24px; z-index: 10; padding: 12px 18px; background: var(--recall-ink); color: var(--recall-bg); }
 .care-skip-link:focus { top: 16px; }
-.care-record-export { margin-top: 24px; }
-.care-record-export .care-caption { margin-top: 8px; font-size: 17px; }
-.care-record-print { display: none; }
-@page { margin: 18mm; }
-/* Print the record alone. It is portalled to the body, so dropping its siblings
-   leaves no blank sheets and works wherever the dashboard is mounted. */
-@media print {
-  body > *:not(.care-record-print) { display: none; }
-  body { background: #fff; }
-  .care-record-print { display: block; color: #000; background: #fff; font-size: 12pt; line-height: 1.55; }
-  .care-record-print h1 { font-size: 20pt; font-weight: 650; letter-spacing: -.01em; }
-  .care-record-print-subject { margin-top: 4pt; font-size: 13pt; font-weight: 650; }
-  .care-record-print p { margin-top: 8pt; max-width: none; break-inside: avoid; }
-  .care-record-print-detail { margin-top: 2pt; padding-left: 16pt; }
-  .care-record-print-gap { display: block; height: 10pt; }
-}
+
 .recall-workspace[data-large-text="true"] .care-portal-nav a,
-.recall-workspace[data-large-text="true"] .care-rail-account,
-.recall-workspace[data-large-text="true"] .care-session-invitation > p { font-size: 22px; }
+.recall-workspace[data-large-text="true"] .care-rail-account { font-size: 22px; }
 .recall-workspace[data-large-text="true"] .care-memories-view { grid-template-columns: minmax(0, 1fr) 340px; }
 
 @media (max-width: 1360px) {

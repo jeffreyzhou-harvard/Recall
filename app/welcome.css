@@ -46,3 +46,32 @@
 }
 
 .recall-access-form .recall-access-error { margin-top: 0; }
+
+/* Account entry uses the page width, with a readable introduction beside the form. */
+.recall-welcome-shell-wide { width: min(100%, 1160px); }
+.recall-welcome-shell-wide .recall-masthead,
+.recall-welcome-shell-wide .recall-welcome-main { max-width: none; }
+.recall-welcome-shell-wide .recall-masthead { border-bottom: 1px solid var(--recall-line); }
+.recall-welcome-shell-wide .recall-welcome-main { padding-top: 48px; }
+.recall-access-entry { max-width: 1040px; margin-block: 32px; container: account-entry / inline-size; }
+.recall-welcome-shell-wide .recall-access-entry { max-width: none; }
+.recall-access-layout { display: grid; gap: 32px; }
+.recall-access-intro,
+.recall-access-fields { min-width: 0; }
+.recall-access-intro h1 { margin: 0; }
+.recall-access-intro p { max-width: 34ch; margin-top: 20px; color: var(--recall-muted); font-size: var(--recall-body-size); line-height: 1.55; }
+.recall-access-intro a { text-decoration: underline; }
+.recall-access-fields .recall-access-form { margin-top: 0; gap: 24px; }
+.recall-access-alternatives { display: grid; justify-items: start; gap: 8px; margin-top: 24px; }
+.recall-access-fields .recall-access-bottom { margin-block: 24px 8px; padding-top: 24px; border-top: 1px solid var(--recall-line); color: var(--recall-muted); }
+.recall-access-bottom a { margin-left: 4px; color: var(--recall-ink); }
+.recall-access-entry[data-patient="true"] .recall-access-intro p { font-size: 24px; }
+
+@container account-entry (min-width: 760px) {
+  .recall-access-layout { grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); align-items: start; gap: 64px; }
+  .recall-access-fields { border-left: 1px solid var(--recall-line); padding-left: 48px; }
+}
+@media (max-width: 600px) {
+  .recall-welcome-shell-wide .recall-welcome-main { padding-top: 24px; }
+  .recall-access-entry { margin-block: 16px; }
+}

@@ -1,7 +1,8 @@
 "use client";
+import { RecallWordmark, RecallMark } from "@/components/recall/RecallFrame";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Flower2, Heart } from "lucide-react";
+import { ArrowLeft, ArrowRight, Heart, Phone } from "lucide-react";
 import { AccessGate, SignOut } from "@/components/live/AccessGate";
 import { StoryRecorder } from "./StoryRecorder";
 import { post, type CircleView } from "./types";
@@ -30,7 +31,7 @@ function Remember() {
   if (!data)
     return (
       <main className="circle-entry">
-        <Flower2 size={40} />
+        <RecallMark size={40} />
         <h1>A familiar moment awaits.</h1>
         <p role={error ? "alert" : "status"}>
           {error || "Opening your photographs…"}
@@ -56,17 +57,19 @@ function Remember() {
     <main className="circle-remember">
       <header>
         <Link href="/" aria-label="Recall home">
-          <Flower2 />
-          recall<span>·</span>
+          <RecallWordmark />
         </Link>
         <span>A little time for you, {data.name}.</span>
         <SignOut />
       </header>
-      {data.people.find((p) => p.id === data.member)?.role !== "participant" && (
-        <nav className="circle-remember-back" aria-label="Collection navigation">
-          <Link className="circle-text-button" href="/caregiver"><ArrowLeft size={18} aria-hidden="true" />Back to collection</Link>
-        </nav>
-      )}
+      <nav className="circle-patient-navigation" aria-label="Your Recall">
+        <Link className="circle-button secondary" href="/"><ArrowLeft size={20} aria-hidden="true" />Back to home</Link>
+        {data.people.find((p) => p.id === data.member)?.role === "participant" ? (
+          <Link className="circle-button primary" href="/conversations/call"><Phone size={20} aria-hidden="true" />Your Recall call</Link>
+        ) : (
+          <Link className="circle-text-button" href="/caregiver">Back to collection<ArrowRight size={18} aria-hidden="true" /></Link>
+        )}
+      </nav>
       {!moment ? (
         <div className="circle-entry">
           <Heart size={42} />
@@ -167,9 +170,6 @@ function Remember() {
             </p>
           )}
         </>
-      )}
-      {data.people.find((p) => p.id === data.member)?.role === "participant" && (
-        <p className="circle-remember-note"><Link href="/conversations/call">Open scheduled conversations</Link></p>
       )}
     </main>
   );

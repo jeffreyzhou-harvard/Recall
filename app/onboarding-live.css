@@ -90,3 +90,50 @@
 
 /* The grouped phone field owns its border and height. */
 .live-setup .live-setup-phone .live-setup-phone-number-row input { border: 0; min-height: 52px; border-radius: 0 6px 6px 0; }
+
+/* Joint setup groups related choices across the available desktop width. */
+.recall-setup-shell { max-width: 1160px; }
+.recall-setup-shell .recall-masthead-compact { padding-inline: 32px; }
+.recall-setup-main { padding: 24px 32px 64px; }
+.live-setup.live-setup-flow { max-width: none; padding: 0; }
+.live-setup-flow h1 { max-width: 26ch; margin-block: 32px 0; }
+.live-setup-flow .setup-intro { margin-block: 16px 40px; }
+.live-setup-flow .live-setup-steps { margin-block: 24px 32px; padding-block: 20px; }
+.live-setup-columns { display: grid; gap: 32px; align-items: start; }
+.live-setup-columns > .live-setup-section { margin: 0; padding-top: 24px; }
+.live-setup-flow .live-setup-section > legend { float: none; width: auto; margin-bottom: 24px; }
+.live-setup-people > fieldset { align-content: start; }
+.live-setup-people > fieldset > legend { margin-bottom: 24px; }
+.live-setup-contact { display: grid; gap: 12px; min-width: 0; }
+.live-setup-flow .live-setup-disclosure { margin-block: 32px; }
+.live-setup-flow .live-setup-disclosure > summary { padding-block: 20px; }
+.live-setup-flow .live-setup-options { padding-block: 8px 24px; }
+.live-setup-flow .live-setup-summary > div { gap: 12px; padding-block: 24px; }
+.live-setup-flow .live-setup-agreements { margin-top: 32px; padding: 24px; }
+.live-setup-flow .setup-actions { align-items: center; justify-content: flex-end; margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--recall-line); }
+.live-setup-flow .setup-actions > .recall-primary { flex: 0 1 280px; }
+.live-setup-flow .setup-actions > .recall-secondary { flex: 0 1 150px; margin-right: auto; }
+.live-setup-flow .setup-complete > .recall-button { margin-inline: 0; }
+
+@media (min-width: 960px) {
+  .live-setup-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 48px; }
+  .live-setup-people > fieldset + fieldset { border-left: 1px solid var(--recall-line); padding-left: 48px; }
+  .live-setup-flow .live-setup-options { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 48px; }
+  .live-setup-full-row { grid-column: 1 / -1; }
+  .live-setup-flow .live-setup-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 48px; }
+  .live-setup-flow .live-setup-summary > div { grid-template-columns: 1fr; align-content: start; }
+}
+@media (max-width: 959px) {
+  .live-setup-people > fieldset + fieldset { padding-top: 32px; border-top: 1px solid var(--recall-line); }
+}
+@media (max-width: 600px) {
+  .recall-setup-shell .recall-masthead-compact { padding-inline: 24px; }
+  .care-main.recall-setup-main { padding: 20px 24px 48px; }
+  .live-setup-flow h1 { margin-top: 24px; }
+  .live-setup-flow .setup-intro { margin-bottom: 32px; }
+  .live-setup-flow .live-setup-steps { margin-block: 16px 24px; }
+  .live-setup-flow .live-setup-agreements { padding: 16px; }
+  .live-setup-flow .setup-actions { align-items: stretch; margin-top: 32px; }
+  .live-setup-flow .setup-actions > .recall-primary,
+  .live-setup-flow .setup-actions > .recall-secondary { flex: none; margin-right: 0; }
+}

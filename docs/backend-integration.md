@@ -1,6 +1,6 @@
 # Live Recall web app
 
-The patient call runs inside the web app. No Twilio or telephone delivery is used. `/` welcomes guests and directs existing sessions by role. `/sign-in` accepts private access keys; patient accounts continue to `/revisit` for scheduled incoming calls. `/get-started` offers joint setup or invitation, not public email/password signup. Answering requests microphone permission; Recall then speaks its gated questions, listens for a completed recording, and transcribes it through Deepgram. The existing reducer and tool gates choose the questions and decide whether anything may be stored.
+The patient call runs inside the web app at `/conversations/call`. No Twilio or telephone delivery is used. `/` welcomes guests; `/sign-in` supports email/password, phone links, and existing access keys. `/onboarding` starts a family and records joint preferences. The local-only `/demo/call` opens a separate patient demo session linked to the sample family. Answering requests microphone permission; Recall then speaks its gated questions and shows the patient's live captions. The existing reducer and tool gates choose the questions and decide whether anything may be stored.
 
 ## Set up and run
 
@@ -10,7 +10,7 @@ The patient call runs inside the web app. No Twilio or telephone delivery is use
 4. Open `/onboarding/manage`. Add a contributed topic, approve its use together, and choose member access. Enable web calls in the joint review. Schedule windows, topic blocks, minimum interval, weekly frequency, and maximum duration remain enforced. There is no family trigger for an immediate call.
 5. Issue the participant's call access key. Sign in with it on `/sign-in` and continue to `/revisit` in a separate browser profile/device from the caregiver account, and leave that page open during the agreed window. Family and operator credentials cannot answer a patient call. An operator can also run one schedule check through `POST /api/live/schedule`; it still honors every policy gate.
 
-Calls use a completed-turn audio path: the browser waits through silence, sends a PCM WAV, and the server obtains literal word timings. The UI does not display a patient transcript wall. This is not a streaming partial-transcript display. A family voice note can also be recorded or uploaded as a mono PCM16 WAV, up to 90 seconds. Failed recognition follows the engine's timeout close; browser disconnection stops the call.
+Calls keep the completed-turn evidence path: the browser waits through silence, sends a PCM WAV, and the server obtains literal word timings. During a listening turn, half-second PCM chunks also reach the existing server-side Deepgram streaming client. Its [interim results](https://developers.deepgram.com/docs/interim-results) display as captions for the current response, separate from the call engine. The API key stays on the server. Caption audio is ordered, bounded, authenticated to the current patient and listening step, and never persisted. Completed WAV recognition replaces the caption draft and remains the only input to answer, safety and confirmation handling. Caption failures leave the call working; stop/end clears captions and ignores late results. A family voice note can also be recorded or uploaded as a mono PCM16 WAV, up to 90 seconds. Failed final recognition follows the engine's timeout close; browser disconnection stops the call.
 
 ## Connected family and setup flows
 
@@ -49,3 +49,5 @@ The web-transport policy adaptation follows the user's September 19 instruction 
 ## Knowledge graph
 
 See [the knowledge graph guide](knowledge-graph.md) for selective imports, Muse extraction, contributor interpretation review, graph-driven follow-ups, Ladybug reads and the durable update queue. These paths use the same household graph as calls and family contributions.
+
+The shared collection's Connections screen is a narrower projection, not a private graph dump. Its lines now open keyboard-accessible details for relationships, photo locations and story authorship. Fictional family ties keep their explicit sample source. For a share-confirmed demo call contribution, the story-to-moment edge also displays its actual backend `ABOUT` type, edge properties, author, recorded time, confirmation standing and share-confirmation timestamp. Declined/unconfirmed words and revoked dashboard access cannot enter this projection. Graph-driven call questions still use the private graph and verified evidence, independently of the visual layout.

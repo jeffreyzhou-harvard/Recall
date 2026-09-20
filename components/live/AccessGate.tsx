@@ -110,10 +110,11 @@ export function AccessGate({
   if (allowed) return children;
   return (
     <section
-      className="recall-access"
-      style={{ margin: "8vh auto", maxWidth: 440, padding: 28 }}
+      className="recall-access recall-access-entry"
+      data-patient={patient}
     >
-      <p className="circle-eyebrow">YOUR FAMILY, A LITTLE CLOSER</p>
+      <div className="recall-access-layout">
+      <header className="recall-access-intro">
       <h1>{patient ? "A familiar moment awaits." : "Welcome back."}</h1>
       <p>
         {patient
@@ -128,6 +129,8 @@ export function AccessGate({
           </Link>
         </p>
       )}
+      </header>
+      <div className="recall-access-fields">
       <form className="recall-access-form" onSubmit={signIn}>
         {mode === "key" ? (
           <label htmlFor={fieldId}>Access key
@@ -195,9 +198,9 @@ export function AccessGate({
               : "Text me a sign-in link"}
         </button>
       </form>
+      <div className="recall-access-alternatives">
       <button
         className="care-text-action"
-        style={{ marginTop: 20 }}
         onClick={() => {
           setMode(mode === "email" ? "phone" : "email");
           setError("");
@@ -208,11 +211,14 @@ export function AccessGate({
           ? "Use a link on my phone instead"
           : "Use email and password"}
       </button>
-      {mode !== "key" && <button className="care-text-action" style={{ marginTop: 12 }} onClick={() => { setMode("key"); setError(""); setSent(false); }}>Use an existing access key</button>}
+      {mode !== "key" && <button className="care-text-action" onClick={() => { setMode("key"); setError(""); setSent(false); }}>Use an existing access key</button>}
+      </div>
       <p className="recall-access-bottom">
         New here? <Link href="/onboarding">Start your family</Link>
       </p>
       <Link className="care-text-action" href="/">Back to home</Link>
+      </div>
+      </div>
     </section>
   );
 }

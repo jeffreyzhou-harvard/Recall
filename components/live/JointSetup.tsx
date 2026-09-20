@@ -319,7 +319,7 @@ export function JointSetup() {
     .map(([, label]) => label)
     .join(", ");
   return (
-    <div className="recall-onboarding live-setup">
+    <div className="recall-onboarding live-setup live-setup-flow">
       <Link className="setup-back" href={household ? "/caregiver" : "/"}>
         <ArrowLeft size={18} aria-hidden="true" />
         {household ? "Caregiver view" : "Home"}
@@ -345,10 +345,9 @@ export function JointSetup() {
                 Start with the person who will receive calls and the caregiver
                 beside them.
               </p>
+              <div className="live-setup-columns live-setup-people">
               <fieldset className="live-setup-fields" disabled={pending}>
-                <legend className="sr-only">
-                  The people setting up Recall
-                </legend>
+                <legend>Receiving calls</legend>
                 <label>
                   Their name
                   <input
@@ -368,11 +367,14 @@ export function JointSetup() {
                   />
                 </label>
                 {!ids && (
-                  <>
+                  <div className="live-setup-contact">
                     <PhoneField value={phone} required disabled={pending} describedBy="setup-phone-help" onChange={(next) => { setPhone(next); setDraft((d) => ({ ...d, patient_agreed: false, caregiver_agreed: false })); }} />
                     <span id="setup-phone-help" className="live-setup-hint">This number belongs to the person who will receive Recall’s calls, not the caregiver.</span>
-                  </>
+                  </div>
                 )}
+              </fieldset>
+              <fieldset className="live-setup-fields" disabled={pending}>
+                <legend>Setting up together</legend>
                 <label>
                   Your name
                   <input
@@ -423,6 +425,7 @@ export function JointSetup() {
                   </>
                 )}
               </fieldset>
+              </div>
               <p className="live-setup-hint">
                 You can invite more family members after setup.
               </p>
@@ -434,6 +437,7 @@ export function JointSetup() {
                 Choose a window that feels comfortable for{" "}
                 {participant || "the person receiving calls"}.
               </p>
+              <div className="live-setup-columns">
               <fieldset className="live-setup-section" disabled={pending}>
                 <legend>Days for calls</legend>
                 <div className="live-setup-days">
@@ -495,10 +499,11 @@ export function JointSetup() {
                   </span>
                 </label>
               </fieldset>
+              </div>
               <details className="live-setup-disclosure">
                 <summary>Call length and pace</summary>
-                <div className="live-setup-fields">
-                  <p className="live-setup-hint">
+                <div className="live-setup-fields live-setup-options">
+                  <p className="live-setup-hint live-setup-full-row">
                     Up to {draft.max_calls_per_week} calls a week, at least{" "}
                     {draft.min_hours_between_calls} hours apart. Each call lasts
                     at most {draft.max_minutes} minutes.
@@ -567,6 +572,7 @@ export function JointSetup() {
                 Decide what {caregiver || "the caregiver"} can see. These
                 choices can be changed later.
               </p>
+              <div className="live-setup-columns">
               <fieldset
                 className="live-setup-fields live-setup-section"
                 disabled={pending}
@@ -628,6 +634,7 @@ export function JointSetup() {
                   </span>
                 </label>
               </fieldset>
+              </div>
               <fieldset className="live-setup-section" disabled={pending}>
                 <legend>Introduce Recall</legend>
                 <p>

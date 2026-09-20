@@ -110,6 +110,22 @@ describe("Deepgram streaming", () => {
     expect(JSON.stringify(turns)).not.toContain("confidence"); // confidence is read by nobody and kept nowhere
   });
 
+  it("offers interim captions without producing an actionable turn, using the actual PCM rate", () => {
+    const socket = new FakeSocket(), timers = new FakeTimers(), captions: string[] = [], turns: HeardTurn[] = [];
+    let url = "";
+    const live = new DeepgramLive(KEY, { sampleRate: 48000 }, { onTranscript: text => captions.push(text), onTurn: turn => turns.push(turn), onError: () => {} }, (address) => { url = address; return socket; }, timers);
+    expect(url).toContain("sample_rate=48000"); expect(url).toContain("mip_opt_out=true");
+    socket.onopen?.({}); socket.say(result([["Maya", 0, .5]], { is_final: false }));
+    expect(captions).toEqual(["Maya"]); expect(turns).toEqual([]);
+    live.end(); socket.serverCloses();
+  });
+
+  it("does not start a keepalive if the socket opens after the call has ended", () => {
+    const { live, socket, timers } = open();
+    live.end(); socket.onopen?.({});
+    expect(socket.closed).toBe(true); expect(timers.waiting(true)).toEqual([]);
+  });
+
   it("also closes a turn on UtteranceEnd, holds audio until the socket opens, and ends cleanly", () => {
     const { socket, turns, live } = open();
     live.sendAudio(new Uint8Array([1, 2]));

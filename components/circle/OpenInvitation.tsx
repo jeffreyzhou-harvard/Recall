@@ -1,7 +1,8 @@
 "use client";
+import { RecallWordmark, RecallMark } from "@/components/recall/RecallFrame";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Flower2, Check } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 import { useLive } from "@/components/live/LiveProvider";
 import { post } from "./types";
 import "./circle.css";
@@ -63,13 +64,13 @@ export function OpenInvitation() {
   return (
     <main className="circle-entry">
       <Link className="circle-entry-brand" href="/" aria-label="Recall home">
-        <Flower2 /> recall<span>·</span>
+        <RecallWordmark />
       </Link>
       <div className="circle-invite-art">
         <span />
         <span />
         <span />
-        <Flower2 size={46} />
+        <RecallMark size={46} />
       </div>
       <h1>
         {info ? `You’re invited, ${info.name}.` : "A little closer, together."}

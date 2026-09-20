@@ -1,4 +1,4 @@
-import type { ArchiveView } from "@/lib/archive/types";
+import type { ArchiveView, FamilyConnections } from "@/lib/archive/types";
 import type { CircleMoment } from "@/server/circle/store";
 export type CircleView = Omit<ArchiveView, "moments"> & {
   moments: CircleMoment[];
@@ -9,6 +9,7 @@ export type CircleView = Omit<ArchiveView, "moments"> & {
   canManage: boolean;
   hasEmail: boolean;
   demo: boolean;
+  connections?: FamilyConnections;
   aiConnected: boolean;
   messagingConnected: boolean;
   imports: {

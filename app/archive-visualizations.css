@@ -219,6 +219,18 @@
 .archive-graph-inspector h2 { margin: 16px 20px 16px 0; font-size: 28px; font-weight: 600; line-height: 1.25; overflow-wrap: anywhere; }
 .archive-graph-inspector p { margin: 0 0 14px; font-size: 18px; line-height: 1.5; color: var(--recall-muted); overflow-wrap: anywhere; }
 .archive-graph-inspector .archive-graph-story { color: var(--recall-ink); white-space: pre-wrap; }
+.archive-graph-help { margin: 0; padding: 0 24px 16px; color: var(--recall-muted); font-size: 16px; }
+.archive-graph-edge { cursor: pointer; }
+.archive-graph-edge-target { pointer-events: stroke; }
+.archive-graph-edge-line { pointer-events: none; }
+.archive-graph-edge:hover .archive-graph-edge-line,
+.archive-graph-edge:focus-visible .archive-graph-edge-line { stroke-width: 3px; stroke: var(--recall-focus); }
+.archive-graph-properties { display: grid; gap: 16px; margin-top: 24px; font-size: 16px; }
+.archive-graph-properties > div { display: grid; gap: 4px; }
+.archive-graph-properties dt { color: var(--recall-muted); }
+.archive-graph-properties dd { margin: 0; color: var(--recall-ink); overflow-wrap: anywhere; }
+.archive-graph-evidence { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--recall-line); }
+.archive-graph-evidence h3 { font-size: 20px; }
 .archive-viz-text-button { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 44px; padding: 10px 0; border: 0; background: transparent; color: var(--recall-ink); text-align: left; text-decoration: underline; text-underline-offset: 4px; font-size: 18px; }
 .archive-viz-text-button svg { flex: none; }
 .archive-viz-empty { min-height: 460px; display: flex; justify-content: center; flex-direction: column; padding: 44px; }

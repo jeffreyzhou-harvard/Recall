@@ -1,14 +1,17 @@
 /** A real browser transport for the existing call engine. Commands must finish before the engine advances. */
 import { ToolTimeoutError } from "@/lib/tools/runtime";
 import { randomUUID } from "node:crypto";
-import { CallUnavailableError, type CallDriver, type SpokenPrompt } from "@/lib/orchestrator/call-driver";
+import { CallUnavailableError, type CallDriver, type CallPhotoContext, type SpokenPrompt } from "@/lib/orchestrator/call-driver";
+import type { CallPhotoSource } from "./call-photos";
 import type { MediaSpan } from "@/lib/graph/types";
 import type { AudioWindow, TranscriptionProvider, Turn, Word } from "@/lib/providers/transcription";
 import type { GraphStore } from "@/lib/graph/store";
 import { MediaStore, parseWav, wavFromPcm, type Media } from "./media";
 import { recallVoice } from "./recall-voice";
 import { transcribe } from "./transcribe";
+import { CallCaptions } from "./call-captions";
 export type WebCommand = { id: string; kind: "incoming" | "speak" | "playback" | "listen"; text?: string; pace?: "slow" | "standard" };
+export type WebCallPhoto = { id: string; url: string };
 export class LiveTranscription implements TranscriptionProvider {
   readonly label = "Deepgram measured final turns";
   private turns = new Map<string, Turn[]>();
@@ -24,6 +27,8 @@ export class WebCall implements CallDriver {
   readonly call_asset_id = `web-call:${randomUUID()}`;
   command: WebCommand | null = null;
   topicLabel = "";
+  photoSource?: CallPhotoSource;
+  private photoContext: CallPhotoContext | null = null;
   stopped = false;
   private closed = false;
   get ended() { return this.closed; }
@@ -35,12 +40,13 @@ export class WebCall implements CallDriver {
   private playing: Buffer | null = null;
   private processing = false;
   private abort = new AbortController();
-  constructor(readonly person: string, private media: MediaStore, private transcription: LiveTranscription, private graph: GraphStore, private pace: "slow" | "standard", private maxMinutes: number, private recognize = transcribe, private voice = recallVoice) {}
+  constructor(readonly person: string, private media: MediaStore, private transcription: LiveTranscription, private graph: GraphStore, private pace: "slow" | "standard", private maxMinutes: number, private recognize = transcribe, private voice = recallVoice, readonly captions = new CallCaptions()) {}
   private expiry: ReturnType<typeof setTimeout> | null = null;
   private async ask(kind: WebCommand["kind"], text?: string): Promise<AudioWindow | undefined> {
     if (this.closed || this.stopped) throw new CallUnavailableError("The call ended.");
     if (this.command) throw new Error("A call command is already pending.");
     this.command = { id: randomUUID(), kind, ...(text ? { text } : {}), pace: this.pace };
+    if (kind === "listen") this.captions.start(this.command.id);
     const timeout = kind === "incoming" ? 60000 : kind === "listen" ? 100000 : 60000;
     try {
       return await new Promise<AudioWindow | undefined>((resolve, reject) => {
@@ -49,15 +55,32 @@ export class WebCall implements CallDriver {
       });
     } finally { this.resolve = null; this.reject = null; this.command = null; }
   }
-  async connect() { await this.ask("incoming"); this.expiry = setTimeout(() => { this.expired = true; this.abort.abort(); this.reject?.(new ToolTimeoutError("assess_conversation_state")); }, this.maxMinutes * 60000); }
+  async connect() { await this.ask("incoming"); this.expiry = setTimeout(() => { this.expired = true; this.captions.clear(); this.abort.abort(); this.reject?.(new ToolTimeoutError("assess_conversation_state")); }, this.maxMinutes * 60000); }
   async speak(prompt: SpokenPrompt) {
     if (this.closed || this.stopped) throw new CallUnavailableError("The call ended.");
+    if (prompt.photos === null) this.photoContext = null;
     try { this.playing = await this.voice(prompt.text, this.abort.signal.aborted ? undefined : this.abort.signal); }
     catch {
       if (this.expired && !this.stopped) throw new ToolTimeoutError("render_prompt");
       this.stop(); throw new CallUnavailableError("Recall audio is unavailable.");
     }
+    if (prompt.photos) this.photoContext = prompt.photos;
     try { await this.ask("speak", prompt.text); } finally { this.playing = null; }
+  }
+  private async currentPhotos() {
+    const context = this.photoContext;
+    if (!context || !this.photoSource || this.closed || this.stopped || this.expired) return [];
+    try {
+      const photos = await this.photoSource(context);
+      return context === this.photoContext && !this.closed && !this.stopped && !this.expired ? photos : [];
+    } catch { return []; } // An unavailable photograph must never interrupt her audio or confirmation.
+  }
+  async photos(): Promise<WebCallPhoto[]> {
+    return (await this.currentPhotos()).map(({ id }) => ({ id, url: `/api/call/photo?call=${encodeURIComponent(this.call_asset_id)}&photo=${encodeURIComponent(id)}` }));
+  }
+  async photo(callId: string, id: string): Promise<Media | null> {
+    if (callId !== this.call_asset_id) return null;
+    return (await this.currentPhotos()).find((photo) => photo.id === id)?.media ?? null;
   }
   async playback(kept?: { asset_id: string; spans: MediaSpan[] }) {
     const media = kept && this.recording.get(kept.asset_id);
@@ -72,12 +95,18 @@ export class WebCall implements CallDriver {
     const resolve = this.resolve; this.resolve = null; resolve?.(undefined);
   }
   audio(id: string): Buffer | null { return this.command?.id === id && ["playback", "speak"].includes(this.command.kind) ? this.playing : null; }
+  receiveCaption(id: string, pcm: Uint8Array, rate: number, sequence: number) {
+    if (this.closed || this.stopped || this.expired || this.processing || this.command?.id !== id || this.command.kind !== "listen" || !this.resolve) throw new Error("This listening turn has ended.");
+    this.captions.receive(id, pcm, rate, sequence);
+  }
   async receive(id: string, bytes: Buffer | (() => Promise<Buffer>), stopping = false) {
     if (this.command?.id !== id || this.command.kind !== "listen" || this.processing || !this.resolve) throw new Error("This recording step has ended.");
     this.processing = true;
+    this.captions.finish();
     // Latch a submitted hang-up before any upload or provider await. Its final turn still
     // passes the safety check, but completing it can never reopen the call.
     this.stopped ||= stopping;
+    if (this.stopped) this.captions.clear();
     try {
       // Reserve the turn before reading an HTTP upload, so a concurrent stop cannot discard
       // an already-submitted final turn before its safety check.
@@ -91,6 +120,7 @@ export class WebCall implements CallDriver {
       if (this.closed || this.command?.id !== id || !this.resolve) throw new CallUnavailableError("The call ended.");
       const media = this.media.make(wav.bytes, this.person, "audio/wav", wav.duration);
       this.transcription.put(media.entry.id, result.words, wav.duration);
+      if (!this.stopped && !this.expired) this.captions.complete(id, result.words.map(word => word.w).join(" "));
       this.recording.set(media.entry.id, media);
       // Survives a process failure during commit. Normal hang-up deletes every unreferenced recording.
       await this.media.save(media);
@@ -100,6 +130,8 @@ export class WebCall implements CallDriver {
   }
   stop() {
     this.stopped = true;
+    this.captions.clear();
+    this.photoContext = null;
     // A final recording already received must still pass the safety check, even after hang-up.
     if (this.processing) return;
     this.abort.abort(); this.reject?.(new CallUnavailableError("The call ended."));
@@ -114,6 +146,8 @@ export class WebCall implements CallDriver {
   }
   async hangUp() {
     if (this.closed) return; this.closed = true;
+    this.captions.clear();
+    this.photoContext = null;
     if (this.expiry) clearTimeout(this.expiry); this.abort.abort(); this.reject?.(new CallUnavailableError("The call ended.")); this.command = null; this.playing = null;
     try {
       const used = new Set((await this.graph.nodesOfType("Artifact")).map((n) => n.prov.asset_id));
