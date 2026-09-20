@@ -1,11 +1,37 @@
 /** Local-only import previews. No network, graph writes, identity inference, or scheduling. */
-export type SetupContact = { id: string; name: string; phone: string; relationship: string; selected: boolean };
-export type SetupEvent = { id: string; title: string; date: string; selected: boolean };
+export type SetupContact = { id: string; name: string; phone: string; relationship: string; selected: boolean; source?: string; detail?: string };
+export type SetupEvent = { id: string; title: string; date: string; selected: boolean; source?: string; detail?: string };
+/** Fictional fixture metadata, never represented as EXIF extracted from an uploaded file. */
+export type SampleSetupPhoto = {
+  id: string; name: string; src?: string; alt: string; topicId: string;
+  metadata: {
+    capturedAt: string; device: string; dimensions: { width: number; height: number };
+    album: string; placeLabel: string; caption: string; contributor: string;
+    approximateYear?: number; source?: string; fileName?: string;
+    mimeType?: string; bytes?: number; lens?: string; focalLengthMm?: number; iso?: number;
+    acquisition?: "original_capture" | "photographed_print"; people?: string[]; attributedAt?: string;
+  };
+};
 export type SetupSelections = {
   photos: File[]; contacts: SetupContact[]; events: SetupEvent[];
+  samplePhotos?: SampleSetupPhoto[];
   permissions: { faces: boolean; places: boolean; dates: boolean; themes: boolean };
   days: string[]; start: string; end: string; agreed: boolean;
 };
+
+/** Every material change needs a fresh joint review, including edits made after agreement. */
+export function reviseSetup(setup: SetupSelections, changes: Partial<Omit<SetupSelections, "agreed">>): SetupSelections {
+  return { ...setup, ...changes, agreed: false };
+}
+
+export function setupValidationError(setup: SetupSelections): string | undefined {
+  if (!setup.contacts.some((contact) => contact.selected)) return "Choose at least one approved person in the People step.";
+  const time = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+  if (!setup.days.length || !time.test(setup.start) || !time.test(setup.end) || setup.start >= setup.end) {
+    return "Choose at least one calling day and an end time after the start time.";
+  }
+  if (!setup.agreed) return "Review these choices together and confirm your agreement below.";
+}
 export const emptySetup: SetupSelections = {
   photos: [], contacts: [], events: [], permissions: { faces: false, places: false, dates: false, themes: false },
   days: [], start: "10:00", end: "12:00", agreed: false,

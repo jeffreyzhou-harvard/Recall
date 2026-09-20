@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** Keep the earlier review link useful after the recall product update. */
-export default function PatientDesignReview() {
-  redirect("/design/recall");
+/** Preserve old bookmarks without exposing design preview controls. */
+export default function FormerDesignPreview() {
+  redirect("/");
 }

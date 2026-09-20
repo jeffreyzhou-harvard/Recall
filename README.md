@@ -65,7 +65,7 @@ Family flows sit outside that reducer: a query is redirected, a contribution is 
 | Memory graph + retrieval layer | `lib/graph` — 18 node types, provenance on every claim and edge, a thinner per-cue effectiveness layer that never decides whether to climb, only which cue to try |
 | Trims, hashes, receipts | `lib/provenance` — an edit-decision list that can only express silence and disfluency trims; hash-chained PROV-style log |
 | Onboarding database | `lib/onboarding` — households, the people in them, stated ties, invitations, and every version of the joint setup, append-only. SQLite (`node:sqlite`) with an in-memory twin; the same rules run over both |
-| Caregiver frontend | `/caregiver` (`/family` alias) — session waveform, optional topic details/Weekly Note, local memory and question suggestions |
+| Caregiver frontend | `/caregiver` (`/family` alias) — persisted session bookshelf, optional topic details/Weekly Note, attributed memory and private media contributions |
 | Judged sandbox | `/present` — isolated fixture-based engine check |
 
 The model may select tool calls. It cannot bypass gates. Storing a claim without confirmation, speaking an uncited fact, leaking graph content through `handle_family_query`, or climbing the ladder out of order are hard fails.
@@ -94,7 +94,7 @@ Before Recall's first call, a household is set up: her, the caregiver setting Re
 - **Data minimization is in the schema (rule 8).** One phone number - hers - and nothing else about anyone: no diagnosis, stage, birth date, address, or email column exists, a family member's row cannot hold a number, and clinical or state language is refused in any name or note.
 - **Ask, don't assert.** A tie between two people is recorded only because a named member stated it, in the word they used, and `graphSeed()` turns the household into the identity layer of her graph - people, stated ties, the setup - with no memories in it. Those come only from her own confirmed words, or a family contribution in its author's name.
 
-Routes are under `/api/onboarding/*` (operator only until there is a sign-in; accepting an invitation needs only the token).
+Routes are under `/api/onboarding/*`. Private-key browser sessions enforce setup authority; accepting an invitation needs its one-time token.
 
 ## The 90-second golden path
 
@@ -111,7 +111,7 @@ Cast is fixed: Susan, Maya (daughter), Priya (sister), Anika (granddaughter), Ca
 
 ## Connected application
 
-`/onboarding`, `/caregiver` (also `/family`), `/`, and `/revisit` use the live backend without sample history. Browser calls use microphone audio, final-turn transcription, Recall speech, and original-audio confirmation playback. Joint setup, scheduled calls, topic authoring and approval, private photo/voice contributions, invitations, member access, family records and exports are connected.
+`/` is the guest welcome and role-based account entry. `/get-started` offers joint setup or invitation; `/sign-in` accepts an existing private access key. `/onboarding`, `/caregiver` (also `/family`), and `/revisit` use the live backend without sample history. There is no public email/password signup; initial setup requires an operator key or explicitly available local development access. Browser calls use microphone audio, final-turn transcription, Recall speech, and original-audio confirmation playback. Joint setup, scheduled calls, topic authoring and approval, private photo/voice contributions, invitations, member access, family records and exports are connected.
 
 The safety engine includes phrase handoffs, missed-call tiering, caregiver acknowledgment and escalation. Delivery uses the configured dashboard or durable webhook channel. The fixture engine and its safety thresholds remain covered by `npm run check`.
 

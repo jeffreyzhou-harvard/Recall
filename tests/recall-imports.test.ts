@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCalendar, parseContacts } from "@/lib/recall-preview/imports";
+import { emptySetup, parseCalendar, parseContacts, reviseSetup, setupValidationError, type SetupSelections } from "@/lib/recall-preview/imports";
 
 describe("caregiver local import previews", () => {
   it("reads quoted CSV names without approving contacts automatically", () => {
@@ -23,5 +23,29 @@ describe("caregiver local import previews", () => {
     expect(() => parseCalendar("BEGIN:VCALENDAR\nEND:VCALENDAR")).toThrow("No dated events");
     const event = "BEGIN:VEVENT\nUID:visit\nSUMMARY:Lunch\nDTSTART;VALUE=DATE:20260920\nEND:VEVENT\n";
     expect(parseCalendar(event + event)).toHaveLength(1);
+  });
+
+  const agreedSetup: SetupSelections = {
+    ...emptySetup,
+    contacts: [{ id: "maya", name: "Maya", phone: "", relationship: "Daughter", selected: true }],
+    days: ["Monday"], agreed: true,
+  };
+  it("requires a fresh agreement after any change to selected sources, permissions, or calling times", () => {
+    expect(setupValidationError(agreedSetup)).toBeUndefined();
+    const changes: Partial<Omit<SetupSelections, "agreed">>[] = [
+      { photos: [] }, { samplePhotos: [] }, { contacts: [] }, { events: [] },
+      { permissions: { ...emptySetup.permissions, dates: true } }, { days: ["Friday"] },
+      { start: "11:00" }, { end: "13:00" },
+    ];
+    for (const change of changes) expect(reviseSetup(agreedSetup, change).agreed).toBe(false);
+    expect(agreedSetup.agreed).toBe(true);
+  });
+  it("does not treat an imported contact or a displayed time as agreement", () => {
+    expect(setupValidationError({ ...agreedSetup, contacts: parseContacts("Name\nMaya", "csv") })).toContain("approved person");
+    expect(setupValidationError({ ...agreedSetup, days: [] })).toContain("calling day");
+    expect(setupValidationError({ ...agreedSetup, start: "" })).toContain("end time");
+    expect(setupValidationError({ ...agreedSetup, end: "25:00" })).toContain("end time");
+    expect(setupValidationError({ ...agreedSetup, end: "09:00" })).toContain("end time");
+    expect(setupValidationError({ ...agreedSetup, agreed: false })).toContain("confirm your agreement");
   });
 });

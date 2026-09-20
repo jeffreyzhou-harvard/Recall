@@ -1,12 +1,12 @@
 @import "tailwindcss";
 
-/* Core demo tokens. Recall's quiet preview palette lives in recall.css. */
+/* Shared brand-book palette; recall.css adds component and dark-mode tokens. */
 @theme {
-  --color-paper: #f6f1e8;
-  --color-ink: #18342f;
-  --color-sage: #b9cec3;
-  --color-coral: #e4775b;
-  --color-amber: #d5a64a;
+  --color-paper: #fafaf7;
+  --color-ink: #242c28;
+  --color-sage: #e9ece6;
+  --color-coral: #98513f;
+  --color-amber: #535e57;
   --radius-card: 18px;
   --font-sans: "Atkinson Hyperlegible Next", ui-sans-serif, system-ui, sans-serif;
 }

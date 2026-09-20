@@ -21,7 +21,7 @@
         { "id": "CAPE-08", "speaker": "Susan", "text": "We went to Cape May every summer.", "rung": 3 }
       ],
       "contributionLineId": "CAPE-08",
-      "history": ["unaided", "cue", "unaided", "unaided", "unaided", "unaided", "cue", "unaided"]
+      "history": ["unaided", "cue", "unaided", "unaided", "recognition", "cue", "unaided", "unaided", "cue", "unaided", "unaided", "unaided", "cue", "cue", "unaided", "cue", "unaided", "unaided", "unaided", "unaided", "cue", "unaided", "unaided", "unaided", "unaided", "unaided", "unaided", "unaided", "unaided", "cue", "unaided", "unaided", "unaided", "unaided", "cue", "unaided", "unaided", "unaided", "unaided", "unaided", "cue", "unaided", "unaided", "unaided", "unaided", "cue", "unaided"]
     },
     {
       "id": "lincoln",
@@ -37,7 +37,7 @@
         { "id": "LINCOLN-05", "speaker": "Susan", "text": "I worked at Lincoln Elementary.", "rung": 2 }
       ],
       "contributionLineId": "LINCOLN-05",
-      "history": ["unaided", "unaided", "unaided", "unaided", "cue", "recognition", "unaided", "cue"]
+      "history": ["unaided", "unaided", "cue", "recognition", "cue", "unaided", "recognition", "cue", "unaided", "unaided", "unaided", "cue", "recognition", "cue", "cue", "unaided", "cue", "recognition", "cue", "unaided", "unaided", "cue", "unaided", "unaided", "recognition", "cue", "cue", "unaided", "recognition", "cue", "unaided", "unaided", "cue", "recognition", "unaided", "cue", "unaided", "unaided", "cue", "unaided", "unaided", "unaided", "unaided", "cue", "recognition", "unaided", "cue"]
     },
     {
       "id": "princeton",

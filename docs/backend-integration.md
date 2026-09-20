@@ -1,6 +1,6 @@
 # Live Recall web app
 
-The patient call runs inside the web app. No Twilio or telephone delivery is used. `/` and `/revisit` accept a patient-specific access key and show a scheduled incoming call. Answering requests microphone permission; Recall then speaks its gated questions, listens for a completed recording, and transcribes it through Deepgram. The existing reducer and tool gates choose the questions and decide whether anything may be stored.
+The patient call runs inside the web app. No Twilio or telephone delivery is used. `/` welcomes guests and directs existing sessions by role. `/sign-in` accepts private access keys; patient accounts continue to `/revisit` for scheduled incoming calls. `/get-started` offers joint setup or invitation, not public email/password signup. Answering requests microphone permission; Recall then speaks its gated questions, listens for a completed recording, and transcribes it through Deepgram. The existing reducer and tool gates choose the questions and decide whether anything may be stored.
 
 ## Set up and run
 
@@ -8,7 +8,7 @@ The patient call runs inside the web app. No Twilio or telephone delivery is use
 2. Configure `RECALL_OPERATOR_SECRET` and `DEEPGRAM_API_KEY`. Use `RECALL_CALL=web` and `RECALL_SCHEDULER=1` to enable the web transport and the 30-second schedule check. In local development with no operator credentials, **Open local setup** is available on loopback only.
 3. Complete `/onboarding` together. Give the web call a familiar name and explicitly confirm that Recall has been introduced as an AI assistant. Web calls do not require a saved telephone contact or photo; existing phone policies retain those requirements. Saving initial preferences leaves calls paused.
 4. Open `/onboarding/manage`. Add a contributed topic, approve its use together, and choose member access. Enable web calls in the joint review. Schedule windows, topic blocks, minimum interval, weekly frequency, and maximum duration remain enforced. There is no family trigger for an immediate call.
-5. Issue the participant's call access key. Sign in with it on `/` in a separate browser profile/device from the caregiver account, and leave that page open during the agreed window. Family and operator credentials cannot answer a patient call. An operator can also run one schedule check through `POST /api/live/schedule`; it still honors every policy gate.
+5. Issue the participant's call access key. Sign in with it on `/sign-in` and continue to `/revisit` in a separate browser profile/device from the caregiver account, and leave that page open during the agreed window. Family and operator credentials cannot answer a patient call. An operator can also run one schedule check through `POST /api/live/schedule`; it still honors every policy gate.
 
 Calls use a completed-turn audio path: the browser waits through silence, sends a PCM WAV, and the server obtains literal word timings. The UI does not display a patient transcript wall. This is not a streaming partial-transcript display. A family voice note can also be recorded or uploaded as a mono PCM16 WAV, up to 90 seconds. Failed recognition follows the engine's timeout close; browser disconnection stops the call.
 
@@ -18,7 +18,7 @@ Calls use a completed-turn audio path: the browser waits through silence, sends 
 - Joint approval grants contribution and dashboard access. Keys can be replaced or revoked. Only their hashes are stored; rotation invalidates browser sessions. Existing `RECALL_FAMILY_CREDENTIALS` environment-managed keys still work, but must be rotated in the environment.
 - Topic creation stores the contributor's account, with `patient_confirmed: false`. Generic topics have no invented contextual facts: they use the reviewed free-recall and attributed-family prompts. Topic approval never starts a call. Families can attach further memories to an approved topic.
 - Text, JPEG/PNG photos, and voice notes are private, member-bound contributions. Photos lose optional metadata before hashing. Voice notes are transcribed literally and remain attributed to their contributor. Unsupported files and oversized uploads are refused.
-- The dashboard, Weekly Note, per-topic record, exports, and own-contribution list read persisted data. Only share-confirmed patient words can reach the family view. Caregivers can pause calls from their dashboard; resuming requires joint setup.
+- The dashboard, Weekly Note, per-topic record, exports, and own-contribution list read persisted data. The current frontend filters out patient share lines entirely; the Weekly Note and record show permitted observable content, not patient quotations. Caregivers can pause calls from their dashboard; resuming requires joint setup.
 
 ## Audio and safety
 

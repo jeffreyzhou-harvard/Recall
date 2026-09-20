@@ -7,7 +7,8 @@ import { sessionSummaries } from "@/lib/recall-preview/sessions";
 describe("caregiver waveform projection", () => {
   it("uses only a topic's history up to the selected call", () => {
     const sessions = sessionSummaries(data.topics, timeline, thresholds);
-    expect(sessions.find((session) => session.id === "sample-05")).toMatchObject({ recentCalls: 3, unaidedCalls: 2 });
+    expect(sessions.find((session) => session.id === "archive-005")).toMatchObject({ recentCalls: 3, unaidedCalls: 2 });
+    expect(sessions.find((session) => session.id === "sample-05")).toMatchObject({ recentCalls: 8, unaidedCalls: 6 });
     expect(sessions.at(-1)).toMatchObject({ recentCalls: 8, unaidedCalls: 6 });
     expect(sessions.find((session) => session.id === "sample-17")).toMatchObject({ recentCalls: 8, unaidedCalls: 5 });
   });

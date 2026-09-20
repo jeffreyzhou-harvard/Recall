@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#FAFAF7">
+  <title>Recall — visual brand book</title>
+  <style>
+    @font-face{font-family:Atkinson;src:url('./AtkinsonHyperlegibleNext-Variable.woff2') format('woff2');font-weight:200 800;font-display:swap}
+    :root{color-scheme:light;--paper:#FAFAF7;--ink:#242C28;--secondary:#535E57;--mist:#F0F2EC;--sage:#E9ECE6;--divider:#BDC5BD;--line:#C6CEC5;--focus:#354F43;--clay:#98513F}
+    *{box-sizing:border-box}html{background:var(--sage);scrollbar-color:var(--secondary) var(--sage)}body{margin:0;font-family:Atkinson,Arial,sans-serif;color:var(--ink);font-size:20px;line-height:1.45}::selection{color:var(--paper);background:var(--focus)}a{color:inherit;text-underline-offset:4px}a:focus-visible{outline:3px solid var(--focus);outline-offset:5px}h1,h2,h3,p{margin:0}h1,h2,h3{font-weight:650;line-height:1.08;letter-spacing:-.025em}h1{font-size:64px}h2{font-size:44px}h3{font-size:26px}p+p{margin-top:16px}.muted{color:var(--secondary)}.small{font-size:17px;line-height:1.4}.page{position:relative;max-width:1120px;min-height:792px;margin:24px auto;background:var(--paper);padding:54px 64px 70px;overflow:hidden}.page-footer{position:absolute;bottom:24px;left:64px;right:64px;display:flex;justify-content:space-between;gap:20px;font-size:16px;color:var(--secondary);border-top:1px solid var(--divider);padding-top:12px}.lockup{display:flex;align-items:center;gap:12px;font-weight:650;font-size:28px;letter-spacing:-.02em}.lockup img{width:32px;height:32px}.page-title{margin-bottom:30px}.page-title p{margin-top:12px;max-width:68ch}.spread{display:grid;grid-template-columns:1fr 1fr;gap:44px}.cover-main{display:grid;grid-template-columns:1.3fr 1fr;gap:48px;align-items:center;margin:56px 0 38px}.cover-main h1{max-width:9ch}.cover-main p{max-width:38ch;margin-top:24px}.mark-field{display:flex;justify-content:center;align-items:center;aspect-ratio:1;background:var(--sage)}.mark-field img{width:62%;height:62%}.identity-strip{border-top:1px solid var(--divider);display:grid;grid-template-columns:1fr 1fr 1fr;padding-top:24px;gap:24px}.identity-strip .lockup{margin-bottom:12px}.identity-strip p{font-size:17px;line-height:1.35}.context-mini{display:flex;align-items:center;gap:16px;font-size:20px;font-weight:600;margin-bottom:12px}.context-mini img{width:40px;height:40px}.swatches{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.swatch{min-height:110px;display:flex;flex-direction:column;justify-content:space-between;padding:16px;border:1px solid var(--divider);font-size:18px;font-weight:600}.swatch code{font-family:inherit;font-size:16px;font-weight:400}.contrast{border-top:1px solid var(--divider);margin-top:24px;padding-top:16px;font-size:17px}.type-demo{font-size:48px;font-weight:650;line-height:1.1;margin:18px 0 20px}.type-demo small{display:block;font-size:22px;line-height:1.45;font-weight:400;margin-top:20px}.type-rules{display:grid;grid-template-columns:1fr auto;gap:12px 24px;font-size:18px;margin-top:24px}.type-rules dt,.type-rules dd{margin:0;border-bottom:1px solid var(--divider);padding-bottom:10px}.type-rules dd{text-align:right;font-variant-numeric:tabular-nums}.body-example{margin-top:24px;font-size:20px}.patient-layout{display:grid;grid-template-columns:310px 1fr;gap:54px;align-items:start}.phone{background:var(--paper);border:1px solid var(--secondary);border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:18px}.phone .lockup{font-size:22px;gap:8px}.phone .lockup img{width:26px;height:26px}.phone-photo{display:block;width:100%;height:178px;object-fit:cover;border-radius:8px}.phone-caption{font-size:28px;font-weight:650;line-height:1.3;letter-spacing:-.01em}.phone-status{font-size:18px;color:var(--secondary)}.example-action{min-height:64px;display:flex;align-items:center;justify-content:center;border:2px solid var(--ink);border-radius:12px;font-weight:600;font-size:24px;margin-top:4px}.rule-group+.rule-group{margin-top:28px}.rule-group h3{margin-bottom:10px}.rule-group p{font-size:20px}.spec-row{display:flex;gap:32px;margin-top:24px;border-top:1px solid var(--divider);padding-top:18px}.spec-row span{display:block;font-size:17px;color:var(--secondary)}.spec-row strong{font-size:28px;font-weight:650}.equal-choice{display:flex;gap:12px;margin-top:16px}.equal-choice span{display:flex;align-items:center;justify-content:center;width:100px;min-height:54px;border:2px solid var(--ink);border-radius:12px;font-size:22px;font-weight:600}.shelf-layout{display:grid;grid-template-columns:1.3fr 1fr;gap:44px;align-items:start}.shelf-example{padding-top:12px}.books{display:flex;align-items:flex-end;gap:10px;height:190px}.book{display:block;position:relative;width:32px;background:var(--ink);border-radius:2px 2px 0 0;height:var(--h)}.book::before,.book::after{content:'';position:absolute;left:5px;right:5px;border-top:1px solid var(--paper)}.book::before{top:16px}.book::after{bottom:16px}.book.unmeasured{background:transparent;border:1px dashed var(--secondary)}.book.unmeasured::before,.book.unmeasured::after{border-color:var(--secondary)}.book.open{width:132px;height:182px;background:var(--sage);border:1px solid var(--secondary);padding:15px 12px;font-size:16px;line-height:1.3}.book.open::before{display:none}.book.open::after{left:auto;right:4px;top:0;bottom:0;width:2px;border:0;border-left:1px solid var(--divider)}.book.open strong{display:block;font-size:25px;font-weight:650;margin:20px 0 3px}.book.open small{display:block;font-size:15px;margin-top:12px}.timeline{position:relative;margin-top:24px;height:1px;background:var(--secondary)}.timeline::before,.timeline::after{content:'';position:absolute;top:-3px;width:1px;height:7px;background:var(--secondary)}.timeline::before{left:0}.timeline::after{right:0}.timeline i{position:absolute;top:-5px;left:78%;height:11px;width:11px;background:var(--clay);border-radius:50%}.dates{display:flex;justify-content:space-between;margin-top:12px;font-size:16px;color:var(--secondary)}.legend{display:flex;gap:18px;margin-top:24px;flex-wrap:wrap;font-size:17px}.legend-key{display:flex;align-items:center;gap:10px}.legend-bars{display:flex;gap:3px;align-items:flex-end;height:25px}.legend-bars i{display:block;width:5px;background:var(--ink)}.legend-bars i:nth-child(1){height:10px}.legend-bars i:nth-child(2){height:17px}.legend-bars i:nth-child(3){height:25px}.legend-empty{width:13px;height:25px;border:1px dashed var(--secondary);border-radius:2px}.shelf-note{font-size:16px;margin-top:12px;color:var(--secondary)}.cursor-section{margin-top:30px;padding-top:24px;border-top:1px solid var(--divider)}.cursor-section h3{margin-bottom:12px}.cursor-section p{font-size:18px;max-width:90ch}.source-note{margin-top:16px;font-size:16px;color:var(--secondary)}
+    .cover-main h1{font-size:60px;max-width:none}.patient-layout{grid-template-columns:350px 1fr}.phone-status{font-size:24px;line-height:1.4}.phone-photo{height:138px}.shelf-layout .rule-group p{font-size:18px}.shelf-layout .rule-group h3{font-size:24px}.shelf-layout .rule-group+.rule-group{margin-top:22px}.cursor-section{margin-top:24px;padding-top:18px}.cursor-section h3{margin-bottom:10px}.cursor-section p{font-size:17px}.cursor-section .source-note{font-size:16px;margin-top:10px}
+    @media(max-width:800px){.page{margin:0;border-bottom:1px solid var(--divider);min-height:0;padding:32px 24px 36px;overflow:visible}.page-footer{position:static;margin-top:40px;left:auto;right:auto;bottom:auto;flex-wrap:wrap}.cover-main,.spread,.patient-layout,.shelf-layout{grid-template-columns:1fr;gap:32px}.cover-main{margin:40px 0 32px}.cover-main h1{font-size:52px;max-width:11ch}.mark-field{max-width:340px;aspect-ratio:1.4}.mark-field img{width:50%;height:80%}.identity-strip{grid-template-columns:1fr;gap:24px}.identity-strip p{max-width:45ch}h2{font-size:36px}.swatches{grid-template-columns:repeat(3,minmax(0,1fr))}.swatch{padding:12px;font-size:16px}.swatch code{font-size:14px}.phone{max-width:340px}.books{gap:7px}.book{width:25px}.book.open{width:123px}.spec-row{gap:24px}}
+    @media print{@page{size:A4 landscape;margin:0}html,body{background:var(--paper)}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.page{margin:0;width:297mm;height:210mm;min-height:0;max-width:none;padding:14mm 17mm 19mm;break-after:page;page-break-after:always}.page:last-child{break-after:auto;page-break-after:auto}.page-footer{left:17mm;right:17mm;bottom:6mm}.cover-main{margin-top:12mm;margin-bottom:8mm}.page-title{margin-bottom:7mm}.source-note{margin-top:10px}a{text-decoration:none}}
+  </style>
+</head>
+<body>
+  <main>
+    <section class="page" aria-labelledby="brand-title">
+      <div class="lockup"><img src="recall-mark.svg" alt=""><span>Recall</span></div>
+      <div class="cover-main">
+        <div><h1 id="brand-title">Familiar memories.<br>Room to speak.</h1><p>One photograph. One thought. Enough time to find her own words.</p><p class="muted">A calm visual identity for memory participation and family connection.</p></div>
+        <div class="mark-field"><img src="recall-context.svg" alt="Recall's connected-node identity, with one clay path"></div>
+      </div>
+      <div class="identity-strip">
+        <div><div class="lockup"><img src="recall-mark.svg" alt=""><span>Recall</span></div><p>A compact connected path for family and brand surfaces.</p></div>
+        <div><div class="lockup"><img src="recall-mark-mono.svg" alt=""><span>Recall</span></div><p>For one-color reproduction. The app keeps its clay path on every screen.</p></div>
+        <div><div class="context-mini"><img src="recall-context.svg" alt=""><span>The complete grid</span></div><p>The same identity at a larger scale. Never patient navigation.</p></div>
+      </div>
+      <footer class="page-footer"><span>Recall · Visual brand book · September 2026</span><span>Identity · 1 / 4</span></footer>
+    </section>
+
+    <section class="page" aria-labelledby="palette-title">
+      <header class="page-title"><h2 id="palette-title">Quiet color. Clear words.</h2><p class="muted">Paper and ink do most of the work. Sage groups. Clay marks one current position.</p></header>
+      <div class="spread">
+        <div>
+          <div class="swatches">
+            <div class="swatch" style="background:#FAFAF7"><span>Paper</span><code>#FAFAF7</code></div>
+            <div class="swatch" style="background:#242C28;color:#FAFAF7"><span>Ink</span><code>#242C28</code></div>
+            <div class="swatch" style="background:#535E57;color:#FAFAF7"><span>Secondary</span><code>#535E57</code></div>
+            <div class="swatch" style="background:#F0F2EC"><span>Mist</span><code>#F0F2EC</code></div>
+            <div class="swatch" style="background:#E9ECE6"><span>Sage paper</span><code>#E9ECE6</code></div>
+            <div class="swatch" style="background:#BDC5BD"><span>Divider</span><code>#BDC5BD</code></div>
+            <div class="swatch" style="background:#C6CEC5"><span>Sage line</span><code>#C6CEC5</code></div>
+            <div class="swatch" style="background:#354F43;color:#FAFAF7"><span>Focus</span><code>#354F43</code></div>
+            <div class="swatch" style="background:#98513F;color:#FAFAF7"><span>Clay</span><code>#98513F</code></div>
+          </div>
+          <p class="contrast">On Paper: Ink 13.70:1 · Secondary 6.46:1<br>Focus 8.54:1 · Clay 5.60:1</p>
+          <p class="small muted">Pair color with a label, shape, or position. Dividers may be quiet; control boundaries must stay clear.</p>
+        </div>
+        <div>
+          <h3>Atkinson Hyperlegible Next</h3>
+          <div class="type-demo">Room to read.<small>Distinctive letters. Familiar words.<br>Ordinary spacing. An unhurried rhythm.</small></div>
+          <dl class="type-rules"><dt>Patient captions</dt><dd>32 / 40px</dd><dt>Patient questions</dt><dd>28px or larger</dd><dt>Caregiver body</dt><dd>20 / 24px</dd><dt>Caregiver detail</dt><dd>17–18px</dd></dl>
+          <p class="body-example">Keep sentences short and left aligned. Give text room to grow. Never shrink a question to fit a photograph.</p>
+          <p class="source-note">Self-hosted variable font. SIL Open Font License included. Full roles and dark colors: BRAND_BOOK.md.</p>
+        </div>
+      </div>
+      <footer class="page-footer"><span>Legibility comes from the whole interface.</span><span>Color &amp; typography · 2 / 4</span></footer>
+    </section>
+
+    <section class="page" aria-labelledby="patient-title">
+      <header class="page-title"><h2 id="patient-title">One familiar thing at a time.</h2><p class="muted">The patient view stays still, spacious, and easy to leave.</p></header>
+      <div class="patient-layout">
+        <div>
+          <div class="phone" aria-label="Illustrative patient call layout">
+            <div class="lockup"><img src="recall-mark.svg" alt=""><span>Recall</span></div>
+            <p class="phone-status">AI assistant set up by Maya</p>
+            <img class="phone-photo" src="../preview/family-beach.png" alt="Illustrative family photograph on a beach">
+            <p class="phone-caption">Would you like to talk about Cape May?</p>
+            <div class="example-action">End call</div>
+          </div>
+          <p class="source-note">Layout example. Fictional photo; not a live call.</p>
+        </div>
+        <div>
+          <div class="rule-group"><h3>Make the next step obvious.</h3><p>One photograph. One caption. Keep the name, question, and controls in stable positions.</p></div>
+          <div class="rule-group"><h3>Wait without visual noise.</h3><p>No typing dots, countdowns, or pulsing logos. Use a brief crossfade when content changes.</p></div>
+          <div class="rule-group"><h3>Choice stays equal.</h3><p>Ask about remembering and sharing separately. Read the exact words back. Make No as easy as Yes.</p><div class="equal-choice" aria-label="Illustrative consent controls with equal emphasis"><span>Yes</span><span>No</span></div></div>
+          <div class="spec-row"><div><strong>64px+</strong><span>Patient action height</span></div><div><strong>24px+</strong><span>Patient supporting text</span></div><div><strong>3px</strong><span>Visible focus outline</span></div></div>
+        </div>
+      </div>
+      <footer class="page-footer"><span>Speak to an adult. The person leads; the interface waits.</span><span>Patient experience · 3 / 4</span></footer>
+    </section>
+
+    <section class="page" aria-labelledby="family-title">
+      <header class="page-title"><h2 id="family-title">A quiet record. A reason to call.</h2><p class="muted">Family sees what happened in calls, with her privacy intact.</p></header>
+      <div class="shelf-layout">
+        <div class="shelf-example">
+          <div class="books" role="img" aria-label="Illustrative call bookshelf with bottom-aligned spines of varying heights; the open book shows 6 of 8 calls without a cue">
+            <span class="book unmeasured" style="--h:88px"></span><span class="book" style="--h:103px"></span><span class="book" style="--h:123px"></span><span class="book" style="--h:146px"></span><span class="book" style="--h:126px"></span><span class="book" style="--h:158px"></span><span class="book open">Cape May<strong>6 of 8</strong>without a cue<small>Sep 18, 2026</small></span><span class="book" style="--h:146px"></span>
+          </div>
+          <div class="timeline" aria-hidden="true"><i></i></div><div class="dates"><span>Jun 1</span><span>Call dates</span><span>Sep 18</span></div>
+          <div class="legend"><span class="legend-key"><span class="legend-bars" aria-hidden="true"><i></i><i></i><i></i></span>More without a cue</span><span class="legend-key"><span class="legend-empty" aria-hidden="true"></span>Fewer than 3 calls</span></div>
+          <p class="shelf-note">Same topic · up to 8 recent calls. Illustrative records.</p>
+        </div>
+        <div>
+          <div class="rule-group"><h3>Show counts, never a score.</h3><p>Count unaided calls for each topic. Show the denominator. Never label her abilities.</p></div>
+          <div class="rule-group"><h3>Keep context attributed.</h3><p>Sources begin unselected. Reveal metadata on request. Attribute family descriptions.</p></div>
+          <div class="rule-group"><h3>Keep people connected.</h3><p>Keep “Suggest a conversation” nearby. Encourage family to call her directly.</p></div>
+        </div>
+      </div>
+      <div class="cursor-section"><h3>Bring this direction into Cursor.</h3><p>Use <strong>@BRAND_BOOK.md</strong>, <strong>@DESIGN.md</strong>, and <strong>@AGENTS.md</strong>. Apply this visual system to the existing frontend. Preserve behavior, privacy, and separate remember/share choices. Find the copy-ready prompt in BRAND_BOOK.md.</p><p class="source-note">Verify phone and laptop layouts, large text, keyboard focus, dark preference, and reduced motion. Design targets are not accessibility certification.</p></div>
+      <footer class="page-footer"><span>Familiar memories. Room to speak.</span><span>Caregiver experience · 4 / 4</span></footer>
+    </section>
+  </main>
+</body>
+</html>

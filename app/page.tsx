@@ -1,2 +1,5 @@
-import { CallWaiting } from "@/components/live/CallWaiting";
-export default function Home() { return <CallWaiting />; }
+import { Welcome } from "@/components/live/Welcome";
+
+export default function Home() {
+  return <Welcome />;
+}
