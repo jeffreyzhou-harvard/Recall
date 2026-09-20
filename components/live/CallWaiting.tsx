@@ -10,6 +10,7 @@ import type { CallCaption } from "@/server/call-captions";
 import { AccessGate } from "./AccessGate";
 import type { WebCommand, WebCallPhoto } from "@/server/web-call";
 import { CallPhotographs } from "./CallPhotographs";
+import { IncomingRingtone } from "./IncomingRingtone";
 export function CallWaiting({ demo = false }: { demo?: boolean }) { return <RecallFrame><main className="recall-phone recall-call-shell"><RecallHeader /><AccessGate patient><WebCallView demo={demo} /></AccessGate></main></RecallFrame>; }
 function WebCallView({ demo }: { demo: boolean }) {
   const apiBase = demo ? "/api/demo/call" : "/api/call";
@@ -115,6 +116,7 @@ function WebCallView({ demo }: { demo: boolean }) {
     {demo && !active && <button className="recall-button recall-primary" onClick={() => void startDemo()} disabled={starting}><Phone aria-hidden="true" />{starting ? "Opening a call…" : "Start demo call"}</button>}
     {incoming && <button className="recall-button recall-primary" onClick={() => void answer()} disabled={answering}><Phone aria-hidden="true" />{answering ? "Opening microphone…" : "Answer call"}</button>}
     {active && <button className="recall-button recall-secondary" onClick={() => void stop()}><PhoneOff aria-hidden="true" />End call</button>}
+    {active && incoming && !answering && !mic.current && <IncomingRingtone key={command.id} />}
     {!active && <Link className="recall-button recall-secondary" href={demo ? "/" : "/revisit"}>{demo ? "Back to home" : "Back to photographs"}</Link>}
     </div>
     {!active && (demo ? <p>Your words are saved after you confirm. Choose to share them to add them to <Link href="/caregiver" target="_blank" rel="noopener">your sample family’s memories</Link>.</p> : <p>You can put your device down.</p>)}{error && <p role="alert">{error}</p>}
