@@ -1971,14 +1971,14 @@
 .circle-landing-collage {
   position: relative;
   width: 100%;
-  aspect-ratio: 1.06;
+  aspect-ratio: 0.98;
   min-height: 400px;
   perspective: 1100px;
 }
 .circle-landing-art figure {
   --photo-lift: -8px;
   position: absolute;
-  width: 55%;
+  width: 64%;
   margin: 0;
   background: #fff;
   padding: 10px 10px 15px;
@@ -1990,7 +1990,7 @@
 }
 .circle-landing-art figure:nth-child(2) {
   --photo-lift: -6px;
-  left: 35%;
+  left: 31%;
   top: 2%;
   transform: rotate(9deg);
   z-index: 2;
@@ -1999,11 +1999,11 @@
 }
 .circle-landing-art figure:nth-child(3) {
   --photo-lift: -10px;
-  left: 30%;
-  top: 40%;
+  left: 25%;
+  top: 38%;
   transform: rotate(5deg);
   z-index: 3;
-  width: 56%;
+  width: 65%;
   animation-duration: 11s;
   animation-delay: -4s;
 }
@@ -2031,8 +2031,8 @@
 }
 .circle-art-caption {
   position: absolute;
-  top: 52%;
-  left: -20px;
+  top: 80%;
+  right: -8px;
   z-index: 4;
   width: max-content;
   max-width: calc(100% - 16px);
@@ -2050,7 +2050,7 @@
 }
 .circle-art-caption > svg { flex-shrink: 0; }
 @media (max-width: 480px) {
-  .circle-art-caption { top: 30%; left: 0; font-size: 15px; padding: 12px 16px; }
+  .circle-art-caption { top: 62%; right: 0; max-width: 100%; font-size: 15px; padding: 12px 14px; }
 }
 
 .circle-delete-actions { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px 20px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #e5e6dd; }
@@ -2179,7 +2179,7 @@
     font-size: 49px;
   }
   .circle-landing-art {
-    max-width: 480px;
+    max-width: 540px;
     width: 100%;
     margin: auto;
   }
