@@ -315,9 +315,9 @@ describe("the safety handoff", () => {
     expect(tools.slice(tools.indexOf("send_safety_alert"))).not.toContain("assess_conversation_state"); // nothing else processed that turn
     const alerts = r.alerts.sentTo("person:maya");
     expect(alerts).toHaveLength(1);
-    expect(alerts[0]!.text).toBe("Recall safety note, 2026-11-05 15:30 UTC: during a Recall call, Susan said something on Recall's safety list (a fall). Recall is not an emergency service and cannot tell what is happening. Please call Susan.");
+    expect(alerts[0]!.text).toBe("Recall safety note, 2026-11-05 15:30 UTC: during a Recall call, Susan said something on Recall's safety list (a fall). Recall is not an emergency service and cannot tell what is happening. Please call Susan. Reply 1 to let Recall know you've seen this.");
     expect(alerts[0]!.text).not.toMatch(/kitchen|morning/); // never her words
-    expect((await nodesOf(r, "SafetyEvent"))[0]!.props).toEqual({ category: "fall", at: alerts[0]!.at, recipients: ["person:maya"] });
+    expect((await nodesOf(r, "SafetyEvent"))[0]!.props).toMatchObject({ category: "fall", at: alerts[0]!.at, recipients: ["person:maya"] });
     expect(r.recording.safety_category).toBe("fall");
     expect(r.recording.caregiver_receipt!.lines.map((l) => l.text)).toEqual(["Recall stopped the call and sent a safety note to the designated caregiver."]);
   });

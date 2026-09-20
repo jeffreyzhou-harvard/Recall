@@ -97,7 +97,7 @@ describe("conduct", () => {
   });
 
   it("script ids are unique, and every slot is one Recall knows how to fill from the graph or the joint setup", () => {
-    const lines = [...allScriptLines(CALL_SCRIPT), ...Object.values(FAMILY_COPY.lines), SAFETY_PHRASES.alert];
+    const lines = [...allScriptLines(CALL_SCRIPT), ...Object.values(FAMILY_COPY.lines), SAFETY_PHRASES.alert, SAFETY_PHRASES.ack_prompt, SAFETY_PHRASES.missed_calls_alert];
     expect(new Set(lines.map((l) => l.id)).size).toBe(lines.length);
     const known = new Set(["name", "set_up_by", "caregiver", "emergency_number", "topic", "cue", "person", "author", "place", "relation", "option_a", "option_b"]);
     for (const l of allScriptLines(CALL_SCRIPT)) for (const slot of slotsOf(l.text)) expect(known.has(slot), `${l.id} {${slot}}`).toBe(true);
@@ -111,6 +111,9 @@ describe("conduct", () => {
 
   it("the safety alert has no slot that could carry her words", () => {
     expect(slotsOf(SAFETY_PHRASES.alert.text).sort()).toEqual(["category", "name", "name", "time"]);
+    expect(slotsOf(SAFETY_PHRASES.missed_calls_alert.text).sort()).toEqual(["count", "name", "name", "time"]);
+    expect(slotsOf(SAFETY_PHRASES.ack_prompt.text)).toEqual([]);
     expect(SAFETY_PHRASES.alert.text).toMatch(/not an emergency service/);
+    expect(SAFETY_PHRASES.missed_calls_alert.text).toMatch(/not an emergency service/);
   });
 });

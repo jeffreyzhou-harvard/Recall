@@ -61,7 +61,7 @@ Family flows sit outside that reducer: a query is redirected, a contribution is 
 | Piece | Where it lives |
 | --- | --- |
 | Reducer and transition table | `lib/state` — one source of truth; every pane keys off the same transitions |
-| 19 tools and hard gates | `lib/tools` — topic pick, place call, graph query, evidence, ladder, capture, store- and share-confirmation, family redirect, weekly note, topic record, clinician export, safety check |
+| 21 tools and hard gates | `lib/tools` — topic pick, place call, graph query, evidence, ladder, capture, store- and share-confirmation, family redirect, weekly note, topic record, clinician export, safety check, missed-call alert, caregiver ack |
 | Memory graph + retrieval layer | `lib/graph` — 18 node types, provenance on every claim and edge, a thinner per-cue effectiveness layer that never decides whether to climb, only which cue to try |
 | Trims, hashes, receipts | `lib/provenance` — an edit-decision list that can only express silence and disfluency trims; hash-chained PROV-style log |
 | Onboarding database | `lib/onboarding` — households, the people in them, stated ties, invitations, and every version of the joint setup, append-only. SQLite (`node:sqlite`) with an in-memory twin; the same rules run over both |
@@ -111,11 +111,11 @@ Cast is fixed: Susan, Maya (daughter), Priya (sister), Anika (granddaughter), Ca
 
 ## Connected application
 
-`/onboarding`, `/caregiver` (also `/family`), `/`, and `/revisit` now use the live backend. Joint setup, attributed text contributions, family records and exports are connected. No sample history is loaded into these routes. The current call screen reports that no live call is available.
+`/onboarding`, `/caregiver` (also `/family`), `/`, and `/revisit` use the live backend without sample history. Browser calls use microphone audio, final-turn transcription, Recall speech, and original-audio confirmation playback. Joint setup, scheduled calls, topic authoring and approval, private photo/voice contributions, invitations, member access, family records and exports are connected.
 
-See [backend integration](docs/backend-integration.md) for local setup, member-bound browser access, persistent storage configuration, verification and the remaining work. The offline engine demo remains isolated at `/present`.
+The safety engine includes phrase handoffs, missed-call tiering, caregiver acknowledgment and escalation. Delivery uses the configured dashboard or durable webhook channel. The fixture engine and its safety thresholds remain covered by `npm run check`.
 
-**Still unbuilt:** live audio/calling and external safety delivery, automatic scheduling, topic authoring/approval, photo/voice uploads and invitation/account provisioning screens. Calls remain paused while those dependencies are absent. The local contact/calendar import and question-request prototypes are not live ingestion paths.
+See [backend integration](docs/backend-integration.md) for configuration, verification and deployment limits. A real browser microphone/speaker walkthrough remains to be verified. The offline `/present` demo remains isolated and still contains placeholder recordings. The local contact/calendar import and question-request prototypes are not live ingestion paths.
 
 ## Replacing the placeholder media
 

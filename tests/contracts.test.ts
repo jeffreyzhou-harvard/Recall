@@ -1,17 +1,17 @@
-/** AGENTS.md section 6: nineteen tools, strict contracts, and a family side that cannot express a leak. */
+/** AGENTS.md section 6: twenty-one tools, strict contracts, and a family side that cannot express a leak. */
 import { describe, expect, it } from "vitest";
 import { runJudgedPath } from "@/fixtures/harness";
-import { ENFORCED_SEQUENCE, FAMILY_TOOLS, TOOL_IMPLS, TOOL_NAMES, ToolContractError, ToolRuntime, contracts, toolDefinitions } from "@/lib/tools";
+import { ENFORCED_SEQUENCE, FAMILY_TOOLS, OPS_TOOLS, TOOL_IMPLS, TOOL_NAMES, ToolContractError, ToolRuntime, contracts, toolDefinitions } from "@/lib/tools";
 import { bench } from "./helpers";
 
-const BRIEF_ORDER = ["get_next_recall_topic", "place_recall_call", "query_context_graph", "verify_claim_support", "assess_conversation_state", "select_scaffold", "render_prompt", "capture_contribution", "confirm_and_store", "record_retrieval_outcome", "receive_family_contribution", "handle_family_query", "build_caregiver_receipt", "build_weekly_note", "get_topic_record", "export_record_for_clinician", "confirm_share", "check_safety_phrases", "send_safety_alert"];
+const BRIEF_ORDER = ["get_next_recall_topic", "place_recall_call", "query_context_graph", "verify_claim_support", "assess_conversation_state", "select_scaffold", "render_prompt", "capture_contribution", "confirm_and_store", "record_retrieval_outcome", "receive_family_contribution", "handle_family_query", "build_caregiver_receipt", "build_weekly_note", "get_topic_record", "export_record_for_clinician", "confirm_share", "check_safety_phrases", "send_safety_alert", "record_alert_ack", "escalate_safety_alert"];
 
-describe("the nineteen tools", () => {
+describe("the twenty-one tools", () => {
   it("are exactly the brief's, in the brief's numbering, each with an implementation and a JSON schema", () => {
     expect(TOOL_NAMES).toEqual(BRIEF_ORDER);
     expect(Object.keys(TOOL_IMPLS)).toEqual(BRIEF_ORDER);
     const defs = toolDefinitions();
-    expect(defs).toHaveLength(19);
+    expect(defs).toHaveLength(21);
     for (const d of defs) {
       expect(d.description.length, d.name).toBeGreaterThan(40);
       // An object, or - for confirm_and_store, whose two steps take different inputs - a choice between objects.
@@ -23,7 +23,8 @@ describe("the nineteen tools", () => {
   it("the family flows never enter the call sequence, and every other tool is in it", () => {
     expect([...FAMILY_TOOLS].sort()).toEqual(["build_weekly_note", "export_record_for_clinician", "get_topic_record", "handle_family_query", "receive_family_contribution"]);
     for (const t of FAMILY_TOOLS) expect(ENFORCED_SEQUENCE as readonly string[]).not.toContain(t);
-    expect([...ENFORCED_SEQUENCE, ...FAMILY_TOOLS].sort()).toEqual([...TOOL_NAMES].sort());
+    expect([...ENFORCED_SEQUENCE, ...FAMILY_TOOLS, ...OPS_TOOLS].sort()).toEqual([...TOOL_NAMES].sort());
+    expect([...OPS_TOOLS].sort()).toEqual(["escalate_safety_alert", "record_alert_ack"]);
   });
 
   it("are strict: an unknown field is an error on the way in, and nothing unvalidated comes out", async () => {

@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "description": "Numbers for missed-call tiering and caregiver-alert acknowledgment (AGENTS.md rule 15). NOT clinically validated; placeholders expected to change, with a second reviewer. Same status as record-thresholds.json.",
+  "missed_call_notice_threshold": 2,
+  "missed_call_alert_threshold": 3,
+  "ack_timeout_minutes": 10
+}

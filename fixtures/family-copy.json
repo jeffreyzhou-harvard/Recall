@@ -109,6 +109,10 @@
     "thesis": {
       "id": "THESIS",
       "text": "Cues, not answers - every memory stays in her own words."
+    },
+    "missed_call_notice": {
+      "id": "FAM-MISS-01",
+      "text": "{name} hasn't answered her last {count} scheduled calls."
     }
   },
   "question_openers": [

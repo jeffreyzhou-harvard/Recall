@@ -8,7 +8,7 @@ import { WebCall, LiveTranscription } from "@/server/web-call";
 import { MediaStore, parseWav, wavFromPcm, cleanPhoto } from "@/server/media";
 import { createTopic } from "@/server/topics";
 import { buildFixtureRig } from "@/fixtures/harness";
-import { CALL_SCRIPT, FAMILY_COPY, RECORD_THRESHOLDS, SAFETY_PHRASES } from "@/fixtures";
+import { CALL_SCRIPT, FAMILY_COPY, RECORD_THRESHOLDS, SAFETY_PHRASES, SAFETY_THRESHOLDS } from "@/fixtures";
 import { RecallService } from "@/lib/service/recall-service";
 import { issueAccount, revokeAccount } from "@/server/accounts";
 import { principalForKey, sessionCookie, browserPrincipal } from "@/server/session";
@@ -27,7 +27,7 @@ async function rig(replies: string[] = []) {
   const transcript = new LiveTranscription();
   const recognition = vi.fn(async () => ({ transcript: "", words: words(replies.shift() ?? "") }));
   const driver = new WebCall("person:susan", media, transcript, fixture.graph, "standard", 8, recognition, async () => audio);
-  return { ...fixture, media, transcript, driver, recognition };
+  return { ...fixture, safetyThresholds: SAFETY_THRESHOLDS, media, transcript, driver, recognition };
 }
 async function drive(driver: WebCall, done: Promise<unknown>, onListen: (step: string, number: number) => Promise<void>) {
   let ended = false, failure: unknown; const settled = done.then(() => { ended = true; }, (e) => { ended = true; failure = e; });
