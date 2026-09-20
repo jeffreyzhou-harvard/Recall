@@ -153,19 +153,19 @@ function backingArtifactId(node: GraphNode): string {
   return node.type === "Artifact" ? node.id : node.prov.source_id;
 }
 
+/** Shared eligibility check: scaffold material must obey the same edge policy as traversal. */
+export async function contextExclusion(store: GraphStore, params: Pick<RetrievalParams, "allowed_sources" | "approved_authors" | "now_iso" | "audience" | "policy_id">, p: Provenance, artifactId = p.source_id): Promise<ExclusionReason | null> {
+  if (!SPEAKABLE_AS_FACT.has(p.status)) return "not_confirmed";
+  if (!params.allowed_sources.includes(p.source_class)) return "source_class_not_allowed";
+  if (params.approved_authors && ["family_contribution", "discovery_answer", "joint_setup"].includes(p.source_class) && !params.approved_authors.includes(p.author)) return "source_class_not_allowed";
+  if (p.expires_at !== null && p.expires_at <= params.now_iso) return "expired";
+  if (!p.audience_scope.includes(params.audience)) return "audience_out_of_scope";
+  const permitted = (await store.edgesOf(artifactId)).some((e) => e.type === "PERMITTED_IN" && e.to === params.policy_id);
+  return permitted ? null : "artifact_not_permitted_by_policy";
+}
+
 export async function retrieveCandidates(store: GraphStore, params: RetrievalParams): Promise<RetrievalResult> {
-  const allowed = new Set(params.allowed_sources);
-  /** ONE set of filters, for a node and for an edge alike: a tie between two people is a fact like any other, and gets no easier a test. */
-  const whyNot = async (p: Provenance, artifactId: string): Promise<ExclusionReason | null> => {
-    // First, always: an observation or an inference is not context, whatever the policy allows.
-    if (!SPEAKABLE_AS_FACT.has(p.status)) return "not_confirmed";
-    if (!allowed.has(p.source_class)) return "source_class_not_allowed";
-    if (params.approved_authors && ["family_contribution", "discovery_answer", "joint_setup"].includes(p.source_class) && !params.approved_authors.includes(p.author)) return "source_class_not_allowed";
-    if (p.expires_at !== null && p.expires_at <= params.now_iso) return "expired";
-    if (!p.audience_scope.includes(params.audience)) return "audience_out_of_scope";
-    const permitted = (await store.edgesOf(artifactId)).some((e) => e.type === "PERMITTED_IN" && e.to === params.policy_id);
-    return permitted ? null : "artifact_not_permitted_by_policy";
-  };
+  const whyNot = (p: Provenance, artifactId: string) => contextExclusion(store, params, p, artifactId);
 
   const reached = (await walk(store, params.topic_id, params.max_hops, async (e) => (await whyNot(e.prov, e.prov.source_id)) === null)).filter((r) => CANDIDATE_TYPES.has(r.node.type));
   const excluded: Exclusion[] = [];

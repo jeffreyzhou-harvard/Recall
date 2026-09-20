@@ -111,14 +111,24 @@ export class KnowledgeUpdater {
 
   private async enrich(claim: EpisodicClaimNode): Promise<boolean> {
     const graph = this.graph, policy = this.policy(), version = JSON.stringify(policy);
-    const source = await graph.getNode(claim.prov.source_id);
+    // Provider calls run outside the transaction. Keep the exact evidence and identity set they
+    // read, then compare it again inside the commit so concurrent reviews cannot stale the proposal.
+    const readBasis = async () => ({
+      claim: await graph.getNode(claim.id), source: await graph.getNode(claim.prov.source_id),
+      edges: await graph.edgesOf(claim.id),
+      entities: (await Promise.all(entityTypes.map((type) => graph.nodesOfType(type)))).flat(),
+    });
+    const basis = graph.atomic ? await graph.atomic(readBasis) : await readBasis();
+    const basisVersion = JSON.stringify(basis);
+    if (JSON.stringify(basis.claim) !== JSON.stringify(claim) || basis.edges.some((e) => e.type === "CONTRADICTS")) throw new Error("Evidence changed");
+    const source = basis.source;
     if (source?.type !== "Artifact" || !(await graph.edgesOf(claim.id)).some((e) => e.type === "EVIDENCE_FOR" && e.from === source.id)) throw new Error("Missing source");
     if (claim.prov.source_class === "recall_call") {
       const derived = (await graph.edgesOf(claim.id)).find((e) => e.type === "DERIVED_FROM" && e.to.startsWith("contribution:"));
       const contribution = derived ? await graph.getNode(derived.to) : null;
       if (contribution?.type !== "Contribution" || contribution.props.literal_transcript !== claim.props.text || !contribution.prov.patient_confirmed) throw new Error("Missing committed contribution");
     }
-    const entities = (await Promise.all(entityTypes.map((type) => graph.nodesOfType(type)))).flat();
+    const entities = basis.entities;
     const known = entities.filter((n) => usable(n.prov, policy, this.clock.iso())).flatMap((n) => names(n).filter((name) => literalSpan(claim.props.text, name)).map((name) => ({ id: n.id, type: n.type as typeof entityTypes[number], name })));
     const episode: Episode = { claim_id: claim.id, source_id: source.id, author: claim.prov.author, text: claim.props.text, known };
     const proposal = extractionSchema.parse(await this.extractor.extract(episode));
@@ -146,6 +156,7 @@ export class KnowledgeUpdater {
     const write = async () => {
       if (JSON.stringify(this.policy()) !== version || !usable(claim.prov, this.policy(), this.clock.iso())) throw new Error("Policy changed");
       if (await graph.getNode(updateId(claim.id))) return false;
+      if (JSON.stringify(await readBasis()) !== basisVersion) throw new Error("Evidence changed during extraction");
       for (const node of nodes) if (!await graph.getNode(node.id)) await graph.putNode(node);
       for (const edge of edges) if (!await graph.getEdge(edge.id)) await graph.putEdge(edge);
       await graph.putNode({ id: updateId(claim.id), type: "Artifact", label: "Graph update receipt", props: { kind: "audit_log", text: JSON.stringify({ version: UPDATE_VERSION, claim_id: claim.id, extractor: this.extractor.name, nodes: nodes.length, edges: edges.length }), alt: null }, prov: { ...derivedProv(false), source_class: "session_audit", status: "reference", patient_confirmed: false, author: "system:recall", extraction_method: "system_event", asset_id: null, media_hash: null, span: null } });
