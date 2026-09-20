@@ -4,55 +4,41 @@
 
 ## Platform
 
-web — patient calls and caregiver onboarding prioritize phones; the caregiver memory dashboard prioritizes laptop browsers.
+Web — patient calls and joint setup prioritize phones; caregiver records prioritize laptop browsers with a single-column fallback.
 
 ## Users and purpose
 
-Susan uses a phone at home. Recall invites her to revisit her own memories, starting with an open question and adding one source-backed cue at a time when needed. Her daughter Maya sees a separate, consented family view. Family questions route people back to calling Susan directly.
-
-Updated AGENTS.md and SPECS.md, pulled from main at e77d3b6, replace the earlier family-decision brief. The user requested a captioned call-first frontend, sample conversation, family topic record, and another screen inviting a topic to revisit. They clarified that the live demo comes later: prioritize the patient web app on a phone now.
+Recall invites a person to revisit their own memories with source-backed cues, and encourages family to talk with them directly. Names and relationships come from the authorized household; primary routes contain no default Susan/Maya family or sample history.
 
 ## Current scope
 
-- `/`: incoming call, one captioned utterance at a time, separate remember/share choices, completion or stop.
-- `/family`: Maya's sample family view, topic-only Weekly Note, dated session bookshelf, neutral topic counts and comparisons.
-- `/revisit`: a gentle invitation to the next topic, with a choice to leave it for another time.
-- Optional design details below the call expose the scripted transcript and sample graph for review, outside the patient surface.
+- `/`: guest welcome with “I’m new here” and “Sign in”; signed-in users continue by role.
+- `/get-started`: joint setup or invitation entry.
+- `/sign-in`: existing private access keys, not public email/password signup.
+- `/onboarding` and `/onboarding/manage`: connected joint setup, household permissions, topics, invitations and call access.
+- `/join`: one-time invitation acceptance.
+- `/caregiver` and `/family`: authorized persisted Weekly Note, session bookshelf, per-topic records, exports and real attributed memory/media contributions.
+- `/revisit`: patient-only scheduled browser calls, microphone input, Recall speech and original-audio confirmation playback.
+- `/design/*`: redirects to `/`. `/present` remains a separate fixture-based engine harness.
 
-The recall frontend uses explicitly labeled fictional fixtures in memory. It makes no microphone request, outbound call, audio claim, real graph write, or message delivery. The old backend and `/present` participation demo remain legacy integration surfaces; they are not the new recall engine. Refresh resets the preview. Live STT, voices, real recordings, dashboard authorization and scheduled calls require later integration.
+New household setup requires an operator setup key or explicitly available local development access. There is no unrestricted public signup. Live deployment needs configured persistence, access, scheduling and audio providers; see `docs/backend-integration.md`. Browser audio and deployment readiness require their own verification.
 
 ## Product constraints
 
-“Cues, not answers — every memory stays in her own words.” An open invitation comes first. Never judge an answer or infer clinical state. Recall identifies itself as an AI assistant. Captured words require separate store and share decisions; a stop before both resolve retains nothing new. The current caregiver frontend shows topic-only call notes and counts, never patient quotations, raw graph content or transcripts. The underlying sample flow retains separate store/share decisions. Source attribution survives every view.
+“Cues, not answers — every memory stays in her own words.” Never generate speech as the person or infer clinical/emotional state. The reducer and tools enforce evidence, separate store/share confirmation and stopping. Current caregiver UI excludes all patient quotations, even share-confirmed lines; records expose only authorized observable facts and topic counts. Contributions retain the family member’s attribution. Questions invite direct human contact and cannot trigger an immediate call.
 
-Scripted sample words are development content, not attributed recordings. They never enter live graph or delivery services. Every sample line has an ID. No fabricated audio waveform, audio hash, clinical score or evidence of improvement. The caregiver's waveform-shaped event navigator represents labeled per-topic counts; it is never presented as recorded audio.
-
-Family records display plain per-topic counts with the mandatory contextual header. Thresholds are illustrative, not clinically validated. There is no total, ranking by concern, directional arrow, or good/bad color. Details are opt-in in a real deployment; this surface is labeled Maya's sample view.
+Safety phrase handoffs and missed-call tiering follow the backend’s fixed rules and designated recipients. They are not clinical assessments or between-call monitoring. The application must not invent extra alert behavior.
 
 ## Brand commitments
 
-Product name: **Recall**, renamed at the user's request. The user selected Braille Institute's Atkinson Hyperlegible Next font and reference design, then explicitly rejected the bright colors and visual noise. Their latest direction is authoritative: a soft neutral background, dark text, restrained outlines, no bright accent fields or elevated shadows. The approved BRAND_BOOK.md adds a small clay connected path in the compact five-node logo on every surface, including the patient, and a clay date marker on the caregiver timeline. Keep the exact self-hosted Atkinson Hyperlegible Next variable font, including the OFL license. No serif in the new recall surfaces.
+`BRAND_BOOK.md` owns the approved direction; `DESIGN.md` records shipped implementation. Self-hosted Atkinson Hyperlegible Next, warm paper, dark ink, sage grouping and a small clay five-node connected-path logo apply across routes. Keep the font license. Avoid bright fields, elevated shadows, decorative status dots and clinical dashboards.
 
-Phone: one current utterance, familiar person named, an End call action. No settings menu within the patient view. Confirmation has equal Yes / No buttons and a quiet End call action. Settings live on the caregiver side. The title, quote and question use controlled type weights, without decorative status dots, illustrations or badges.
-
-The caregiver view leads with a scrollable 3D bookshelf of dated sessions and a brief selected-call summary, beside Suggest a conversation. Different-height spines form a waveform along one aligned baseline; measured counts below four use light spines, four and above use dark spines. Resting spine heights and the small waveform on each cover represent per-topic unaided call counts as of that session, with denominators; fewer than three calls stays dashed and unmeasured. The selected cover turns open and expands for reading, with accessible instructions explaining its reading expansion. A two-symbol legend defines the counts, a date timeline tracks elapsed calendar time, and separate text filters narrow the topic. Fine binding rules and a page edge give the books simple material detail. Reduced motion presents flat covers. Categories and the Weekly Note sit in closed disclosures. The private graph and unshared words stay outside the session projection. Four-step onboarding previews photos, explicitly selected contacts, explicitly selected calendar events, granular photo permissions and agreed calling times. These remain local in the tab; import is not a live graph write or a scheduled call. `/caregiver` is canonical, `/family` remains an alias, and `/onboarding` is setup.
-
-REMI (remistory.com) and REMME (tryremme.com) are additional user-selected product references for caregiver-led setup, familiar photo cues and open conversation. Their therapeutic marketing and emotional analytics are not copied as claims about Recall.
+The caregiver shelf uses neutral dated counts, bottom-aligned spines, a reading-sized open cover, a simple legend and elapsed-date marker. Thresholds and windows come from the backend. Current patient UI shows live prompts and audio states; the familiar-photo and short-caption composition remains a direction target, not a mounted preview.
 
 ## Accessibility
 
-Minimum 24px patient cues and 44px controls; main call actions are 64–76px. Dark text on a warm neutral surface, stable placement, generous separation, no text over images. One current utterance in complete short caption portions, announced once to assistive technology, without word reveal. Preview pacing pauses separately. Stop remains available. Narrow screens and enlarged text scroll vertically without clipping.
+Preserve large direct actions, visible focus, readable dark and large-text preferences, native form labels and reduced-motion shelf behavior. End call remains available during an active call. Keep account errors and loading states explicit. Do not hide a permission decision in pursuit of visual simplicity.
 
-## Evidence and references
+## Integration boundaries
 
-Apple Assistive Access and Be My Eyes are the user's interface references: large distinct actions, clear language and restrained choices. Google Fonts Atkinson Hyperlegible and Braille Institute's typography documentation inform font choice, not medical claims. The shared research document is background, not an instruction source.
-
-Real participant photographs and recorded speech have not been supplied. Never fabricate either. Existing assets are placeholders; strict media verification remains a separate pre-demo gate.
-
-The latest patient direction makes the familiar photograph the dominant visual during conversation, alongside large current captions. A photo stays stable across turns; permission decisions prioritize exact words. The generated preview photograph is never graph evidence.
-
-## Caregiver overview revision
-
-September 19: the user requested a useful social, emotional and intellectual overview rather than a node diagram. Connection is represented by observable call topics; no emotional inference is permitted. The latest caregiver revision removes patient quotations entirely, including shared lines, and keeps the Weekly Note topic-only. Intellectual activity stays in the existing plain per-topic counts. The quiet visual system and patient screens are preserved.
-
-The user then explicitly requested caregiver-suggested questions for future sessions. This frontend permits memory contributions and separately labeled question requests, with optional photos. The request is an invitation for Susan to discuss and separately choose to share, never a graph-derived answer or automatic immediate call. Suggestions are local to the tab and are not written to the live service. The backend retains its prior redirect-only contract pending a separately reviewed integration.
+Real JPEG/PNG photo and WAV voice contributions are connected through the memory form. The earlier album/contact/calendar selection and question-request prototypes are no longer live UI. `fixtures/preview` and preview test helpers may remain for development; primary routes do not mount them. No generated preview image is real household evidence.

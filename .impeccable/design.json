@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-20T01:00:33.645063+00:00",
+  "generatedAt": "2026-09-20T01:15:44.206945+00:00",
   "title": "Design System: Recall",
   "extensions": {
     "colorMeta": {
@@ -165,6 +165,10 @@
       "display": {
         "displayName": "Caregiver title",
         "purpose": "42px desktop heading; 36px at 600px and below."
+      },
+      "headline": {
+        "displayName": "Live setup title",
+        "purpose": "clamp(36px, 5vw, 48px), weight 650, line-height 1.13."
       }
     },
     "shadows": [],
@@ -209,54 +213,46 @@
       "css": ".ds-button-primary{font-family:\"Atkinson Hyperlegible Next\",\"Atkinson Hyperlegible\",sans-serif;display:flex;align-items:center;justify-content:center;width:100%;min-height:76px;padding:18px;border:1.5px solid #242c28;border-radius:12px;font-size:26px;font-weight:600;line-height:1.2;transition:background-color 120ms ease-out;cursor:pointer;background:var(--recall-ink,#242c28);color:var(--recall-bg,#fafaf7);}.ds-button-primary:hover{background:var(--recall-muted,#535e57);}.ds-button-primary:focus-visible{outline:3px solid #354f43;outline-offset:5px;}.ds-button-primary:active{background:var(--recall-ink,#242c28);}"
     },
     {
-      "name": "Secondary button",
-      "kind": "button",
-      "refersTo": "button-secondary",
-      "description": "Equal styling for either consent choice.",
-      "html": "<button class=\"ds-button-secondary\">Yes</button>",
-      "css": ".ds-button-secondary{font-family:\"Atkinson Hyperlegible Next\",\"Atkinson Hyperlegible\",sans-serif;display:flex;align-items:center;justify-content:center;width:100%;min-height:76px;padding:18px;border:1.5px solid #242c28;border-radius:12px;font-size:26px;font-weight:600;line-height:1.2;transition:background-color 120ms ease-out;cursor:pointer;background:var(--recall-bg,#fafaf7);color:var(--recall-ink,#242c28);}.ds-button-secondary:hover{background:var(--recall-tint,#f0f2ec);}.ds-button-secondary:focus-visible{outline:3px solid #354f43;outline-offset:5px;}"
-    },
-    {
-      "name": "Text field",
+      "name": "Access key field",
       "kind": "input",
       "refersTo": "input",
-      "description": "Explicit caregiver input with visible label.",
-      "html": "<label class=\"ds-field\">Name<input placeholder=\"For example, Maya\" /></label>",
-      "css": ".ds-field{font-family:\"Atkinson Hyperlegible Next\",\"Atkinson Hyperlegible\",sans-serif;display:grid;gap:8px;font-size:20px;color:var(--recall-ink,#242c28);}.ds-field input{font-family:\"Atkinson Hyperlegible Next\",\"Atkinson Hyperlegible\",sans-serif;min-width:0;min-height:54px;border:2px solid #242c28;border-radius:6px;padding:10px 12px;background:var(--recall-bg,#fafaf7);color:var(--recall-ink,#242c28);font-size:22px;}.ds-field input::placeholder{color:var(--recall-muted,#535e57);opacity:1;}.ds-field input:focus-visible{outline:3px solid #354f43;outline-offset:5px;}"
+      "description": "Existing private key entry, with a visible label.",
+      "html": "<label class=\"ds-field\">Access key<input type=\"password\" autocomplete=\"current-password\" /></label>",
+      "css": ".ds-field{font-family:\"Atkinson Hyperlegible Next\",\"Atkinson Hyperlegible\",sans-serif;display:grid;gap:8px;font-size:20px;color:var(--recall-ink,#242c28);}.ds-field input{font-family:\"Atkinson Hyperlegible Next\",\"Atkinson Hyperlegible\",sans-serif;min-width:0;min-height:60px;border:2px solid #242c28;border-radius:6px;padding:12px;background:var(--recall-bg,#fafaf7);color:var(--recall-ink,#242c28);font-size:22px;}.ds-field input::placeholder{color:var(--recall-muted,#535e57);opacity:1;}.ds-field input:focus-visible{outline:3px solid #354f43;outline-offset:5px;}"
     },
     {
       "name": "Caregiver navigation",
       "kind": "nav",
       "description": "Underlined destinations with generous targets.",
-      "html": "<nav class=\"ds-nav\" aria-label=\"Caregiver sections\"><a href=\"#topic-record\">Recall sessions</a><a href=\"#suggestions\">Suggest a conversation</a><a href=\"/onboarding\">Setup</a></nav>",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Caregiver sections\"><a href=\"#topic-record\">Recall sessions</a><a href=\"#suggestions\">Share a memory</a><a href=\"/onboarding\">Setup</a></nav>",
       "css": ".ds-nav{font-family:\"Atkinson Hyperlegible Next\",\"Atkinson Hyperlegible\",sans-serif;display:flex;flex-wrap:wrap;gap:8px 28px;border-bottom:1px solid var(--recall-line, #bdc5bd);padding-block:18px;margin-bottom:30px;font-size:18px;}.ds-nav a{display:inline-flex;align-items:center;min-height:44px;color:var(--recall-ink, #242c28);text-decoration:underline;}.ds-nav a:hover{text-decoration-thickness:2px;}.ds-nav a:focus-visible{outline:3px solid var(--recall-focus, #354f43);outline-offset:5px;}"
     },
     {
       "name": "Selected session receipt",
       "kind": "custom",
       "description": "Date, topic, observable support and counts as of that call; no private words.",
-      "html": "<section class=\"ds-receipt\"><div class=\"ds-date\"><time datetime=\"2026-09-19\">Saturday, September 19</time><span>Sample call</span></div><h3>Cape May summers</h3><p class=\"ds-support\">Recall offered a cue to help Susan talk about this topic.</p><p class=\"ds-count\"><strong>6 of 8 recent calls unaided</strong><span>For this topic, up to Sep 19.</span></p><p class=\"ds-privacy\">A brief account of the support used. Personal words stay private.</p></section>",
+      "html": "<section class=\"ds-receipt\"><div class=\"ds-date\"><time datetime=\"2026-09-19\">Saturday, September 19</time><span>Call record</span></div><h3>Cape May summers</h3><p class=\"ds-support\">Recall offered a cue during this conversation.</p><p class=\"ds-count\"><strong>6 of 8 recent calls unaided</strong><span>For this topic, up to Sep 19.</span></p><p class=\"ds-privacy\">A brief account of the support used. Personal words stay private.</p></section>",
       "css": ".ds-receipt{font-family:\"Atkinson Hyperlegible Next\",\"Atkinson Hyperlegible\",sans-serif;color:var(--recall-ink,#242c28);}.ds-date{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 20px;color:var(--recall-muted,#535e57);font-size:17px;}.ds-receipt h3{font-size:32px;font-weight:600;letter-spacing:-.015em;line-height:1.2;margin:18px 0 0;}.ds-support{font-size:21px;line-height:1.4;max-width:45ch;margin:14px 0 0;}.ds-count{margin:24px 0 0;font-size:19px;}.ds-count strong{display:block;font-weight:600;}.ds-count span{display:block;font-size:17px;margin-top:6px;color:var(--recall-muted,#535e57);}.ds-privacy{border-top:1px solid var(--recall-line,#bdc5bd);padding-top:18px;margin-top:12px;font-size:17px;color:var(--recall-muted,#535e57);}@media(max-width:600px){.ds-receipt h3{font-size:28px;}}"
     },
     {
-      "name": "Inline suggestion panel",
+      "name": "Memory contribution panel",
       "kind": "card",
       "refersTo": "suggestion-panel",
-      "description": "Contributor form opens within the tinted panel; memory and question remain distinct.",
-      "html": "<aside class=\"ds-suggestion\"><h2>For your next conversation</h2><p>Suggest a memory or a question for Susan\u2019s next agreed Recall call.</p><button type=\"button\">Suggest a conversation</button><p class=\"ds-caption\">Susan chooses whether to discuss it, and whether to share her answer with you.</p></aside>",
+      "description": "Real attributed memory contributions with optional private photo or voice note.",
+      "html": "<aside class=\"ds-suggestion\"><h2>For your next conversation</h2><p>Share a memory you have together.</p><button type=\"button\">Share a memory</button><p class=\"ds-caption\">This saves your contribution. It does not schedule a call.</p></aside>",
       "css": ".ds-suggestion{font-family:\"Atkinson Hyperlegible Next\",\"Atkinson Hyperlegible\",sans-serif;background:var(--recall-tint, #f0f2ec);color:var(--recall-ink, #242c28);border:1px solid var(--recall-line, #bdc5bd);border-radius:12px;padding:24px;}.ds-suggestion h2{font-size:27px;font-weight:650;line-height:1.2;margin:0;}.ds-suggestion p{font-size:19px;line-height:1.4;margin:16px 0 0;}.ds-suggestion button{font:600 19px \"Atkinson Hyperlegible Next\",sans-serif;display:flex;align-items:center;justify-content:center;min-height:50px;width:100%;margin-top:24px;padding:12px 16px;border:1px solid var(--recall-ink, #242c28);border-radius:8px;background:var(--recall-ink, #242c28);color:var(--recall-bg, #fafaf7);cursor:pointer;}.ds-suggestion button:hover{background:var(--recall-muted, #535e57);}.ds-suggestion button:active{background:var(--recall-ink, #242c28);}.ds-suggestion button:focus-visible{outline:3px solid var(--recall-focus, #354f43);outline-offset:5px;}.ds-suggestion .ds-caption{font-size:17px;line-height:1.45;color:var(--recall-muted, #535e57);}@media(max-width:600px){.ds-suggestion{padding:22px;}}"
     },
     {
       "name": "Topic disclosure",
       "kind": "custom",
       "description": "Expandable neutral per-topic counts, separated by rules.",
-      "html": "<details class=\"ds-topic\"><summary><span><strong>Cape May summers</strong><span class=\"ds-caption\">September 2026 \u00b7 Sample call record</span></span><span class=\"ds-summary\">Open call counts</span><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"m6 9 6 6 6-6\"/></svg></summary><div class=\"ds-detail\">Counts remain specific to this topic and describe calls only.</div></details>",
+      "html": "<details class=\"ds-topic\"><summary><span><strong>Cape May summers</strong><span class=\"ds-caption\">September 2026 \u00b7 Call record</span></span><span class=\"ds-summary\">Open call counts</span><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"m6 9 6 6 6-6\"/></svg></summary><div class=\"ds-detail\">Counts remain specific to this topic and describe calls only.</div></details>",
       "css": ".ds-topic{font-family:\"Atkinson Hyperlegible Next\",\"Atkinson Hyperlegible\",sans-serif;color:var(--recall-ink, #242c28);border-top:1px solid var(--recall-line, #bdc5bd);border-bottom:1px solid var(--recall-line, #bdc5bd);}.ds-topic summary{display:grid;grid-template-columns:minmax(0,1fr) auto 24px;gap:24px;align-items:center;min-height:104px;padding:20px 8px;list-style:none;cursor:pointer;}.ds-topic summary::-webkit-details-marker{display:none;}.ds-topic summary:hover{background:var(--recall-tint, #f0f2ec);}.ds-topic summary:focus-visible{outline:3px solid var(--recall-focus, #354f43);outline-offset:5px;}.ds-topic strong{display:block;font-size:23px;font-weight:600;}.ds-topic .ds-caption{display:block;margin-top:6px;font-size:17px;color:var(--recall-muted, #535e57);}.ds-summary{font-size:20px;}.ds-topic[open] svg{transform:rotate(180deg);}.ds-detail{padding:0 8px 28px;font-size:20px;}@media(max-width:600px){.ds-topic summary{grid-template-columns:minmax(0,1fr) 24px;gap:8px 12px;}.ds-topic summary>span:first-child{grid-column:1;}.ds-summary{grid-row:2;grid-column:1;font-size:19px;}.ds-topic svg{grid-row:1 / 3;grid-column:2;}}"
     },
     {
       "name": "Session bookshelf cover",
       "kind": "custom",
-      "description": "Static open-cover specimen. Resting heights use (80 + 36 \u00d7 same-topic unaided calls) / 368; below four measured calls spines are light, from four dark, and fewer than three historical calls unmeasured. The open cover grows for reading.",
+      "description": "Static open-cover specimen. Resting scale is (80 + clamp(unaided / recordWindow, 0, 1) \u00d7 288) / 368. Server thresholds govern insufficient history; below half the window spines are light. The open cover expands for reading.",
       "html": "<div class=\"ds-shelf\"><button class=\"ds-book-stop\" aria-pressed=\"true\" aria-label=\"September 19: Cape May summers. Not enough calls yet\"><span class=\"ds-book\"><span class=\"ds-book-cover\"><span class=\"ds-book-title\">Cape May summers</span><svg viewBox=\"0 0 144 184\" aria-hidden=\"true\"><line x1=\"0\" y1=\"92\" x2=\"144\" y2=\"92\"/><rect class=\"ds-book-unmeasured\" x=\"6\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-book-unmeasured\" x=\"13\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-book-unmeasured\" x=\"20\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-book-unmeasured\" x=\"27\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-book-unmeasured\" x=\"34\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-book-unmeasured\" x=\"41\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-book-unmeasured\" x=\"48\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-book-unmeasured\" x=\"55\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-book-unmeasured\" x=\"62\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-book-unmeasured\" x=\"69\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-book-unmeasured\" x=\"76\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-book-unmeasured\" x=\"83\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-book-unmeasured\" x=\"90\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-book-unmeasured\" x=\"97\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-book-unmeasured\" x=\"104\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-book-unmeasured\" x=\"111\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-book-unmeasured\" x=\"118\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-book-unmeasured\" x=\"125\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/><rect class=\"ds-book-unmeasured\" x=\"132\" y=\"86\" width=\"4\" height=\"12\" rx=\"2\"/></svg><span class=\"ds-book-count\">Not enough calls yet</span><span class=\"ds-book-date\"><time datetime=\"2026-09-19\">Sep 19</time><span>Recall</span></span></span><span class=\"ds-book-spine\" data-unmeasured=\"true\"><time datetime=\"2026-09-19\">Sep 19</time></span></span></button></div>",
       "css": ".ds-shelf{padding:26px 32px 32px;font-family:\"Atkinson Hyperlegible Next\",\"Atkinson Hyperlegible\",sans-serif;perspective:1100px;perspective-origin:50% 100%;}.ds-book-stop{display:block;position:relative;width:232px;height:368px;background:transparent;border:0;color:var(--recall-ink,#242c28);font:inherit;cursor:pointer;perspective:1100px;perspective-origin:50% 100%;}.ds-book{position:absolute;inset:0;transform-style:preserve-3d;transform:rotateY(-8deg);transform-origin:50% 100%;text-align:left;}.ds-book-cover{position:absolute;inset:0;display:flex;flex-direction:column;padding:20px;background:var(--recall-soft,#e9ece6);border:1px solid var(--recall-line,#bdc5bd);border-radius:3px 6px 6px 3px;backface-visibility:hidden;transform:translateZ(18px);}.ds-book-title{font-size:27px;font-weight:650;line-height:1.15;letter-spacing:-.015em;min-height:64px;}.ds-book-cover svg{width:100%;height:106px;flex:1;min-height:70px;}.ds-book-cover rect{fill:var(--recall-ink,#242c28);}.ds-book-cover line{stroke:var(--recall-line,#bdc5bd);stroke-width:.6;}.ds-book-cover .ds-book-unmeasured{fill:none;stroke:var(--recall-muted,#535e57);stroke-width:.8;stroke-dasharray:2 2;}.ds-book-count{font-size:16px;line-height:1.25;padding-top:8px;}.ds-book-date{display:flex;justify-content:space-between;gap:8px;margin-top:16px;padding-top:12px;border-top:1px solid var(--recall-line,#bdc5bd);font-size:17px;line-height:1.3;}.ds-book-spine{position:absolute;left:98px;top:0;width:36px;height:100%;display:flex;align-items:center;justify-content:center;padding:16px 0;background:var(--recall-ink,#242c28);color:var(--recall-bg,#fafaf7);border:1px solid var(--recall-ink,#242c28);backface-visibility:hidden;transform:rotateY(90deg) translateZ(116px);writing-mode:vertical-rl;font-size:17px;font-weight:600;}.ds-book-stop:hover .ds-book-spine:not([data-unmeasured=\"true\"]){background:var(--recall-muted,#535e57);}.ds-book-stop:focus-visible{outline:none;}.ds-book-stop:focus-visible .ds-book-cover,.ds-book-stop:focus-visible .ds-book-spine{outline:3px solid var(--recall-focus,#354f43);outline-offset:4px;}@media(max-width:600px){.ds-book-stop{width:216px;height:330px;}.ds-book-cover{padding:18px;}.ds-book-title{font-size:25px;}.ds-book-spine{left:90px;transform:rotateY(90deg) translateZ(108px);}}@media(prefers-reduced-motion:reduce){.ds-book,.ds-book-cover{transform:none;}.ds-book-spine{display:none;}.ds-book-cover{outline:2px solid var(--recall-ink,#242c28);outline-offset:4px;}} .ds-book-cover::before{content:\"\";position:absolute;top:0;bottom:0;right:7px;width:1px;background:var(--recall-line,#bdc5bd);}.ds-book-cover::after{content:\"\";position:absolute;top:3px;bottom:3px;left:-5px;width:4px;background:var(--recall-bg,#fafaf7);border:1px solid var(--recall-line,#bdc5bd);border-radius:2px 0 0 2px;}.ds-book-spine::before,.ds-book-spine::after{content:\"\";position:absolute;left:4px;right:4px;height:1px;background:currentColor;opacity:.4;}.ds-book-spine::before{top:12%;}.ds-book-spine::after{bottom:12%;}.ds-book-spine[data-unmeasured=\"true\"]{background:var(--recall-bg,#fafaf7);color:var(--recall-ink,#242c28);border-style:dashed;}"
     },
@@ -270,12 +266,12 @@
   ],
   "narrative": {
     "northStar": "A familiar photograph, one spoken thought",
-    "overview": "Recall uses warm neutral surfaces, dark readable words and quiet controls. The exact self-hosted Atkinson Hyperlegible Next family carries both identity and reading. Familiar imagery remains still; literal words and decisions receive clear space.\n\nThis system describes the frontend boilerplate at `/`, `/caregiver` (also `/family`), `/onboarding` and `/revisit`, as shipped in `app/recall.css` and `components/recall`. It does not describe backend integration or legacy operator/demo surfaces. The approved `BRAND_BOOK.md` preserves the quiet palette and adds the small clay connected-path identity on every surface, including the patient screen. Source evidence includes the current phone, caregiver bookshelf, setup and revisit components; the surface contracts are `.impeccable/surfaces/recall-phone.md` and `.impeccable/surfaces/caregiver-waveform.md`.\n",
+    "overview": "Recall uses warm paper, dark readable words, quiet sage surfaces and a small clay connected path. Self-hosted Atkinson Hyperlegible Next carries identity and reading. The approved `BRAND_BOOK.md` remains the direction; this document records the current connected application rather than the retired scripted preview.\n\nSource evidence: `app/recall.css`, `app/globals.css`, `app/welcome.css`, `app/onboarding-live.css`, `components/live`, `RecallFrame` and `SessionBookshelf`. Welcome, access, household setup, invitations, caregiver records and patient web calls share the identity. The photo-led patient composition remains a brand target: the mounted live call currently displays prompts and audio status, without a photo or paginated captions. `/present` is a separate engine harness.\n",
     "keyCharacteristics": [
-      "Quiet warm neutrals and flat surfaces.",
-      "One exact font family with generous patient text.",
-      "Familiar photographs separate from captions.",
-      "Equal visual weight for consent choices."
+      "Warm neutral surfaces with restrained clay identity.",
+      "One exact font family and generous actions.",
+      "Explicit access, contribution and permission boundaries.",
+      "Dated call counts without patient quotations or clinical grading."
     ],
     "rules": [
       {
@@ -285,32 +281,26 @@
       },
       {
         "name": "The Exact Typeface Rule",
-        "body": "Keep the self-hosted Atkinson Hyperlegible Next face throughout Recall surfaces.",
+        "body": "Keep self-hosted Atkinson Hyperlegible Next across Recall surfaces.",
         "section": "typography"
       },
       {
         "name": "The Flat Surface Rule",
-        "body": "Keep surfaces free of elevated shadows. The timeline marker\u2019s one-pixel clay ring is a functional outline, not elevation.",
+        "body": "Use no elevated shadows; preserve the bookshelf\u2019s scoped geometric depth.",
         "section": "elevation"
-      },
-      {
-        "name": "The Equal Choice Rule",
-        "body": "Remember/share Yes and No use identical secondary styling and equal columns. End call is a separate underlined action.",
-        "section": "components"
       }
     ],
     "dos": [
-      "Do keep patient captions, decisions and stopping controls visually distinct.",
-      "Do preserve exact words and equal consent choices.",
-      "Do keep patient photographs still, uncropped and free of text overlays. Setup and source-review thumbnails may crop to their fixed preview ratio.",
-      "Do retain visible keyboard focus, generous targets and responsive vertical scrolling.",
-      "Do label sample media and preserve source attribution."
+      "Do preserve source attribution, visible access states and separate spoken confirmation gates.",
+      "Do keep neutral counts paired with their denominator and date.",
+      "Do keep the clay path consistent across all shared headers.",
+      "Do retain visible keyboard focus, reduced-motion alternatives and readable dark preferences."
     ],
     "donts": [
-      "Don't restore bright accent fields, elevated shadows or decorative status dots; retain the small clay brand path and functional date marker.",
-      "Don't substitute a serif or system display face for Atkinson Hyperlegible Next.",
-      "Don't turn neutral topic counts into a score or color-coded verdict.",
-      "Don't promote legacy demo styling or generated preview media into product evidence."
+      "Don't present fixture identities, sample history or generated images as a live household.",
+      "Don't turn counts into clinical scores or expose patient quotations in this caregiver frontend.",
+      "Don't restore bright accent fields, elevated shadows or a competing waveform logo.",
+      "Don't describe planned photo-led calls or rich imports as implemented live features."
     ]
   }
 }

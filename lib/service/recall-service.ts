@@ -19,7 +19,7 @@ import { LexicalAnswerInterpreter, applyAnswer, type Answer, type AnswerInterpre
 import { findGaps } from "@/lib/discovery/gaps";
 import { ingestLibrary, type IngestResult } from "@/lib/discovery/ingest";
 import { assertSpeakable, questionFor, type Question } from "@/lib/discovery/questions";
-import type { FamilyCopy, RecordThresholds } from "@/lib/family/copy";
+import type { FamilyCopy, RecordThresholds, SafetyThresholds } from "@/lib/family/copy";
 import { FamilyView } from "@/lib/family/projection";
 import { clearRetrievalLayer, clearTopicRecord } from "@/lib/graph/retrieval-layer";
 import type { GraphStore } from "@/lib/graph/store";
@@ -29,13 +29,21 @@ import type { AssetIndex } from "@/lib/provenance/assets";
 import { ProvLog } from "@/lib/provenance/prov-log";
 import type { TranscriptionProvider } from "@/lib/providers/transcription";
 import type { AlertChannel } from "@/lib/safety/alert";
+import { alertsDueToEscalate, caregiverForPhone, isAckBody, mostRecentPendingFor } from "@/lib/safety/ack";
+import { MISSED_CALLS_CATEGORY, readMissedCallState, shouldFireMissedCallAlert } from "@/lib/safety/missed-calls";
 import type { SafetyPhrases } from "@/lib/safety/phrases";
+import { fill } from "@/lib/script/call-script";
 import type { CallScript } from "@/lib/script/call-script";
 import { buildRecording, type SessionRecording } from "@/lib/session/recording";
+import type { MachineState } from "@/lib/state/reducer";
 import { createRecallStore } from "@/lib/state/store";
-import { GateKeeper, TOOL_IMPLS, ToolRuntime, newSession, type FamilyToolContext, type Fault, type ScaffoldAdvisor, type SetupStore, type ToolContext, type ToolInput, type ToolName, type ToolOutput } from "@/lib/tools";
+import { GateKeeper, TOOL_IMPLS, ToolRuntime, dashboardAccess, newSession, type FamilyToolContext, type Fault, type ScaffoldAdvisor, type SetupStore, type ToolContext, type ToolInput, type ToolName, type ToolOutput } from "@/lib/tools";
 
 export interface RecallDeps {
+  isCallStopped?: () => boolean;
+  callAttempts?: () => Array<{ session_id: string; at: string }>;
+  onContributionCommitted?: (ctx: ToolContext) => Promise<void>;
+  onCallSession?: (sessionId: string) => void;
   graph: GraphStore;
   /** The live joint setup. Read fresh at every call and every dashboard load, so a revocation is in force before the next one. */
   setup: SetupStore;
@@ -46,9 +54,10 @@ export interface RecallDeps {
   copy: FamilyCopy;
   thresholds: RecordThresholds;
   safetyPhrases: SafetyPhrases;
+  safetyThresholds: SafetyThresholds;
   alerts: AlertChannel;
   /** Places the call once the policy has granted it. Never invoked before that. Null means this deployment cannot call. */
-  callDriver: (() => CallDriver) | null;
+  callDriver: ((topicLabel?: string) => CallDriver) | null;
   /** Reads facts out of an answer. It only proposes: applyAnswer decides what is grounded enough to keep. */
   answerInterpreter?: AnswerInterpreter;
   /** Live only (Muse Spark). May pick WHICH cue where the retrieval layer has no preference; see select_scaffold. */
@@ -72,6 +81,8 @@ export class RecallService {
   private readonly answerInterpreter: AnswerInterpreter;
   /** The family side's tool log, for the judge console. Kept apart from any call's log. */
   readonly familyRuntime: ToolRuntime;
+  /** Ack and escalation: they need the graph, and they never enter a call or a family flow. */
+  readonly opsRuntime: ToolRuntime;
 
   constructor(private readonly deps: RecallDeps) {
     this.answerInterpreter = deps.answerInterpreter ?? new LexicalAnswerInterpreter();
@@ -83,9 +94,31 @@ export class RecallService {
       script: deps.script,
       copy: deps.copy,
       thresholds: deps.thresholds,
+      safetyThresholds: deps.safetyThresholds,
     };
     // A runtime with a family context and no call context: a family flow cannot run a call tool even by mistake.
     this.familyRuntime = new ToolRuntime({ clock: deps.clock, family }, TOOL_IMPLS, { max_log: 500 });
+    this.opsRuntime = new ToolRuntime({ clock: deps.clock, call: this.opsContext() }, TOOL_IMPLS, { max_log: 200 });
+  }
+
+  private opsContext(): ToolContext {
+    const { deps } = this;
+    return {
+      graph: deps.graph,
+      setup: deps.setup,
+      assets: deps.assets,
+      clock: deps.clock,
+      gate: new GateKeeper(),
+      transcription: deps.transcription,
+      session: newSession("session:ops"),
+      prov: new ProvLog(),
+      script: deps.script,
+      copy: deps.copy,
+      safetyPhrases: deps.safetyPhrases,
+      safetyThresholds: deps.safetyThresholds,
+      alerts: deps.alerts,
+      machine: () => createRecallStore().getState().machine,
+    };
   }
 
   // --- the recall call -----------------------------------------------------------------------------------------
@@ -96,9 +129,12 @@ export class RecallService {
    */
   async runScheduledCall(sessionId: string): Promise<SessionRun | null> {
     const { deps } = this;
+    deps.onCallSession?.(sessionId);
     const store = createRecallStore();
     const personId = deps.setup.current().person_id;
     const ctx: ToolContext = {
+      isCallStopped: deps.isCallStopped,
+      callAttempts: deps.callAttempts,
       graph: deps.graph,
       setup: deps.setup,
       assets: deps.assets,
@@ -110,16 +146,67 @@ export class RecallService {
       script: deps.script,
       copy: deps.copy,
       safetyPhrases: deps.safetyPhrases,
+      safetyThresholds: deps.safetyThresholds,
       alerts: deps.alerts,
       machine: () => store.getState().machine,
       scaffoldAdvisor: deps.scaffoldAdvisor,
     };
+    if (deps.onContributionCommitted) ctx.onContributionCommitted = () => deps.onContributionCommitted!(ctx);
     const runtime = new ToolRuntime({ clock: deps.clock, call: ctx }, TOOL_IMPLS, deps.runtime ?? {});
     const startedAt = deps.clock.iso();
     const { machine, receipt } = await runRecallCall({ person_id: personId, ctx, runtime, store, callDriver: deps.callDriver });
     if (machine.state === "idle") return null;
+    await this.applyUnansweredStreak(machine, runtime);
     const recording = await buildRecording({ person_id: personId, started_at: startedAt, ended_at: deps.clock.iso(), machine, session: ctx.session, tool_log: runtime.log, receipt });
     return { recording, ctx, runtime };
+  }
+
+  /**
+   * Scheduler-level: a ring that never connected increments the streak; any
+   * connected call clears it. Streak 2 is a dashboard line only. Streak 3
+   * sends the same safety-alert path, with category `missed_calls`.
+   */
+  private async applyUnansweredStreak(machine: MachineState, runtime: ToolRuntime): Promise<void> {
+    const state = await readMissedCallState(this.deps.graph);
+    const thisAttemptWasMiss = machine.trace.some((t) => t.accepted && t.event === "CALL_NOT_ANSWERED");
+    if (!shouldFireMissedCallAlert(state, this.deps.safetyThresholds, thisAttemptWasMiss)) return;
+    const caregivers = this.deps.setup.current().safety.designated_caregivers.map((c) => c.person_id);
+    await runtime.call("send_safety_alert", { category: MISSED_CALLS_CATEGORY, caregiver_ids: caregivers });
+  }
+
+  /**
+   * Passive dashboard line. Not a Weekly Note, not a push, and gone the moment
+   * a later call connects. Approved members only.
+   */
+  async unansweredStreakNotice(memberId: string): Promise<{ script_id: string; text: string; count: number } | null> {
+    const policy = this.deps.setup.current();
+    if (dashboardAccess(policy, memberId) === null) return null;
+    const { count } = await new FamilyView(this.deps.graph, policy.person_id).missedCallStreak();
+    if (count < this.deps.safetyThresholds.missed_call_notice_threshold) return null;
+    const line = this.deps.copy.lines.missed_call_notice;
+    return { script_id: line.id, text: fill(line, { name: await new FamilyView(this.deps.graph, policy.person_id).herName(), count: String(count) }), count };
+  }
+
+  /**
+   * Inbound SMS from a caregiver. Only a body of `1` (trimmed, case-insensitive)
+   * is an ack. Anything else, or a `1` with nothing pending, is a silent no-op.
+   */
+  async receiveCaregiverSms(from: string, body: string): Promise<{ status: "acknowledged" | "noop"; alert_id: string | null }> {
+    if (!isAckBody(body)) return { status: "noop", alert_id: null };
+    const caregiverId = caregiverForPhone(this.deps.setup.current(), from);
+    if (!caregiverId) return { status: "noop", alert_id: null };
+    const pending = await mostRecentPendingFor(this.deps.graph, caregiverId);
+    if (!pending) return { status: "noop", alert_id: null };
+    const result = await this.opsRuntime.call("record_alert_ack", { alert_id: pending.props.alert_id, caregiver_id: caregiverId });
+    return { status: result.status, alert_id: result.alert_id };
+  }
+
+  /** Fire any backup escalations whose ack window has closed. Safe to call on every schedule tick. */
+  async tickSafetyEscalations(): Promise<Array<ToolOutput<"escalate_safety_alert">>> {
+    const due = await alertsDueToEscalate(this.deps.graph, this.deps.clock.iso());
+    const out: Array<ToolOutput<"escalate_safety_alert">> = [];
+    for (const event of due) out.push(await this.opsRuntime.call("escalate_safety_alert", { alert_id: event.props.alert_id }));
+    return out;
   }
 
   // --- the family side: read when an approved member opens it, never pushed ----------------------------------------
@@ -131,7 +218,9 @@ export class RecallService {
    */
   private familyQueue: Promise<unknown> = Promise.resolve();
   private family<T extends FamilyTool>(tool: T, input: ToolInput<T>): Promise<ToolOutput<T>> {
-    const next = this.familyQueue.then(() => this.familyRuntime.call(tool, input));
+    const next = this.familyQueue.then(() => this.deps.graph.atomic
+      ? this.deps.graph.atomic(() => this.familyRuntime.call(tool, input))
+      : this.familyRuntime.call(tool, input));
     this.familyQueue = next.catch(() => undefined);
     return next;
   }
@@ -157,6 +246,26 @@ export class RecallService {
 
   exportRecord(requesterId: string): Promise<ToolOutput<"export_record_for_clinician">> {
     return this.family("export_record_for_clinician", { requester_id: requesterId });
+  }
+
+  /** Names and per-topic event counts only; the same whitelist as the record, with its access gate. */
+  async dashboardInfo(memberId: string) {
+    const policy = this.deps.setup.current();
+    if (!policy.approved_people.includes(memberId)) return null;
+    const view = new FamilyView(this.deps.graph, policy.person_id);
+    const detail = dashboardAccess(policy, memberId);
+    const rows = detail === "weekly_note_and_record" ? await view.outcomeRows() : [];
+    const ordered = rows.sort((a, b) => a.at.localeCompare(b.at) || a.topic_key.localeCompare(b.topic_key));
+    const sessions = ordered.map((row, i) => {
+      const window = ordered.slice(0, i + 1).filter((r) => r.topic_key === row.topic_key).slice(-this.deps.thresholds.record_window_calls);
+      return {
+        id: `${row.topic_key}:${row.at}:${i}`, date: row.at.slice(0, 10), topicId: row.topic_key, topicName: row.topic_name,
+        outcome: row.reached_at_rung === 1 ? "unaided" as const : row.reached_at_rung === 2 || row.reached_at_rung === 3 ? "cue" as const : row.reached_at_rung === 4 ? "recognition" as const : "unreached" as const,
+        recentCalls: window.length,
+        unaidedCalls: window.length >= this.deps.thresholds.min_calls_to_show ? window.filter((r) => r.reached_at_rung === 1).length : null,
+      };
+    });
+    return { person_name: await view.herName(), member_name: await view.memberName(memberId), detail_level: detail, record_window_calls: this.deps.thresholds.record_window_calls, min_calls_to_show: this.deps.thresholds.min_calls_to_show, sessions, contributions: await view.ownContributions(memberId) };
   }
 
   // --- caregiver controls (rule 12; section 6.3) ----------------------------------------------------------------

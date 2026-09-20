@@ -35,6 +35,8 @@ export interface SpokenPrompt {
 
 export interface CallDriver {
   readonly call_asset_id: string;
+  /** Browser hang-up after a final recording: safety is checked before honoring it. */
+  readonly stopped?: boolean;
   connect(): Promise<void>;
   /** Recall speaks, in Recall's own labeled voice. Resolves when the line has finished. */
   speak(prompt: SpokenPrompt): Promise<void>;
@@ -42,6 +44,8 @@ export interface CallDriver {
   playback(kept?: { asset_id: string; spans: MediaSpan[] }): Promise<void>;
   /** Wait for her next final turn, or for the silence timeout. Returns the window to assess. */
   listen(): Promise<AudioWindow>;
+  /** Live drivers retain confirmation receipts only after the gated commit succeeded. */
+  retainConfirmed?(evidence: { contribution_hash: string; store: unknown; share: unknown; share_audio?: { asset_id: string; start_ms: number; end_ms: number } | null }): Promise<void>;
   hangUp(): Promise<void>;
 }
 

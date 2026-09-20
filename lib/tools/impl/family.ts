@@ -21,7 +21,7 @@ const DAY_MS = 86_400_000;
 const daysBefore = (iso: string, days: number): string => new Date(Date.parse(iso) - days * DAY_MS).toISOString();
 
 /** Section 6.4.1: the contribution form is for telling, not asking. */
-function opensAsAQuestion(text: string, openers: readonly string[]): boolean {
+export function opensAsAQuestion(text: string, openers: readonly string[]): boolean {
   const firstSentence = text.trim().split(/(?<=[.?!])\s+/)[0] ?? "";
   if (firstSentence.trim().endsWith("?")) return true;
   const start = normalize(text).trimStart();

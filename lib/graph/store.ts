@@ -25,6 +25,8 @@ export function withConfirmation(prov: Provenance, c: Confirmation): Provenance 
 }
 
 export interface GraphStore {
+  /** Persistent stores can commit a complete service operation or roll it back. */
+  atomic?<T>(work: () => Promise<T>): Promise<T>;
   getNode(id: string): Promise<GraphNode | null>;
   getEdge(id: string): Promise<GraphEdge | null>;
   /** Every edge touching `id`, in either direction, ordered by edge id. */

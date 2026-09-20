@@ -2,15 +2,14 @@
 
 import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { ArrowLeft, ArrowRight, MoveHorizontal } from "lucide-react";
-import { sessionSupport, type SessionSummary } from "@/lib/recall-preview/sessions";
-import { MemorySuggestionForm } from "./MemorySuggestionForm";
+import { sessionSupport, type SessionSummary } from "@/lib/family/session-summary";
 
 const envelope = [.12, .21, .32, .27, .46, .58, .49, .73, .86, 1, .82, .69, .77, .51, .43, .32, .38, .21, .12];
 const shortDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 const fullDate = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
 const dateLabel = (date: string, full = false) => (full ? fullDate : shortDate).format(new Date(date + "T12:00:00Z"));
 
-export function SessionBookshelf({ sessions: allSessions, children }: { sessions: SessionSummary[]; children?: ReactNode }) {
+export function SessionBookshelf({ sessions: allSessions, children, contribution, recordWindow = 8, minimumCalls = 3 }: { sessions: SessionSummary[]; children?: ReactNode; contribution?: ReactNode; recordWindow?: number; minimumCalls?: number }) {
   const [topicFilter, setTopicFilter] = useState("all");
   const sessions = useMemo(() => allSessions.filter((session) => topicFilter === "all" || session.topicId === topicFilter), [allSessions, topicFilter]);
   const topics = [...new Map(allSessions.map((session) => [session.topicId, session.topicName])).entries()];
@@ -74,7 +73,7 @@ export function SessionBookshelf({ sessions: allSessions, children }: { sessions
         const closed = Math.min(1, Math.abs(distance));
         const openness = 1 - closed * closed * (3 - 2 * closed);
         const count = sessions[index]?.unaidedCalls;
-        const restingScale = count === null || count === undefined ? .37 : (80 + count * 36) / 368;
+        const restingScale = count === null || count === undefined ? .37 : (80 + Math.min(1, Math.max(0, count / Math.max(1, recordWindow))) * 288) / 368;
         const heightScale = restingScale + (1 - restingScale) * openness;
         // Keep the snap target untransformed; only its visual child moves.
         if (placements.current[index]) placements.current[index]!.style.transform = reduced.current ? "none" : `translateX(${Math.sign(distance) * closed * 112 + shelfOffset}px)`;
@@ -166,7 +165,7 @@ export function SessionBookshelf({ sessions: allSessions, children }: { sessions
       element.removeEventListener("pointerdown", onPointer);
       preference.removeEventListener("change", onPreference);
     };
-  }, [sessions]);
+  }, [sessions, recordWindow]);
 
   function select(index: number, focus = false) {
     const next = Math.max(0, Math.min(sessions.length - 1, index));
@@ -185,7 +184,7 @@ export function SessionBookshelf({ sessions: allSessions, children }: { sessions
     event.preventDefault(); select(next, true);
   }
 
-  if (!selected) return <div className="care-overview"><div><p>No calls to explore yet. A session will appear here after a Recall conversation.</p>{children}</div><MemorySuggestionForm /></div>;
+  if (!selected) return <div className="care-overview"><div><p>No calls to explore yet. A session will appear here after a Recall conversation.</p>{children}</div>{contribution}</div>;
 
   return <>
     <div className="session-shelf" aria-label="Recall session history">
@@ -216,7 +215,7 @@ export function SessionBookshelf({ sessions: allSessions, children }: { sessions
                 <svg viewBox="0 0 144 184" preserveAspectRatio="none" focusable="false">
               <line x1="0" y1="92" x2="144" y2="92" className="session-wave-axis" />
               {envelope.map((level, bar) => {
-                const height = session.unaidedCalls === null ? 12 : 8 + session.unaidedCalls * 20 * level;
+                const height = session.unaidedCalls === null ? 12 : 8 + Math.min(1, session.unaidedCalls / Math.max(1, recordWindow)) * 160 * level;
                 return <rect key={bar} x={bar * 7 + 6} y={92 - height / 2} width="4" height={height} rx="2" className={session.unaidedCalls === null ? "session-wave-unmeasured" : "session-wave-bar"} />;
               })}
                 </svg>
@@ -224,7 +223,7 @@ export function SessionBookshelf({ sessions: allSessions, children }: { sessions
                 <span className="session-book-date"><time dateTime={session.date}>{dateLabel(session.date)}</time><span>Recall</span></span>
                 </span>
               </span>
-              <span className="session-book-spine" data-unmeasured={session.unaidedCalls === null} data-light={session.unaidedCalls !== null && session.unaidedCalls < 4}><time dateTime={session.date}>{dateLabel(session.date)}</time></span>
+              <span className="session-book-spine" data-unmeasured={session.unaidedCalls === null} data-light={session.unaidedCalls !== null && session.unaidedCalls < recordWindow / 2}><time dateTime={session.date}>{dateLabel(session.date)}</time></span>
               <span className="session-book-back" />
             </span>
             </span>
@@ -238,8 +237,8 @@ export function SessionBookshelf({ sessions: allSessions, children }: { sessions
       </div>
       <div className="session-shelf-legend" id="session-shelf-instructions">
         <span><svg viewBox="0 0 36 28" aria-hidden="true"><rect x="2" y="18" width="7" height="8" rx="1" /><rect x="14" y="10" width="7" height="16" rx="1" /><rect x="26" y="2" width="7" height="24" rx="1" /></svg>More without a cue</span>
-        <span><svg viewBox="0 0 24 28" aria-hidden="true" className="session-legend-outline"><rect x="5" y="3" width="14" height="23" rx="1" /></svg>Fewer than 3 calls</span>
-        <p>Height counts calls without a cue · same topic, up to 8 recent calls.</p>
+        <span><svg viewBox="0 0 24 28" aria-hidden="true" className="session-legend-outline"><rect x="5" y="3" width="14" height="23" rx="1" /></svg>Fewer than {minimumCalls} calls</span>
+        <p>Height counts calls without a cue · same topic, up to {recordWindow} recent calls.</p>
       </div>
       <p className="session-sr-only">One book per call. Taller closed spines show more calls without a cue. The open cover expands for reading. Use left and right arrow keys, Home, or End to choose a call.</p>
       <p className="session-sr-only" role="status" aria-live="polite">{announcement}</p>
@@ -247,17 +246,17 @@ export function SessionBookshelf({ sessions: allSessions, children }: { sessions
     <div className="care-overview session-overview">
       <div>
         <section className="session-receipt" id="selected-session" aria-labelledby="selected-session-title">
-          <div className="session-receipt-heading"><time dateTime={selected.date}>{dateLabel(selected.date, true)}</time><span>Sample call</span></div>
+          <div className="session-receipt-heading"><time dateTime={selected.date}>{dateLabel(selected.date, true)}</time><span>Recall call</span></div>
           <div className="session-receipt-content" key={selected.id}>
             <h3 id="selected-session-title">{selected.topicName}</h3>
             <p className="session-support">{sessionSupport(selected.outcome)}</p>
-            <p className="session-count">{selected.unaidedCalls === null ? <><strong>Not enough calls yet</strong><span>This topic needs at least 3 calls before a peak is shown.</span></> : <><strong>{selected.unaidedCalls} of {selected.recentCalls} recent calls unaided</strong><span>For this topic, up to {dateLabel(selected.date)}.</span></>}</p>
+            <p className="session-count">{selected.unaidedCalls === null ? <><strong>Not enough calls yet</strong><span>This topic needs at least {minimumCalls} calls before a peak is shown.</span></> : <><strong>{selected.unaidedCalls} of {selected.recentCalls} recent calls unaided</strong><span>For this topic, up to {dateLabel(selected.date)}.</span></>}</p>
           </div>
           <p className="care-caption session-privacy">A brief account of the support used. Personal words stay private.</p>
         </section>
         {children}
       </div>
-      <MemorySuggestionForm />
+      {contribution}
     </div>
   </>;
 }

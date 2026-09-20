@@ -35,6 +35,7 @@ export const FAMILY_LINE_KEYS = [
   "receipt_safety",
   "receipt_conduct",
   "thesis",
+  "missed_call_notice",
 ] as const;
 export type FamilyLineKey = (typeof FAMILY_LINE_KEYS)[number];
 
@@ -62,3 +63,18 @@ export const recordThresholdsSchema = z.strictObject({
   weekly_note_days: z.number().int().positive(),
 });
 export type RecordThresholds = z.infer<typeof recordThresholdsSchema>;
+
+/** Not clinically validated; placeholders expected to change, with a second reviewer (Appendix B). */
+export const safetyThresholdsSchema = z
+  .strictObject({
+    version: z.literal(1),
+    description: z.string(),
+    missed_call_notice_threshold: z.number().int().positive(),
+    missed_call_alert_threshold: z.number().int().positive(),
+    ack_timeout_minutes: z.number().int().positive(),
+  })
+  .refine((t) => t.missed_call_alert_threshold > t.missed_call_notice_threshold, {
+    message: "the missed-call alert fires after the dashboard notice, not at the same count",
+    path: ["missed_call_alert_threshold"],
+  });
+export type SafetyThresholds = z.infer<typeof safetyThresholdsSchema>;

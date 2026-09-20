@@ -10,6 +10,7 @@
  *   call-script.json           every fixed line Recall can say, with script ids, and the banned-phrase list
  *   family-copy.json           every fixed line the family side can show
  *   record-thresholds.json     every number the per-topic record uses
+ *   safety-thresholds.json     missed-call and acknowledgment numbers (placeholders)
  *   safety-phrases.json        the fixed safety list and the fixed alert text
  *   transcripts/call-golden    the literal, time-aligned transcript of the prerecorded call
  *
@@ -17,7 +18,7 @@
  * the gates and lives with the tests, not here.
  */
 import manifestJson from "@/assets/manifest.json";
-import { familyCopySchema, recordThresholdsSchema, type FamilyCopy, type RecordThresholds } from "@/lib/family/copy";
+import { familyCopySchema, recordThresholdsSchema, safetyThresholdsSchema, type FamilyCopy, type RecordThresholds, type SafetyThresholds } from "@/lib/family/copy";
 import type { SeedFile } from "@/lib/graph/seed";
 import type { AssetManifest } from "@/lib/provenance/assets";
 import type { CallTranscript } from "@/lib/providers/transcription";
@@ -29,6 +30,7 @@ import familyCopy from "./family-copy.json";
 import family from "./graph/family.json";
 import susanSetup from "./policy/susan-setup.json";
 import recordThresholds from "./record-thresholds.json";
+import safetyThresholds from "./safety-thresholds.json";
 import safetyPhrases from "./safety-phrases.json";
 import callGolden from "./transcripts/call-golden.json";
 
@@ -41,6 +43,7 @@ export const GOLDEN_TRANSCRIPT = callGolden as CallTranscript;
 export const CALL_SCRIPT: CallScript = callScriptSchema.parse(callScript);
 export const FAMILY_COPY: FamilyCopy = familyCopySchema.parse(familyCopy);
 export const RECORD_THRESHOLDS: RecordThresholds = recordThresholdsSchema.parse(recordThresholds);
+export const SAFETY_THRESHOLDS: SafetyThresholds = safetyThresholdsSchema.parse(safetyThresholds);
 export const SAFETY_PHRASES: SafetyPhrases = safetyPhrasesSchema.parse(safetyPhrases);
 
 /** Timing for the deterministic replay: 10:30 on a Thursday morning in New York, inside the agreed call window (mornings: EVIDENCE.md, section E). */

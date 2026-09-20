@@ -16,6 +16,7 @@
  * returns graph content.
  */
 import { patientConfirmed, RECALL_AGENT_ID, type GraphEdge, type GraphNode, type Provenance, type SourceClass, type WeeklyNoteNode } from "@/lib/graph/types";
+import { readMissedCallState } from "@/lib/safety/missed-calls";
 import { edgeId } from "@/lib/graph/seed";
 import type { GraphStore } from "@/lib/graph/store";
 import type { OutcomeRow } from "./record";
@@ -62,8 +63,27 @@ export class FamilyView {
     return this.displayName(this.personId);
   }
 
+  /**
+   * Consecutive scheduled attempts that never connected. A count only: no cause,
+   * and nothing she said (rule 8). Zero after any call that reached her.
+   */
+  async missedCallStreak(): Promise<{ count: number; last_attempt_at: string | null }> {
+    const state = await readMissedCallState(this.graph);
+    return { count: state.streak, last_attempt_at: state.last_attempt_at };
+  }
+
   memberName(memberId: string): Promise<string> {
     return this.displayName(memberId);
+  }
+
+  /** Only this contributor's own submitted words. Never a patient's claim or another member's account. */
+  async ownContributions(memberId: string): Promise<Array<{ text: string; at: string; media?: { asset_id: string; kind: "photo" | "voice_note" } }>> {
+    const own = (await this.graph.nodesOfType("EpisodicClaim")).filter((c) => c.prov.source_class === "family_contribution" && c.prov.author === memberId && !c.prov.patient_confirmed);
+    return (await Promise.all(own.map(async (c) => {
+      const artifact = c.prov.asset_id ? await this.graph.getNode(c.prov.source_id) : null;
+      const kind = artifact?.type === "Artifact" ? artifact.props.kind : null;
+      return { text: c.props.text, at: c.prov.observed_at, ...(c.prov.asset_id && (kind === "photo" || kind === "audio") ? { media: { asset_id: c.prov.asset_id, kind: kind === "photo" ? "photo" as const : "voice_note" as const } } : {}) };
+    }))).sort((a, b) => a.at.localeCompare(b.at));
   }
 
   /** Is there anything of hers in the graph at all? A single boolean for the whole graph: it cannot be used to probe a topic. */
@@ -240,7 +260,7 @@ export class FamilyView {
     const claimId = `claim:family-contribution:${n}`;
     const prov = this.prov(input.received_at, input.contributor_id, artifactId, "family_contribution", input.photo_asset);
     const about = [input.who, input.when_where].filter((s): s is string => !!s && s.trim() !== "").join(" - ");
-    await this.graph.putNode({ id: artifactId, type: "Artifact", label: "A family memory, as it was told to Recall", props: { kind: input.medium === "photo" ? "photo" : "family_story", text: input.what_happened, alt: about || null }, prov });
+    await this.graph.putNode({ id: artifactId, type: "Artifact", label: "A family memory, as it was told to Recall", props: { kind: input.medium === "photo" ? "photo" : input.medium === "voice_note" ? "audio" : "family_story", text: input.what_happened, alt: about || null }, prov });
     await this.graph.putNode({ id: claimId, type: "EpisodicClaim", label: about || "A family memory", props: { text: input.what_happened }, prov });
     const edges: Array<[GraphEdge["type"], string, string]> = [
       ["EVIDENCE_FOR", artifactId, claimId],

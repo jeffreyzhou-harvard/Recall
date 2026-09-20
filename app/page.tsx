@@ -1,5 +1,5 @@
-import { RecallPhone } from "@/components/recall/RecallPhone";
+import { Welcome } from "@/components/live/Welcome";
 
 export default function Home() {
-  return <RecallPhone />;
+  return <Welcome />;
 }

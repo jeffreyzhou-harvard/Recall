@@ -8,6 +8,8 @@ Recall is an AI phone-call system for people living with dementia. It invites th
 
 This book establishes the visual direction before its application to the frontend. It preserves the existing quiet interface and Atkinson typography. The user's selected connected-node logo informs the identity's geometry; its bright red is replaced with a restrained clay accent. `AGENTS.md` owns behavior and privacy. This book owns brand expression. `DESIGN.md` documents the implemented tokens and components.
 
+Current application status: the identity and shared styles now serve real private-key account entry, joint setup, household management, persisted caregiver records and browser calls. The live patient screen currently shows prompts and audio status; photo-led captions and rich album/contact/calendar intake remain direction targets. The caregiver frontend omits patient quotations. See `DESIGN.md` and `docs/frontend-preview.md` for the implemented surface and integration boundaries.
+
 ## 1. Character
 
 Calm, familiar, direct, adult. A still photograph on a clear table, with room beside it for one spoken thought.

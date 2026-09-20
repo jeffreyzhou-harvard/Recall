@@ -76,7 +76,7 @@ html:has(.recall-workspace)::-webkit-scrollbar-track { background: #fafaf7; }
 .recall-display-options input { width: 24px; height: 24px; flex: none; }
 .recall-familiar { padding: 0 24px 24px; font-size: 24px; color: var(--recall-muted); border-bottom: 1px solid var(--recall-line); }
 .recall-incoming { flex: 1; padding: 40px 24px; display: flex; justify-content: center; flex-direction: column; align-items: flex-start; }
-.recall-contact-symbol { display: grid; place-items: center; width: 84px; height: 84px; background: var(--recall-soft); color: #000; border: 2px solid #000; border-radius: 8px; margin-bottom: 28px; }
+.recall-contact-symbol { display: grid; place-items: center; width: 84px; height: 84px; background: var(--recall-soft); color: var(--recall-ink); border: 2px solid var(--recall-ink); border-radius: 8px; margin-bottom: 28px; }
 .recall-incoming h1, .recall-finished h1, .recall-revisit h1 { font-size: clamp(38px, 10vw, 44px); font-weight: 600; line-height: 1.2; letter-spacing: -.015em; text-wrap: balance; }
 .recall-incoming-title { margin-top: 14px; font-size: var(--recall-cue-size); }
 .recall-intro { font-size: 24px; margin-top: 20px; color: var(--recall-muted); }
@@ -94,7 +94,7 @@ html:has(.recall-workspace)::-webkit-scrollbar-track { background: #fafaf7; }
 .recall-conversation { flex: 1; min-height: 310px; padding: 32px 24px; }
 .recall-speaker { font-size: 24px; font-weight: 600; margin-bottom: 20px; }
 .recall-speaker-mark { width: 10px; height: 10px; border: 2px solid currentColor; border-radius: 50%; }
-.recall-speaker-mark.is-susan { background: var(--recall-rule-accent); border-color: #000; border-radius: 0; }
+.recall-speaker-mark.is-susan { background: var(--recall-rule-accent); border-color: var(--recall-ink); border-radius: 0; }
 .recall-caption, .recall-quoted { font-size: var(--recall-cue-size); font-weight: 500; line-height: 1.36; overflow-wrap: anywhere; }
 .recall-quoted { padding-bottom: 22px; }
 .recall-confirm-question { font-size: 28px; line-height: 1.3; font-weight: 700; margin-top: 26px; }
@@ -128,6 +128,10 @@ html:has(.recall-workspace)::-webkit-scrollbar-track { background: #fafaf7; }
 .recall-place-name { font-size: 26px; font-weight: 600; margin-top: 40px; padding-bottom: 16px; border-bottom: 1px solid var(--recall-line); }
 .recall-revisit-prompt { margin-top: 24px; font-size: var(--recall-cue-size); line-height: 1.4; }
 .recall-revisit > p { margin-top: 24px; font-size: var(--recall-cue-size); }
+.recall-live-call { display: flex; flex-direction: column; align-items: flex-start; gap: 28px; }
+.recall-live-call > p { margin: 0; font-size: 24px; color: var(--recall-muted); }
+.recall-live-call > h1 { margin: 0; font-size: var(--recall-cue-size); line-height: 1.36; letter-spacing: 0; text-wrap: pretty; }
+.recall-live-call .recall-call-actions { display: grid; gap: 18px; width: 100%; margin-top: auto; padding-top: 24px; }
 .recall-reset-link { min-height: 44px; margin-top: 16px; font-size: 18px; text-decoration: underline; }
 .recall-family-shell { max-width: 1080px; margin-inline: auto; }
 .recall-family-main { padding: 48px 32px; font-size: var(--recall-body-size); }
@@ -138,8 +142,8 @@ html:has(.recall-workspace)::-webkit-scrollbar-track { background: #fafaf7; }
 .recall-section-heading h2 { font-size: 30px; font-weight: 750; line-height: 1.15; }
 .recall-section-heading > span { font-size: 18px; }
 .recall-weekly > p { max-width: 65ch; font-size: 25px; }
-.recall-weekly > .recall-note-small { font-size: 18px; border-top: 1px solid #080808; margin-top: 26px; padding-top: 22px; max-width: 65ch; }
-.recall-shared-quote { margin-top: 28px; border-top: 2px solid #080808; padding-top: 24px; }
+.recall-weekly > .recall-note-small { font-size: 18px; border-top: 1px solid var(--recall-ink); margin-top: 26px; padding-top: 22px; max-width: 65ch; }
+.recall-shared-quote { margin-top: 28px; border-top: 2px solid var(--recall-ink); padding-top: 24px; }
 .recall-shared-quote h3 { font-size: 19px; font-weight: 700; }
 .recall-shared-quote blockquote { font-size: 34px; line-height: 1.25; font-weight: 650; margin-block: 18px; }
 .recall-shared-quote p, .recall-shared-quote summary { font-size: 18px; }
@@ -172,7 +176,7 @@ html:has(.recall-workspace)::-webkit-scrollbar-track { background: #fafaf7; }
 .setup-steps button { display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 19px; }
 .setup-steps button span { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--recall-ink); border-radius: 50%; font-size: 17px; }
 .setup-steps button[aria-current="step"] { font-weight: 750; text-decoration: underline; text-underline-offset: 6px; }
-.setup-steps button[aria-current="step"] span { background: var(--recall-soft); color: #000; border-color: #000; }
+.setup-steps button[aria-current="step"] span { background: var(--recall-soft); color: var(--recall-ink); border-color: var(--recall-ink); }
 .recall-onboarding h1 { font-size: clamp(38px, 6vw, 54px); line-height: 1.12; font-weight: 750; letter-spacing: -.025em; margin-bottom: 22px; }
 .setup-intro { font-size: 24px; max-width: 55ch; margin-bottom: 32px; }
 .setup-upload { position: relative; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 14px; min-height: 210px; padding: 28px; border: 2px dashed var(--recall-ink); border-radius: 8px; background: var(--recall-tint); cursor: pointer; text-align: center; }
@@ -215,7 +219,7 @@ html:has(.recall-workspace)::-webkit-scrollbar-track { background: #fafaf7; }
 .setup-time-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
 .setup-agreement { display: flex; align-items: flex-start; gap: 16px; padding: 24px 20px; border: 2px solid var(--recall-ink); border-radius: 7px; margin-top: 32px; background: var(--recall-tint); cursor: pointer; font-size: 22px; }
 .setup-agreement input { margin-top: 4px; }
-.setup-error { padding: 18px; border: 2px solid var(--recall-ink); background: var(--recall-soft); color: #080808; margin-top: 24px; font-size: 20px; }
+.setup-error { padding: 18px; border: 2px solid var(--recall-ink); background: var(--recall-soft); color: var(--recall-ink); margin-top: 24px; font-size: 20px; }
 .setup-actions { display: flex; gap: 24px; margin: 42px 4px 20px; }
 .setup-actions > button { flex: 1; }
 .setup-actions > .recall-secondary { flex: 0 1 200px; }
@@ -302,6 +306,15 @@ html:has(.recall-workspace)::-webkit-scrollbar-track { background: #fafaf7; }
 
 /* Caregiver overview: context first, the private graph stays behind the view. */
 .care-main { padding: 32px; font-size: var(--recall-body-size); }
+.care-account-actions { display: flex; justify-content: space-between; align-items: start; gap: 24px; margin-bottom: 32px; }
+.care-account-actions summary { min-height: 44px; padding-block: 10px; font-size: 18px; text-decoration: underline; text-underline-offset: 4px; }
+.care-member-choice { display: grid; gap: 8px; max-width: 360px; margin-bottom: 24px; }
+.care-member-choice select { min-height: 48px; padding: 10px; border: 1px solid var(--recall-ink); border-radius: 6px; background: var(--recall-bg); color: var(--recall-ink); }
+.care-empty { max-width: 620px; padding-block: 32px; }
+.care-empty h1 { font-size: 36px; line-height: 1.2; font-weight: 650; }
+.care-empty p { margin-block: 18px 24px; color: var(--recall-muted); }
+.care-call-preference { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--recall-line); }
+.care-action:disabled, .care-text-action:disabled { cursor: default; opacity: .65; }
 .care-page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
 .care-page-heading h1 { font-size: 42px; font-weight: 650; line-height: 1.15; letter-spacing: -.02em; }
 .care-page-heading > div > p { margin-top: 10px; color: var(--recall-muted); font-size: 21px; }

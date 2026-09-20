@@ -9,7 +9,7 @@
  * leak guarantee is this type, not a filter that could fail.
  */
 import type { Clock } from "@/lib/clock";
-import type { FamilyCopy, RecordThresholds } from "@/lib/family/copy";
+import type { FamilyCopy, RecordThresholds, SafetyThresholds } from "@/lib/family/copy";
 import type { FamilyView } from "@/lib/family/projection";
 import type { CandidateSubgraph, RelationFact } from "@/lib/graph/retrieval";
 import type { GraphStore } from "@/lib/graph/store";
@@ -35,6 +35,8 @@ export interface AccessibilityTelemetry {
 
 /** Layer 3: ephemeral session state. Discarded at call end except what she confirmed. */
 export interface SessionRecord {
+  /** Original final audio for the separate share question; private confirmation evidence only. */
+  share_audio_window?: import("@/lib/providers/transcription").AudioWindow | null;
   session_id: string;
   call_asset_id: string | null;
   started_at: string | null;
@@ -106,6 +108,10 @@ export interface ScaffoldChoice {
 export type ScaffoldAdvisor = (advice: ScaffoldAdvice) => Promise<ScaffoldChoice>;
 
 export interface ToolContext {
+  /** Live transport stop, checked inside the atomic commit boundary. */
+  isCallStopped?: () => boolean;
+  onContributionCommitted?: () => Promise<void>;
+  callAttempts?: () => Array<{ session_id: string; at: string }>;
   graph: GraphStore;
   setup: SetupStore;
   assets: AssetIndex;
@@ -118,6 +124,7 @@ export interface ToolContext {
   /** The receipt's fixed lines live with the rest of the family-side copy. */
   copy: FamilyCopy;
   safetyPhrases: SafetyPhrases;
+  safetyThresholds: SafetyThresholds;
   /** The one way anything is ever sent to family: a fixed-text safety alert to the designated caregivers (rule 15). */
   alerts: AlertChannel;
   /** The reducer's state so far. Read-only. */
@@ -135,4 +142,5 @@ export interface FamilyToolContext {
   script: CallScript;
   copy: FamilyCopy;
   thresholds: RecordThresholds;
+  safetyThresholds: SafetyThresholds;
 }

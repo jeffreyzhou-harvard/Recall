@@ -3,11 +3,11 @@ import { assess_conversation_state, render_prompt, select_scaffold } from "./imp
 import { query_context_graph, verify_claim_support } from "./impl/evidence";
 import { build_weekly_note, export_record_for_clinician, get_topic_record, handle_family_query, receive_family_contribution } from "./impl/family";
 import { build_caregiver_receipt } from "./impl/receipt";
-import { check_safety_phrases, send_safety_alert } from "./impl/safety";
+import { check_safety_phrases, escalate_safety_alert, record_alert_ack, send_safety_alert } from "./impl/safety";
 import { get_next_recall_topic, place_recall_call } from "./impl/scheduling";
 import type { ToolImpls } from "./runtime";
 
-/** The nineteen tools, numbered as AGENTS.md section 6 numbers them. */
+/** The twenty-one tools, numbered as AGENTS.md section 6 numbers them. */
 export const TOOL_IMPLS: ToolImpls = {
   get_next_recall_topic, // 1
   place_recall_call, // 2
@@ -28,6 +28,8 @@ export const TOOL_IMPLS: ToolImpls = {
   confirm_share, // 17
   check_safety_phrases, // 18
   send_safety_alert, // 19
+  record_alert_ack, // 20
+  escalate_safety_alert, // 21
 };
 
 export * from "./contracts";

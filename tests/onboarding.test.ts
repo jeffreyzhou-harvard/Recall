@@ -35,7 +35,7 @@ const codeOf = (p: Promise<unknown>): Promise<string> => p.then(() => "ok", (e) 
 function setupFor(householdId: string, her: string, caregiver: string, patch: (p: AccessPolicy) => void = () => {}): AccessPolicy {
   const p = structuredClone(policySchema.parse(POLICY));
   Object.assign(p, { policy_id: `policy:${householdId}`, person_id: her, established_by: [her, caregiver], recall_set_up_by: caregiver, approved_people: [caregiver], approved_audiences: [her] });
-  p.safety.designated_caregivers = [{ person_id: caregiver, alert_channel: "dashboard" }];
+  p.safety.designated_caregivers = [{ person_id: caregiver, alert_channel: "dashboard", phone: null }];
   p.attestations.introduced_by = caregiver;
   p.dashboard.grants = [{ member_id: caregiver, detail_level: "weekly_note_and_record", granted_at: "2026-10-12T15:00:00.000Z", revoked_at: null }];
   patch(p);
@@ -377,7 +377,9 @@ describe("the live server runs for an onboarded household", () => {
       await expect(createLiveRecall(config)).rejects.toThrow(/joint setup/); // nothing agreed yet: nothing to run on
 
       await onboarding.recordJointSetup(hid, setupFor(hid, her, maya, (p) => (p.attestations.saved_contact_photo = false)), [her, maya], maya);
-      await expect(createLiveRecall(config)).rejects.toThrow(/has not finished onboarding: contact_saved_and_recall_introduced/);
+      const beforeIntroduction = await createLiveRecall(config);
+      expect(beforeIntroduction.callMode).toBe("none"); // family setup can continue; calls remain unavailable
+      expect(await beforeIntroduction.tick()).toBeNull();
 
       await onboarding.recordJointSetup(hid, setupFor(hid, her, maya), [her, maya], maya);
       const live = await createLiveRecall(config);
