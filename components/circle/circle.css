@@ -1966,8 +1966,6 @@
   color: #8b907e;
 }
 .circle-landing-art {
-  display: grid;
-  gap: 28px;
   min-width: 0;
 }
 .circle-landing-collage {
@@ -2032,8 +2030,12 @@
   padding-top: 14px;
 }
 .circle-art-caption {
-  justify-self: start;
-  max-width: 100%;
+  position: absolute;
+  top: 52%;
+  left: -20px;
+  z-index: 4;
+  width: max-content;
+  max-width: calc(100% - 16px);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -2047,6 +2049,9 @@
   line-height: 1.4;
 }
 .circle-art-caption > svg { flex-shrink: 0; }
+@media (max-width: 480px) {
+  .circle-art-caption { top: 30%; left: 0; font-size: 15px; padding: 12px 16px; }
+}
 
 .circle-delete-actions { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px 20px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #e5e6dd; }
 .circle-delete-actions .circle-text-button { min-height: 44px; color: #8a4138; }

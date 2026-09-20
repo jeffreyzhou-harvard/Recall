@@ -189,10 +189,10 @@ export function Welcome() {
               <img src="/preview/princeton-garden.png" alt="A familiar garden" />
               <figcaption>Somewhere that feels like home.</figcaption>
             </figure>
-          </div>
-          <div className="circle-art-caption">
-            <RecallMark size={23} />
-            <span>Every picture has more to tell.</span>
+            <div className="circle-art-caption">
+              <RecallMark size={23} />
+              <span>Every picture has more to tell.</span>
+            </div>
           </div>
         </div>
       </div>
